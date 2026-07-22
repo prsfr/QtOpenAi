@@ -6,6 +6,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/GlobalClient.h
     include/QtOpenAi/Client/ClientError.h
     include/QtOpenAi/Client/ToolRegistry.h
+    include/QtOpenAi/Client/RetryPolicy.h
     include/QtOpenAi/Client/ChatCompletionReply.h
     include/QtOpenAi/Client/ChatCompletionAccumulator.h
     include/QtOpenAi/Client/ChatCompletionStreamReply.h
@@ -14,7 +15,9 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
 
 add_library(QtOpenAiClient
     ${QTOPENAI_CLIENT_PUBLIC_HEADERS}
+    src/HttpSupport_p.h
     src/ToolRegistry.cpp
+    src/RetryPolicy.cpp
     src/ChatCompletionReply.cpp
     src/ChatCompletionAccumulator.cpp
     src/ChatCompletionStreamReply.cpp

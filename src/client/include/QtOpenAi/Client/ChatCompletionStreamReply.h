@@ -3,6 +3,7 @@
 
 #include <QtOpenAi/Client/ClientError.h>
 #include <QtOpenAi/Client/GlobalClient.h>
+#include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Core/ChatCompletionChunk.h>
 #include <QtOpenAi/Core/ChatCompletionResponse.h>
 
@@ -34,6 +35,9 @@ public:
     // The response reassembled from all chunks received so far.
     Core::ChatCompletionResponse response() const;
     ClientError error() const;
+
+    // Rate-limit information from the response headers.
+    RateLimit rateLimit() const;
 
     void setAutoDelete(bool enabled);
     bool autoDelete() const;

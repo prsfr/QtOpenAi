@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/ChatCompletionStreamReply.h"
 
+#include "HttpSupport_p.h"
 #include "QtOpenAi/Client/ChatCompletionAccumulator.h"
 
 #include <QtCore/QJsonDocument>
@@ -16,6 +17,7 @@ public:
     QNetworkReply *networkReply = nullptr;
     ChatCompletionAccumulator accumulator;
     ClientError error;
+    RateLimit rateLimit;
     QByteArray buffer; // unparsed SSE bytes
     bool finished = false;
     bool success = false;
@@ -84,6 +86,7 @@ ChatCompletionStreamReply::ChatCompletionStreamReply(QNetworkReply *reply, QObje
         d->finished = true;
         QNetworkReply *reply = d->networkReply;
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        d->rateLimit = detail::parseRateLimit(reply);
 
         if (reply->error() != QNetworkReply::NoError || status >= 400) {
             // Error responses are delivered as a single JSON body, not SSE.
@@ -140,6 +143,12 @@ ClientError ChatCompletionStreamReply::error() const
 {
     Q_D(const ChatCompletionStreamReply);
     return d->error;
+}
+
+RateLimit ChatCompletionStreamReply::rateLimit() const
+{
+    Q_D(const ChatCompletionStreamReply);
+    return d->rateLimit;
 }
 
 void ChatCompletionStreamReply::setAutoDelete(bool enabled)

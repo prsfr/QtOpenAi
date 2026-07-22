@@ -107,6 +107,36 @@ connect(stream, &Client::ChatCompletionStreamReply::failed, this,
 can also be driven directly over `ChatCompletionChunk` deltas you collect
 yourself.
 
+## Resilience & configuration
+
+The `Client` can retry transient failures, surface rate-limit headroom, and
+adapt to different providers:
+
+```cpp
+Client::Client client(QUrl("https://api.openai.com/v1"), apiKey);
+
+// Automatic retries with exponential backoff + jitter, honouring Retry-After.
+Client::RetryPolicy policy;              // defaults: 2 retries, 429/5xx/network
+policy.maxRetries = 3;
+client.setRetryPolicy(policy);
+
+client.setRequestTimeoutMs(30000);       // per-request transfer timeout
+client.setUserAgent("MyApp/1.0");
+client.setDefaultHeader("X-My-Header", "value");
+
+// Rate-limit headroom from the last response's headers:
+connect(reply, &Client::ChatCompletionReply::finished, this, [reply] {
+    const auto rl = reply->rateLimit();  // remainingRequests / remainingTokens / ...
+});
+```
+
+**Azure OpenAI** (and other `api-key`-style providers):
+
+```cpp
+client.setAuthScheme(Client::Client::AuthScheme::AzureApiKey);  // api-key: <key>
+client.setApiVersion("2024-06-01");                             // ?api-version=...
+```
+
 ## Building
 
 Requirements: CMake ≥ 3.21, a C++17 compiler, and Qt 6 (`Core`, `Network`,

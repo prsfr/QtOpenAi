@@ -3,9 +3,12 @@
 
 #include <QtOpenAi/Client/ClientError.h>
 #include <QtOpenAi/Client/GlobalClient.h>
+#include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Core/ChatCompletionResponse.h>
 
 #include <QtCore/QObject>
+
+#include <functional>
 
 class QNetworkReply;
 
@@ -29,6 +32,12 @@ public:
     Core::ChatCompletionResponse response() const;
     ClientError error() const;
 
+    // Rate-limit information from the last response's headers.
+    RateLimit rateLimit() const;
+
+    // Number of retries performed (0 if the first attempt succeeded/failed).
+    int retryCount() const;
+
     void setAutoDelete(bool enabled);
     bool autoDelete() const;
 
@@ -39,10 +48,19 @@ Q_SIGNALS:
     void finished(const QtOpenAi::Core::ChatCompletionResponse &response);
     void failed(const QtOpenAi::Client::ClientError &error);
     void done();
+    // Emitted before each scheduled retry, with the 1-based attempt number and
+    // the delay (ms) until it fires.
+    void retrying(int attempt, int delayMs);
 
 private:
     friend class Client;
-    explicit ChatCompletionReply(QNetworkReply *reply, QObject *parent = nullptr);
+    // Constructed with a factory that (re)starts the underlying network request,
+    // so the reply can transparently retry per the supplied policy.
+    ChatCompletionReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
+                        QObject *parent = nullptr);
+
+    // (Re)issue the underlying request; drives both the first attempt and retries.
+    void start();
 
     Q_DECLARE_PRIVATE(ChatCompletionReply)
     QScopedPointer<ChatCompletionReplyPrivate> d_ptr;
