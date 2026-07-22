@@ -33,29 +33,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        qt_version: ["6.11.0"]
+        # 6.11.1 rather than 6.11.0: the Windows package checksum for the
+        # 6.11.0 series folder (qt6_6110/Updates.xml) is not retrievable from
+        # download.qt.io, so aqtinstall aborts the Windows install with "Failed
+        # to locate XML data". 6.11.1 lives in a separate folder with a working
+        # checksum and installs cleanly on all platforms.
+        qt_version: ["6.11.1"]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      # Diagnostic: ask the runner (which has full access to download.qt.io)
-      # what Qt versions/architectures are actually published for Windows, to
-      # explain why aqt cannot locate 6.11.0 there while Linux/macOS install it.
-      - name: Diagnose available Qt (Windows)
-        if: runner.os == 'Windows'
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          python -m pip install --upgrade aqtinstall
-          Write-Host "=== all desktop versions ==="
-          python -m aqt list-qt windows desktop
-          Write-Host "=== 6.11 series ==="
-          python -m aqt list-qt windows desktop --spec "6.11"
-          Write-Host "=== latest 6.11 ==="
-          python -m aqt list-qt windows desktop --spec "6.11" --latest-version
-          Write-Host "=== arches for 6.11.0 ==="
-          python -m aqt list-qt windows desktop --arch 6.11.0
 
       - name: Install Qt ${{ matrix.qt_version }}
         uses: jurplel/install-qt-action@v4
