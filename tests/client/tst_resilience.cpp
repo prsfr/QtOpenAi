@@ -220,9 +220,11 @@ void TestResilience::azureAuthSchemeAndApiVersion()
     QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
 
     QCOMPARE(server.requests().size(), 1);
-    const QByteArray req = server.requests().first();
+    // Qt >= 6.10 normalises header-field names to canonical casing (api-key ->
+    // Api-Key), so match the header name case-insensitively.
+    const QByteArray req = server.requests().first().toLower();
     QVERIFY(req.contains("api-key: secret"));
-    QVERIFY(!req.contains("Authorization:"));
+    QVERIFY(!req.contains("authorization:"));
     QVERIFY(req.contains("api-version=2024-06-01"));
     delete reply;
 }
