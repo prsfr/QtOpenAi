@@ -17,7 +17,9 @@ class StubServer : public QObject
     Q_OBJECT
 public:
     StubServer(int status, QByteArray body, QObject *parent = nullptr)
-        : QObject(parent), m_status(status), m_body(std::move(body))
+        : QObject(parent)
+        , m_status(status)
+        , m_body(std::move(body))
     {
         m_server.listen(QHostAddress::LocalHost, 0);
         connect(&m_server, &QTcpServer::newConnection, this, &StubServer::onConnection);
@@ -43,11 +45,14 @@ private slots:
             m_requestBody = m_requestBuffer.mid(headerEnd + 4);
 
             const QByteArray reason = m_status < 400 ? "OK" : "Error";
-            QByteArray response =
-                "HTTP/1.1 " + QByteArray::number(m_status) + " " + reason + "\r\n"
-                "Content-Type: application/json\r\n"
-                "Content-Length: " + QByteArray::number(m_body.size()) + "\r\n"
-                "Connection: close\r\n\r\n" + m_body;
+            QByteArray response = "HTTP/1.1 " + QByteArray::number(m_status) + " " + reason
+                                  + "\r\n"
+                                    "Content-Type: application/json\r\n"
+                                    "Content-Length: "
+                                  + QByteArray::number(m_body.size())
+                                  + "\r\n"
+                                    "Connection: close\r\n\r\n"
+                                  + m_body;
             socket->write(response);
             socket->flush();
             socket->disconnectFromHost();
@@ -83,8 +88,7 @@ void TestReply::successfulCompletionEmitsFinished()
     Client client(server.baseUrl(), QStringLiteral("test-key"));
 
     ChatCompletionReply *reply = client.createChatCompletion(
-        ChatCompletionRequest(QStringLiteral("gpt-4o"),
-                              {Message::user(QStringLiteral("hi"))}));
+            ChatCompletionRequest(QStringLiteral("gpt-4o"), {Message::user(QStringLiteral("hi"))}));
     reply->setAutoDelete(false);
 
     QSignalSpy finishedSpy(reply, &ChatCompletionReply::finished);
@@ -107,8 +111,7 @@ void TestReply::httpErrorEmitsFailedWithDetails()
     Client client(server.baseUrl(), QStringLiteral("bad-key"));
 
     ChatCompletionReply *reply = client.createChatCompletion(
-        ChatCompletionRequest(QStringLiteral("gpt-4o"),
-                              {Message::user(QStringLiteral("hi"))}));
+            ChatCompletionRequest(QStringLiteral("gpt-4o"), {Message::user(QStringLiteral("hi"))}));
     reply->setAutoDelete(false);
 
     QSignalSpy failedSpy(reply, &ChatCompletionReply::failed);
@@ -134,9 +137,8 @@ void TestReply::requestBodyContainsModelAndMessages()
     StubServer server(200, body);
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ChatCompletionReply *reply = client.createChatCompletion(
-        ChatCompletionRequest(QStringLiteral("gpt-4o-mini"),
-                              {Message::user(QStringLiteral("ping"))}));
+    ChatCompletionReply *reply = client.createChatCompletion(ChatCompletionRequest(
+            QStringLiteral("gpt-4o-mini"), {Message::user(QStringLiteral("ping"))}));
     reply->setAutoDelete(false);
     QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
 

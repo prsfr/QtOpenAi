@@ -5,11 +5,11 @@
 
 // Export/import macro for the QtOpenAi::Client module.
 #if defined(QTOPENAI_CLIENT_STATIC)
-#  define QTOPENAI_CLIENT_EXPORT
+#define QTOPENAI_CLIENT_EXPORT
 #else
-#  if defined(QTOPENAI_CLIENT_LIBRARY)
-#    define QTOPENAI_CLIENT_EXPORT Q_DECL_EXPORT
-#  else
-#    define QTOPENAI_CLIENT_EXPORT Q_DECL_IMPORT
-#  endif
+#if defined(QTOPENAI_CLIENT_LIBRARY)
+#define QTOPENAI_CLIENT_EXPORT Q_DECL_EXPORT
+#else
+#define QTOPENAI_CLIENT_EXPORT Q_DECL_IMPORT
+#endif
 #endif

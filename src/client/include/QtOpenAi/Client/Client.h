@@ -27,7 +27,8 @@ class QTOPENAI_CLIENT_EXPORT Client : public QObject
     Q_OBJECT
     Q_PROPERTY(QUrl baseUrl READ baseUrl WRITE setBaseUrl NOTIFY baseUrlChanged)
     Q_PROPERTY(QString apiKey READ apiKey WRITE setApiKey NOTIFY apiKeyChanged)
-    Q_PROPERTY(QString organization READ organization WRITE setOrganization NOTIFY organizationChanged)
+    Q_PROPERTY(
+            QString organization READ organization WRITE setOrganization NOTIFY organizationChanged)
 public:
     explicit Client(QObject *parent = nullptr);
     // Construct with a base URL and key in one step.

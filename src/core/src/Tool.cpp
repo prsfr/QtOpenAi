@@ -22,8 +22,7 @@ public:
 
 FunctionDefinition::FunctionDefinition()
     : d(new FunctionDefinitionData)
-{
-}
+{ }
 
 FunctionDefinition::FunctionDefinition(QString name, QString description, QJsonObject parameters)
     : d(new FunctionDefinitionData)
@@ -43,10 +42,16 @@ QString FunctionDefinition::name() const { return d->name; }
 void FunctionDefinition::setName(const QString &name) { d->name = name; }
 
 QString FunctionDefinition::description() const { return d->description; }
-void FunctionDefinition::setDescription(const QString &description) { d->description = description; }
+void FunctionDefinition::setDescription(const QString &description)
+{
+    d->description = description;
+}
 
 QJsonObject FunctionDefinition::parameters() const { return d->parameters; }
-void FunctionDefinition::setParameters(const QJsonObject &parameters) { d->parameters = parameters; }
+void FunctionDefinition::setParameters(const QJsonObject &parameters)
+{
+    d->parameters = parameters;
+}
 
 bool FunctionDefinition::isEmpty() const { return d->name.isEmpty(); }
 
@@ -71,9 +76,8 @@ FunctionDefinition FunctionDefinition::fromJson(const QJsonObject &json)
 
 bool FunctionDefinition::operator==(const FunctionDefinition &other) const
 {
-    return d->name == other.d->name
-        && d->description == other.d->description
-        && d->parameters == other.d->parameters;
+    return d->name == other.d->name && d->description == other.d->description
+           && d->parameters == other.d->parameters;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,8 +93,7 @@ public:
 
 Tool::Tool()
     : d(new ToolData)
-{
-}
+{ }
 
 Tool::Tool(FunctionDefinition function)
     : d(new ToolData)
@@ -124,7 +127,8 @@ Tool Tool::fromJson(const QJsonObject &json)
 {
     Tool tool;
     tool.d->type = detail::stringOr(json, QStringLiteral("type"), QStringLiteral("function"));
-    tool.d->function = FunctionDefinition::fromJson(json.value(QStringLiteral("function")).toObject());
+    tool.d->function
+            = FunctionDefinition::fromJson(json.value(QStringLiteral("function")).toObject());
     return tool;
 }
 

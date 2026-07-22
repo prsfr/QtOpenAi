@@ -18,8 +18,7 @@ public:
 
 FunctionCall::FunctionCall()
     : d(new FunctionCallData)
-{
-}
+{ }
 
 FunctionCall::FunctionCall(QString name, QString arguments)
     : d(new FunctionCallData)
@@ -45,13 +44,10 @@ QJsonObject FunctionCall::argumentsObject() const
     if (d->arguments.isEmpty())
         return {};
     const QJsonDocument doc = QJsonDocument::fromJson(d->arguments.toUtf8());
-    return doc.isObject() ? doc.object() : QJsonObject{};
+    return doc.isObject() ? doc.object() : QJsonObject {};
 }
 
-bool FunctionCall::isEmpty() const
-{
-    return d->name.isEmpty() && d->arguments.isEmpty();
-}
+bool FunctionCall::isEmpty() const { return d->name.isEmpty() && d->arguments.isEmpty(); }
 
 QJsonObject FunctionCall::toJson() const
 {

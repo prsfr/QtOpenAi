@@ -16,8 +16,7 @@ public:
 
 Usage::Usage()
     : d(new UsageData)
-{
-}
+{ }
 
 Usage::Usage(const Usage &other) = default;
 Usage::Usage(Usage &&other) noexcept = default;
@@ -55,8 +54,8 @@ Usage Usage::fromJson(const QJsonObject &json)
 bool Usage::operator==(const Usage &other) const
 {
     return d->promptTokens == other.d->promptTokens
-        && d->completionTokens == other.d->completionTokens
-        && d->totalTokens == other.d->totalTokens;
+           && d->completionTokens == other.d->completionTokens
+           && d->totalTokens == other.d->totalTokens;
 }
 
 } // namespace Core

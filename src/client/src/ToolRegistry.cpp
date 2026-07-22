@@ -25,11 +25,12 @@ QString makeErrorPayload(const QString &message)
 class ToolRegistryPrivate
 {
 public:
-    struct Entry {
+    struct Entry
+    {
         Core::Tool tool;
-        ToolRegistry::Handler handler;      // functor dispatch (may be null)
-        QPointer<QObject> receiver;         // meta-object dispatch (may be null)
-        QString method;                     // slot name for meta-object dispatch
+        ToolRegistry::Handler handler; // functor dispatch (may be null)
+        QPointer<QObject> receiver;    // meta-object dispatch (may be null)
+        QString method;                // slot name for meta-object dispatch
     };
 
     // Insertion-ordered storage keyed by tool name.
@@ -48,8 +49,7 @@ public:
 ToolRegistry::ToolRegistry(QObject *parent)
     : QObject(parent)
     , d_ptr(new ToolRegistryPrivate)
-{
-}
+{ }
 
 ToolRegistry::~ToolRegistry() = default;
 
@@ -62,17 +62,13 @@ void ToolRegistry::registerTool(const Core::Tool &tool, Handler handler)
     d->put(entry);
 }
 
-void ToolRegistry::registerFunction(const QString &name,
-                                    const QString &description,
-                                    const QJsonObject &parameters,
-                                    Handler handler)
+void ToolRegistry::registerFunction(const QString &name, const QString &description,
+                                    const QJsonObject &parameters, Handler handler)
 {
     registerTool(Core::Tool::function(name, description, parameters), std::move(handler));
 }
 
-bool ToolRegistry::registerMethod(const Core::Tool &tool,
-                                  QObject *receiver,
-                                  const QString &method)
+bool ToolRegistry::registerMethod(const Core::Tool &tool, QObject *receiver, const QString &method)
 {
     Q_D(ToolRegistry);
     if (!receiver)
@@ -161,18 +157,14 @@ Core::Message ToolRegistry::invoke(const Core::ToolCall &call)
         result = entry.handler(arguments);
     } else if (entry.receiver) {
         // Dispatch through the meta-object system by method name.
-        bool ok = QMetaObject::invokeMethod(entry.receiver.data(),
-                                            entry.method.toUtf8().constData(),
-                                            Qt::DirectConnection,
-                                            Q_RETURN_ARG(QString, result),
-                                            Q_ARG(QJsonObject, arguments));
+        bool ok = QMetaObject::invokeMethod(
+                entry.receiver.data(), entry.method.toUtf8().constData(), Qt::DirectConnection,
+                Q_RETURN_ARG(QString, result), Q_ARG(QJsonObject, arguments));
         if (!ok) {
             // Retry with a QVariantMap argument for slots preferring that type.
             QVariantMap variantArgs = arguments.toVariantMap();
-            ok = QMetaObject::invokeMethod(entry.receiver.data(),
-                                           entry.method.toUtf8().constData(),
-                                           Qt::DirectConnection,
-                                           Q_RETURN_ARG(QString, result),
+            ok = QMetaObject::invokeMethod(entry.receiver.data(), entry.method.toUtf8().constData(),
+                                           Qt::DirectConnection, Q_RETURN_ARG(QString, result),
                                            Q_ARG(QVariantMap, variantArgs));
         }
         if (!ok)

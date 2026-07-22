@@ -18,8 +18,7 @@ public:
 
 ToolCall::ToolCall()
     : d(new ToolCallData)
-{
-}
+{ }
 
 ToolCall::ToolCall(QString id, FunctionCall function)
     : d(new ToolCallData)
@@ -43,10 +42,7 @@ void ToolCall::setType(const QString &type) { d->type = type; }
 FunctionCall ToolCall::function() const { return d->function; }
 void ToolCall::setFunction(const FunctionCall &function) { d->function = function; }
 
-bool ToolCall::isEmpty() const
-{
-    return d->id.isEmpty() && d->function.isEmpty();
-}
+bool ToolCall::isEmpty() const { return d->id.isEmpty() && d->function.isEmpty(); }
 
 QJsonObject ToolCall::toJson() const
 {
@@ -68,8 +64,7 @@ ToolCall ToolCall::fromJson(const QJsonObject &json)
 
 bool ToolCall::operator==(const ToolCall &other) const
 {
-    return d->id == other.d->id && d->type == other.d->type
-        && d->function == other.d->function;
+    return d->id == other.d->id && d->type == other.d->type && d->function == other.d->function;
 }
 
 } // namespace Core

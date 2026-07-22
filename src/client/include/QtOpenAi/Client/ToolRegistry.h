@@ -46,17 +46,13 @@ public:
     void registerTool(const Core::Tool &tool, Handler handler);
 
     // Convenience overload building the Tool definition inline.
-    void registerFunction(const QString &name,
-                          const QString &description,
-                          const QJsonObject &parameters,
-                          Handler handler);
+    void registerFunction(const QString &name, const QString &description,
+                          const QJsonObject &parameters, Handler handler);
 
     // Register a tool dispatched to a QObject slot via the meta-object system.
     // The named method is resolved and invoked with QMetaObject::invokeMethod.
     // Returns false if no matching invokable method exists on the receiver.
-    bool registerMethod(const Core::Tool &tool,
-                        QObject *receiver,
-                        const QString &method);
+    bool registerMethod(const Core::Tool &tool, QObject *receiver, const QString &method);
 
     // Remove a registered tool. Returns true if it existed.
     bool unregister(const QString &name);

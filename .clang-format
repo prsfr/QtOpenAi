@@ -1,0 +1,100 @@
+# Coding style for QtOpenAi — follows the official Qt coding style
+# (adapted from qtbase/.clang-format). Requires clang-format >= 15.
+---
+Language: Cpp
+BasedOnStyle: WebKit
+
+# Column limit matching Qt's guidelines.
+ColumnLimit: 100
+
+# 4-space indentation, no tabs.
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 8
+
+# Braces: attached, except for functions/classes/namespaces on their own line
+# (Qt "Linux/Stroustrup"-ish variant used by qtbase).
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass:            true
+  AfterControlStatement: false
+  AfterEnum:             false
+  AfterFunction:         true
+  AfterNamespace:        false
+  AfterStruct:           true
+  AfterUnion:            false
+  AfterExternBlock:      false
+  BeforeCatch:           false
+  BeforeElse:            false
+  IndentBraces:          false
+  SplitEmptyFunction:    false
+  SplitEmptyRecord:      false
+  SplitEmptyNamespace:   false
+
+# Pointers/references bind to the variable: `Type *name`, `Type &name`.
+PointerAlignment: Right
+ReferenceAlignment: Right
+
+# Access modifiers outdented by IndentWidth (public:/private: at class level).
+AccessModifierOffset: -4
+IndentAccessModifiers: false
+
+# Namespaces are not indented (Qt keeps their contents at column 0).
+NamespaceIndentation: None
+CompactNamespaces: false
+FixNamespaceComments: true
+
+# Keep trivial accessors (getters/setters) on a single line; everything else
+# gets its own braces on the next line via BraceWrapping.AfterFunction.
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+AllowShortEnumsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# Constructor initialiser lists.
+BreakConstructorInitializers: BeforeComma
+ConstructorInitializerIndentWidth: 4
+PackConstructorInitializers: Never
+
+# Includes: keep grouping stable but sort within groups.
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+
+# Spacing.
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: false
+SpacesInContainerLiterals: false
+Cpp11BracedListStyle: true
+QualifierAlignment: Left
+
+# Templates and returns.
+AlwaysBreakTemplateDeclarations: Yes
+AlwaysBreakAfterReturnType: None
+
+# Alignment.
+AlignAfterOpenBracket: Align
+AlignTrailingComments: true
+AlignOperands: true
+
+# Line handling.
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+ReflowComments: false
+
+# Qt macros that behave like statements/blocks.
+StatementMacros:
+  - Q_OBJECT
+  - Q_GADGET
+  - Q_NAMESPACE
+  - Q_NAMESPACE_EXPORT
+  - Q_DECLARE_METATYPE
+  - Q_DECLARE_SHARED
+  - Q_ENUM
+  - Q_ENUM_NS
+  - Q_PROPERTY
+
+Standard: c++17
+---

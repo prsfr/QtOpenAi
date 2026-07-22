@@ -23,8 +23,7 @@ public:
 
 Message::Message()
     : d(new MessageData)
-{
-}
+{ }
 
 Message::Message(Role role, QString content)
     : d(new MessageData)
@@ -124,13 +123,10 @@ Message Message::toolResult(const QString &toolCallId, const QString &content)
 
 bool Message::operator==(const Message &other) const
 {
-    return d->role == other.d->role
-        && d->content == other.d->content
-        && d->contentSet == other.d->contentSet
-        && d->name == other.d->name
-        && d->toolCalls == other.d->toolCalls
-        && d->toolCallId == other.d->toolCallId
-        && d->refusal == other.d->refusal;
+    return d->role == other.d->role && d->content == other.d->content
+           && d->contentSet == other.d->contentSet && d->name == other.d->name
+           && d->toolCalls == other.d->toolCalls && d->toolCallId == other.d->toolCallId
+           && d->refusal == other.d->refusal;
 }
 
 } // namespace Core

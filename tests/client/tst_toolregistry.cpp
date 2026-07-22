@@ -46,19 +46,17 @@ private:
 void TestToolRegistry::functorDispatchProducesToolResult()
 {
     ToolRegistry registry;
-    registry.registerFunction(
-        QStringLiteral("add"), QStringLiteral("Add two numbers"), QJsonObject{},
-        [](const QJsonObject &args) {
-            const int sum = args.value(QStringLiteral("a")).toInt()
-                          + args.value(QStringLiteral("b")).toInt();
-            return QString::number(sum);
-        });
+    registry.registerFunction(QStringLiteral("add"), QStringLiteral("Add two numbers"),
+                              QJsonObject {}, [](const QJsonObject &args) {
+                                  const int sum = args.value(QStringLiteral("a")).toInt()
+                                                  + args.value(QStringLiteral("b")).toInt();
+                                  return QString::number(sum);
+                              });
 
     QSignalSpy invokedSpy(&registry, &ToolRegistry::toolInvoked);
 
-    const Message result = registry.invoke(
-        makeCall(QStringLiteral("c1"), QStringLiteral("add"),
-                 QStringLiteral("{\"a\":2,\"b\":3}")));
+    const Message result = registry.invoke(makeCall(QStringLiteral("c1"), QStringLiteral("add"),
+                                                    QStringLiteral("{\"a\":2,\"b\":3}")));
 
     QCOMPARE(result.role(), Role::Tool);
     QCOMPARE(result.toolCallId(), QStringLiteral("c1"));
@@ -73,15 +71,14 @@ void TestToolRegistry::metaObjectDispatchByName()
     WeatherProvider provider;
 
     const Tool tool = Tool::function(QStringLiteral("get_weather"),
-                                     QStringLiteral("Weather lookup"), QJsonObject{});
-    const bool registered =
-        registry.registerMethod(tool, &provider, QStringLiteral("getWeather"));
+                                     QStringLiteral("Weather lookup"), QJsonObject {});
+    const bool registered = registry.registerMethod(tool, &provider, QStringLiteral("getWeather"));
     QVERIFY(registered);
     QVERIFY(registry.contains(QStringLiteral("get_weather")));
 
-    const Message result = registry.invoke(
-        makeCall(QStringLiteral("c2"), QStringLiteral("get_weather"),
-                 QStringLiteral("{\"location\":\"Berlin\"}")));
+    const Message result
+            = registry.invoke(makeCall(QStringLiteral("c2"), QStringLiteral("get_weather"),
+                                       QStringLiteral("{\"location\":\"Berlin\"}")));
 
     // The slot ran through QMetaObject::invokeMethod and mutated the provider.
     QCOMPARE(provider.lastLocation, QStringLiteral("Berlin"));
@@ -92,7 +89,7 @@ void TestToolRegistry::registerMethodRejectsMissingSlot()
 {
     ToolRegistry registry;
     WeatherProvider provider;
-    const Tool tool = Tool::function(QStringLiteral("nope"), QString(), QJsonObject{});
+    const Tool tool = Tool::function(QStringLiteral("nope"), QString(), QJsonObject {});
     QVERIFY(!registry.registerMethod(tool, &provider, QStringLiteral("doesNotExist")));
     QVERIFY(!registry.contains(QStringLiteral("nope")));
 }
@@ -104,27 +101,26 @@ void TestToolRegistry::unknownToolEmitsSignalAndErrorPayload()
     QSignalSpy failedSpy(&registry, &ToolRegistry::toolFailed);
 
     const Message result = registry.invoke(
-        makeCall(QStringLiteral("c3"), QStringLiteral("ghost"), QStringLiteral("{}")));
+            makeCall(QStringLiteral("c3"), QStringLiteral("ghost"), QStringLiteral("{}")));
 
     QCOMPARE(unknownSpy.count(), 1);
     QCOMPARE(failedSpy.count(), 1);
     QCOMPARE(result.role(), Role::Tool);
 
-    const QJsonObject payload =
-        QJsonDocument::fromJson(result.content().toUtf8()).object();
+    const QJsonObject payload = QJsonDocument::fromJson(result.content().toUtf8()).object();
     QVERIFY(payload.contains(QStringLiteral("error")));
 }
 
 void TestToolRegistry::toolsAdvertisedInInsertionOrder()
 {
     ToolRegistry registry;
-    registry.registerFunction(QStringLiteral("first"), QString(), QJsonObject{},
+    registry.registerFunction(QStringLiteral("first"), QString(), QJsonObject {},
                               [](const QJsonObject &) { return QString(); });
-    registry.registerFunction(QStringLiteral("second"), QString(), QJsonObject{},
+    registry.registerFunction(QStringLiteral("second"), QString(), QJsonObject {},
                               [](const QJsonObject &) { return QString(); });
 
     const QStringList names = registry.toolNames();
-    QCOMPARE(names, (QStringList{QStringLiteral("first"), QStringLiteral("second")}));
+    QCOMPARE(names, (QStringList {QStringLiteral("first"), QStringLiteral("second")}));
     QCOMPARE(registry.tools().size(), 2);
     QCOMPARE(registry.tools().first().function().name(), QStringLiteral("first"));
 }
@@ -132,14 +128,13 @@ void TestToolRegistry::toolsAdvertisedInInsertionOrder()
 void TestToolRegistry::invokeAllReturnsOnePerCall()
 {
     ToolRegistry registry;
-    registry.registerFunction(QStringLiteral("echo"), QString(), QJsonObject{},
-                              [](const QJsonObject &args) {
-                                  return args.value(QStringLiteral("v")).toString();
-                              });
+    registry.registerFunction(
+            QStringLiteral("echo"), QString(), QJsonObject {},
+            [](const QJsonObject &args) { return args.value(QStringLiteral("v")).toString(); });
 
-    const QList<ToolCall> calls{
-        makeCall(QStringLiteral("a"), QStringLiteral("echo"), QStringLiteral("{\"v\":\"x\"}")),
-        makeCall(QStringLiteral("b"), QStringLiteral("echo"), QStringLiteral("{\"v\":\"y\"}")),
+    const QList<ToolCall> calls {
+            makeCall(QStringLiteral("a"), QStringLiteral("echo"), QStringLiteral("{\"v\":\"x\"}")),
+            makeCall(QStringLiteral("b"), QStringLiteral("echo"), QStringLiteral("{\"v\":\"y\"}")),
     };
     const QList<Message> results = registry.invokeAll(calls);
     QCOMPARE(results.size(), 2);

@@ -33,8 +33,7 @@ ChatCompletionReply::ChatCompletionReply(QNetworkReply *reply, QObject *parent)
         d->finished = true;
         QNetworkReply *reply = d->networkReply;
         const QByteArray body = reply->readAll();
-        const int status =
-            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
         auto fail = [this, d](ClientError::Kind kind, const QString &message, int http) {
             d->success = false;
@@ -53,8 +52,8 @@ ChatCompletionReply::ChatCompletionReply(QNetworkReply *reply, QObject *parent)
             QString message = reply->errorString();
             ClientError err(ClientError::Kind::Http, message, status);
             if (doc.isObject()) {
-                const QJsonObject errorObject =
-                    doc.object().value(QStringLiteral("error")).toObject();
+                const QJsonObject errorObject
+                        = doc.object().value(QStringLiteral("error")).toObject();
                 if (!errorObject.isEmpty()) {
                     message = errorObject.value(QStringLiteral("message")).toString(message);
                     err = ClientError(ClientError::Kind::Http, message, status);
@@ -66,8 +65,7 @@ ChatCompletionReply::ChatCompletionReply(QNetworkReply *reply, QObject *parent)
             d->error = err;
         } else if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
             fail(ClientError::Kind::Parse,
-                 QStringLiteral("invalid JSON response: %1").arg(parseError.errorString()),
-                 status);
+                 QStringLiteral("invalid JSON response: %1").arg(parseError.errorString()), status);
         } else {
             d->response = Core::ChatCompletionResponse::fromJson(doc.object());
             d->success = true;

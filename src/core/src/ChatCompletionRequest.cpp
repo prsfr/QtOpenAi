@@ -26,8 +26,7 @@ public:
 
 ChatCompletionRequest::ChatCompletionRequest()
     : d(new ChatCompletionRequestData)
-{
-}
+{ }
 
 ChatCompletionRequest::ChatCompletionRequest(QString model, QList<Message> messages)
     : d(new ChatCompletionRequestData)
@@ -38,8 +37,10 @@ ChatCompletionRequest::ChatCompletionRequest(QString model, QList<Message> messa
 
 ChatCompletionRequest::ChatCompletionRequest(const ChatCompletionRequest &other) = default;
 ChatCompletionRequest::ChatCompletionRequest(ChatCompletionRequest &&other) noexcept = default;
-ChatCompletionRequest &ChatCompletionRequest::operator=(const ChatCompletionRequest &other) = default;
-ChatCompletionRequest &ChatCompletionRequest::operator=(ChatCompletionRequest &&other) noexcept = default;
+ChatCompletionRequest &ChatCompletionRequest::operator=(const ChatCompletionRequest &other)
+        = default;
+ChatCompletionRequest &ChatCompletionRequest::operator=(ChatCompletionRequest &&other) noexcept
+        = default;
 ChatCompletionRequest::~ChatCompletionRequest() = default;
 
 QString ChatCompletionRequest::model() const { return d->model; }
@@ -54,7 +55,10 @@ void ChatCompletionRequest::setTools(const QList<Tool> &tools) { d->tools = tool
 void ChatCompletionRequest::addTool(const Tool &tool) { d->tools.append(tool); }
 
 std::optional<QJsonValue> ChatCompletionRequest::toolChoice() const { return d->toolChoice; }
-void ChatCompletionRequest::setToolChoice(const QJsonValue &toolChoice) { d->toolChoice = toolChoice; }
+void ChatCompletionRequest::setToolChoice(const QJsonValue &toolChoice)
+{
+    d->toolChoice = toolChoice;
+}
 
 std::optional<double> ChatCompletionRequest::temperature() const { return d->temperature; }
 void ChatCompletionRequest::setTemperature(double temperature) { d->temperature = temperature; }
@@ -62,7 +66,10 @@ void ChatCompletionRequest::setTemperature(double temperature) { d->temperature 
 std::optional<double> ChatCompletionRequest::topP() const { return d->topP; }
 void ChatCompletionRequest::setTopP(double topP) { d->topP = topP; }
 
-std::optional<int> ChatCompletionRequest::maxCompletionTokens() const { return d->maxCompletionTokens; }
+std::optional<int> ChatCompletionRequest::maxCompletionTokens() const
+{
+    return d->maxCompletionTokens;
+}
 void ChatCompletionRequest::setMaxCompletionTokens(int tokens) { d->maxCompletionTokens = tokens; }
 
 std::optional<int> ChatCompletionRequest::n() const { return d->n; }
@@ -132,7 +139,8 @@ ChatCompletionRequest ChatCompletionRequest::fromJson(const QJsonObject &json)
     if (json.contains(QStringLiteral("top_p")))
         request.d->topP = json.value(QStringLiteral("top_p")).toDouble();
     if (json.contains(QStringLiteral("max_completion_tokens")))
-        request.d->maxCompletionTokens = json.value(QStringLiteral("max_completion_tokens")).toInt();
+        request.d->maxCompletionTokens
+                = json.value(QStringLiteral("max_completion_tokens")).toInt();
     if (json.contains(QStringLiteral("n")))
         request.d->n = json.value(QStringLiteral("n")).toInt();
     if (json.contains(QStringLiteral("stream")))
@@ -143,16 +151,11 @@ ChatCompletionRequest ChatCompletionRequest::fromJson(const QJsonObject &json)
 
 bool ChatCompletionRequest::operator==(const ChatCompletionRequest &other) const
 {
-    return d->model == other.d->model
-        && d->messages == other.d->messages
-        && d->tools == other.d->tools
-        && d->toolChoice == other.d->toolChoice
-        && d->temperature == other.d->temperature
-        && d->topP == other.d->topP
-        && d->maxCompletionTokens == other.d->maxCompletionTokens
-        && d->n == other.d->n
-        && d->stream == other.d->stream
-        && d->extraBody == other.d->extraBody;
+    return d->model == other.d->model && d->messages == other.d->messages
+           && d->tools == other.d->tools && d->toolChoice == other.d->toolChoice
+           && d->temperature == other.d->temperature && d->topP == other.d->topP
+           && d->maxCompletionTokens == other.d->maxCompletionTokens && d->n == other.d->n
+           && d->stream == other.d->stream && d->extraBody == other.d->extraBody;
 }
 
 } // namespace Core

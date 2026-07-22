@@ -29,9 +29,10 @@ public:
 
     ClientError() = default;
     ClientError(Kind kind, QString message, int httpStatus = 0)
-        : m_kind(kind), m_httpStatus(httpStatus), m_message(std::move(message))
-    {
-    }
+        : m_kind(kind)
+        , m_httpStatus(httpStatus)
+        , m_message(std::move(message))
+    { }
 
     Kind kind() const { return m_kind; }
     int httpStatus() const { return m_httpStatus; }

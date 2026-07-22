@@ -52,8 +52,7 @@ void TestSerialization::messageRoundTrip()
 
 void TestSerialization::assistantToolCallSerialization()
 {
-    FunctionCall fn(QStringLiteral("get_weather"),
-                    QStringLiteral("{\"location\":\"Berlin\"}"));
+    FunctionCall fn(QStringLiteral("get_weather"), QStringLiteral("{\"location\":\"Berlin\"}"));
     ToolCall call(QStringLiteral("call_1"), fn);
 
     Message assistant;
@@ -73,8 +72,12 @@ void TestSerialization::assistantToolCallSerialization()
     const Message parsed = Message::fromJson(json);
     QCOMPARE(parsed.toolCalls().size(), 1);
     QCOMPARE(parsed.toolCalls().first(), call);
-    QCOMPARE(parsed.toolCalls().first().function().argumentsObject()
-                 .value(QStringLiteral("location")).toString(),
+    QCOMPARE(parsed.toolCalls()
+                     .first()
+                     .function()
+                     .argumentsObject()
+                     .value(QStringLiteral("location"))
+                     .toString(),
              QStringLiteral("Berlin"));
 }
 
@@ -84,11 +87,11 @@ void TestSerialization::requestSerialization()
                                   {Message::system(QStringLiteral("You are helpful.")),
                                    Message::user(QStringLiteral("Weather in Berlin?"))});
 
-    QJsonObject params{
-        {QStringLiteral("type"), QStringLiteral("object")},
-        {QStringLiteral("properties"),
-         QJsonObject{{QStringLiteral("location"),
-                      QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}}}},
+    QJsonObject params {
+            {QStringLiteral("type"), QStringLiteral("object")},
+            {QStringLiteral("properties"),
+             QJsonObject {{QStringLiteral("location"),
+                           QJsonObject {{QStringLiteral("type"), QStringLiteral("string")}}}}},
     };
     request.addTool(Tool::function(QStringLiteral("get_weather"),
                                    QStringLiteral("Look up the weather"), params));
@@ -111,8 +114,7 @@ void TestSerialization::requestSerialization()
 
 void TestSerialization::requestOmitsUnsetOptionals()
 {
-    ChatCompletionRequest request(QStringLiteral("gpt-4o"),
-                                  {Message::user(QStringLiteral("hi"))});
+    ChatCompletionRequest request(QStringLiteral("gpt-4o"), {Message::user(QStringLiteral("hi"))});
     const QJsonObject json = request.toJson();
     QVERIFY(!json.contains(QStringLiteral("temperature")));
     QVERIFY(!json.contains(QStringLiteral("tools")));
@@ -136,8 +138,8 @@ void TestSerialization::responseParsingFromSpecExample()
         "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
     })";
 
-    const ChatCompletionResponse response =
-        ChatCompletionResponse::fromJson(QJsonDocument::fromJson(body).object());
+    const ChatCompletionResponse response
+            = ChatCompletionResponse::fromJson(QJsonDocument::fromJson(body).object());
 
     QCOMPARE(response.id(), QStringLiteral("chatcmpl-abc"));
     QCOMPARE(response.created(), Q_INT64_C(1741570283));
@@ -170,16 +172,17 @@ void TestSerialization::responseWithToolCalls()
         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
     })";
 
-    const ChatCompletionResponse response =
-        ChatCompletionResponse::fromJson(QJsonDocument::fromJson(body).object());
+    const ChatCompletionResponse response
+            = ChatCompletionResponse::fromJson(QJsonDocument::fromJson(body).object());
 
     QCOMPARE(response.choices().first().finishReason(), FinishReason::ToolCalls);
     const QList<ToolCall> calls = response.toolCalls();
     QCOMPARE(calls.size(), 1);
     QCOMPARE(calls.first().id(), QStringLiteral("call_42"));
     QCOMPARE(calls.first().function().name(), QStringLiteral("get_weather"));
-    QCOMPARE(calls.first().function().argumentsObject().value(QStringLiteral("location")).toString(),
-             QStringLiteral("Paris"));
+    QCOMPARE(
+            calls.first().function().argumentsObject().value(QStringLiteral("location")).toString(),
+            QStringLiteral("Paris"));
 }
 
 QTEST_MAIN(TestSerialization)

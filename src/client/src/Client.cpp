@@ -38,8 +38,7 @@ public:
 Client::Client(QObject *parent)
     : QObject(parent)
     , d_ptr(new ClientPrivate)
-{
-}
+{ }
 
 Client::Client(QUrl baseUrl, QString apiKey, QObject *parent)
     : QObject(parent)
@@ -133,8 +132,7 @@ ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequ
     networkRequest.setHeader(QNetworkRequest::ContentTypeHeader,
                              QStringLiteral("application/json"));
     if (!d->apiKey.isEmpty()) {
-        networkRequest.setRawHeader("Authorization",
-                                    QByteArray("Bearer ") + d->apiKey.toUtf8());
+        networkRequest.setRawHeader("Authorization", QByteArray("Bearer ") + d->apiKey.toUtf8());
     }
     if (!d->organization.isEmpty())
         networkRequest.setRawHeader("OpenAI-Organization", d->organization.toUtf8());

@@ -46,23 +46,22 @@ int main(int argc, char **argv)
 
     // --- Register a local tool -------------------------------------------
     Client::ToolRegistry registry;
-    const QJsonObject weatherSchema{
-        {QStringLiteral("type"), QStringLiteral("object")},
-        {QStringLiteral("properties"),
-         QJsonObject{{QStringLiteral("location"),
-                      QJsonObject{{QStringLiteral("type"), QStringLiteral("string")},
-                                  {QStringLiteral("description"), QStringLiteral("City name")}}}}},
-        {QStringLiteral("required"), QJsonArray{QStringLiteral("location")}},
+    const QJsonObject weatherSchema {
+            {QStringLiteral("type"), QStringLiteral("object")},
+            {QStringLiteral("properties"),
+             QJsonObject {
+                     {QStringLiteral("location"),
+                      QJsonObject {{QStringLiteral("type"), QStringLiteral("string")},
+                                   {QStringLiteral("description"), QStringLiteral("City name")}}}}},
+            {QStringLiteral("required"), QJsonArray {QStringLiteral("location")}},
     };
     registry.registerFunction(
-        QStringLiteral("get_weather"),
-        QStringLiteral("Get the current weather for a city."),
-        weatherSchema,
-        [](const QJsonObject &args) {
-            const QString location = args.value(QStringLiteral("location")).toString();
-            return QStringLiteral("{\"location\":\"%1\",\"temp_c\":21,\"sky\":\"clear\"}")
-                .arg(location);
-        });
+            QStringLiteral("get_weather"), QStringLiteral("Get the current weather for a city."),
+            weatherSchema, [](const QJsonObject &args) {
+                const QString location = args.value(QStringLiteral("location")).toString();
+                return QStringLiteral("{\"location\":\"%1\",\"temp_c\":21,\"sky\":\"clear\"}")
+                        .arg(location);
+            });
 
     QObject::connect(&registry, &Client::ToolRegistry::toolInvoked,
                      [&out](const QString &, const QString &name, const QString &result) {

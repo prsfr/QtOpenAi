@@ -77,8 +77,7 @@ public:
     static Tool fromJson(const QJsonObject &json);
 
     // Convenience factory for a function tool.
-    static Tool function(const QString &name,
-                         const QString &description,
+    static Tool function(const QString &name, const QString &description,
                          const QJsonObject &parameters);
 
     bool operator==(const Tool &other) const;

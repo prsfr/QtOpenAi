@@ -1,0 +1,21 @@
+# Normalise line endings: LF in the repo, auto on checkout.
+* text=auto eol=lf
+
+# Explicit text types.
+*.cpp    text
+*.h      text
+*.cmake  text
+*.txt    text
+*.md     text
+*.yml    text
+*.yaml   text
+*.json   text
+
+# Binary files must never be munged.
+*.png    binary
+*.jpg    binary
+*.ico    binary
+*.pdf    binary
+
+# Collapse noisy generated/vendored files in diffs and stats.
+third_party/**  linguist-vendored

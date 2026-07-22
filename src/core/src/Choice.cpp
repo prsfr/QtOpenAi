@@ -18,8 +18,7 @@ public:
 
 Choice::Choice()
     : d(new ChoiceData)
-{
-}
+{ }
 
 Choice::Choice(const Choice &other) = default;
 Choice::Choice(Choice &&other) noexcept = default;
@@ -52,15 +51,15 @@ Choice Choice::fromJson(const QJsonObject &json)
     Choice choice;
     choice.d->index = json.value(QStringLiteral("index")).toInt();
     choice.d->message = Message::fromJson(json.value(QStringLiteral("message")).toObject());
-    choice.d->finishReason = finishReasonFromString(detail::stringOr(json, QStringLiteral("finish_reason")));
+    choice.d->finishReason
+            = finishReasonFromString(detail::stringOr(json, QStringLiteral("finish_reason")));
     return choice;
 }
 
 bool Choice::operator==(const Choice &other) const
 {
-    return d->index == other.d->index
-        && d->message == other.d->message
-        && d->finishReason == other.d->finishReason;
+    return d->index == other.d->index && d->message == other.d->message
+           && d->finishReason == other.d->finishReason;
 }
 
 } // namespace Core

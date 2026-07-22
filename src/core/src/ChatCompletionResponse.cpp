@@ -23,13 +23,14 @@ public:
 
 ChatCompletionResponse::ChatCompletionResponse()
     : d(new ChatCompletionResponseData)
-{
-}
+{ }
 
 ChatCompletionResponse::ChatCompletionResponse(const ChatCompletionResponse &other) = default;
 ChatCompletionResponse::ChatCompletionResponse(ChatCompletionResponse &&other) noexcept = default;
-ChatCompletionResponse &ChatCompletionResponse::operator=(const ChatCompletionResponse &other) = default;
-ChatCompletionResponse &ChatCompletionResponse::operator=(ChatCompletionResponse &&other) noexcept = default;
+ChatCompletionResponse &ChatCompletionResponse::operator=(const ChatCompletionResponse &other)
+        = default;
+ChatCompletionResponse &ChatCompletionResponse::operator=(ChatCompletionResponse &&other) noexcept
+        = default;
 ChatCompletionResponse::~ChatCompletionResponse() = default;
 
 QString ChatCompletionResponse::id() const { return d->id; }
@@ -88,7 +89,8 @@ ChatCompletionResponse ChatCompletionResponse::fromJson(const QJsonObject &json)
 {
     ChatCompletionResponse response;
     response.d->id = detail::stringOr(json, QStringLiteral("id"));
-    response.d->object = detail::stringOr(json, QStringLiteral("object"), QStringLiteral("chat.completion"));
+    response.d->object
+            = detail::stringOr(json, QStringLiteral("object"), QStringLiteral("chat.completion"));
     response.d->created = static_cast<qint64>(json.value(QStringLiteral("created")).toDouble());
     response.d->model = detail::stringOr(json, QStringLiteral("model"));
     response.d->systemFingerprint = detail::stringOr(json, QStringLiteral("system_fingerprint"));
@@ -105,13 +107,9 @@ ChatCompletionResponse ChatCompletionResponse::fromJson(const QJsonObject &json)
 
 bool ChatCompletionResponse::operator==(const ChatCompletionResponse &other) const
 {
-    return d->id == other.d->id
-        && d->object == other.d->object
-        && d->created == other.d->created
-        && d->model == other.d->model
-        && d->systemFingerprint == other.d->systemFingerprint
-        && d->choices == other.d->choices
-        && d->usage == other.d->usage;
+    return d->id == other.d->id && d->object == other.d->object && d->created == other.d->created
+           && d->model == other.d->model && d->systemFingerprint == other.d->systemFingerprint
+           && d->choices == other.d->choices && d->usage == other.d->usage;
 }
 
 } // namespace Core
