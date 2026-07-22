@@ -70,3 +70,38 @@ jobs:
       - name: Test
         working-directory: build
         run: ctest --build-config Release --output-on-failure
+
+  install-consumer:
+    name: find_package smoke test (${{ matrix.link }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        link: [shared, static]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.1"
+          cache: true
+
+      - name: Build & install QtOpenAi
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_INSTALL_PREFIX=$PWD/_prefix
+          -DQTOPENAI_BUILD_TESTS=OFF
+          -DQTOPENAI_BUILD_EXAMPLES=OFF
+          -DQTOPENAI_BUILD_SHARED=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} &&
+          cmake --build build --parallel &&
+          cmake --install build
+
+      - name: Configure, build & run the consumer
+        run: >
+          cmake -S tests/package -B build-consumer
+          -DCMAKE_PREFIX_PATH=$PWD/_prefix &&
+          cmake --build build-consumer &&
+          LD_LIBRARY_PATH="$PWD/_prefix/lib:$QT_ROOT_DIR/lib" ./build-consumer/consumer

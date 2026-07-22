@@ -49,3 +49,13 @@ set_target_properties(QtOpenAiClient PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
 )
+
+if(QTOPENAI_INSTALL)
+    install(TARGETS QtOpenAiClient
+        EXPORT QtOpenAiTargets
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    # Preserves the QtOpenAi/Client/... include layout.
+    install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+endif()
