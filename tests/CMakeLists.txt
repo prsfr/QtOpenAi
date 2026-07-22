@@ -19,6 +19,10 @@ qtopenai_add_test(tst_core_valuesemantics
     SOURCES core/tst_valuesemantics.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_chunk
+    SOURCES core/tst_chunk.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp
@@ -26,4 +30,8 @@ qtopenai_add_test(tst_client_toolregistry
 
 qtopenai_add_test(tst_client_reply
     SOURCES client/tst_reply.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_streaming
+    SOURCES client/tst_streaming.cpp
     LIBS QtOpenAi::Client)

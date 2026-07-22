@@ -7,6 +7,8 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ClientError.h
     include/QtOpenAi/Client/ToolRegistry.h
     include/QtOpenAi/Client/ChatCompletionReply.h
+    include/QtOpenAi/Client/ChatCompletionAccumulator.h
+    include/QtOpenAi/Client/ChatCompletionStreamReply.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -14,6 +16,8 @@ add_library(QtOpenAiClient
     ${QTOPENAI_CLIENT_PUBLIC_HEADERS}
     src/ToolRegistry.cpp
     src/ChatCompletionReply.cpp
+    src/ChatCompletionAccumulator.cpp
+    src/ChatCompletionStreamReply.cpp
     src/Client.cpp
 )
 

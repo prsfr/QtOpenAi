@@ -13,6 +13,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/Choice.h
     include/QtOpenAi/Core/ChatCompletionRequest.h
     include/QtOpenAi/Core/ChatCompletionResponse.h
+    include/QtOpenAi/Core/ChatCompletionChunk.h
 )
 
 add_library(QtOpenAiCore
@@ -27,6 +28,7 @@ add_library(QtOpenAiCore
     src/Choice.cpp
     src/ChatCompletionRequest.cpp
     src/ChatCompletionResponse.cpp
+    src/ChatCompletionChunk.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

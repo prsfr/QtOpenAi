@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QtOpenAi/Client/ChatCompletionReply.h>
+#include <QtOpenAi/Client/ChatCompletionStreamReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 
@@ -56,6 +57,13 @@ public:
     // reply's auto-delete policy (enabled by default); pass a parent to tie its
     // lifetime elsewhere.
     ChatCompletionReply *createChatCompletion(const Core::ChatCompletionRequest &request);
+
+    // Start a streamed chat completion (Server-Sent Events). Forces the
+    // request's `stream` flag to true and returns a ChatCompletionStreamReply
+    // that emits incremental deltas. Ownership follows the reply's auto-delete
+    // policy (enabled by default).
+    ChatCompletionStreamReply *
+    createChatCompletionStream(const Core::ChatCompletionRequest &request);
 
 Q_SIGNALS:
     void baseUrlChanged();
