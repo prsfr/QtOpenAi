@@ -104,4 +104,4 @@ jobs:
           cmake -S tests/package -B build-consumer
           -DCMAKE_PREFIX_PATH=$PWD/_prefix &&
           cmake --build build-consumer &&
-          LD_LIBRARY_PATH=$PWD/_prefix/lib ./build-consumer/consumer
+          LD_LIBRARY_PATH="$PWD/_prefix/lib:$QT_ROOT_DIR/lib" ./build-consumer/consumer
