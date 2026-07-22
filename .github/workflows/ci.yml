@@ -31,14 +31,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # Linux and macOS build & test against Qt 6.11.1. Windows uses 6.10.3
+      # because download.qt.io currently serves no retrievable checksum for the
+      # entire Qt 6.11 Windows series (qt6_6110 and qt6_6111 Updates.xml), so
+      # aqtinstall cannot install any 6.11 patch on Windows ("Failed to locate
+      # XML data"). This is an upstream packaging gap; see the tracking issue to
+      # restore Windows to 6.11 once the checksums are published. The library
+      # itself supports Qt 6.4+, so the compiler/platform coverage still holds.
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        # 6.11.1 rather than 6.11.0: the Windows package checksum for the
-        # 6.11.0 series folder (qt6_6110/Updates.xml) is not retrievable from
-        # download.qt.io, so aqtinstall aborts the Windows install with "Failed
-        # to locate XML data". 6.11.1 lives in a separate folder with a working
-        # checksum and installs cleanly on all platforms.
-        qt_version: ["6.11.1"]
+        include:
+          - os: ubuntu-latest
+            qt_version: "6.11.1"
+          - os: macos-latest
+            qt_version: "6.11.1"
+          - os: windows-latest
+            qt_version: "6.10.3"
 
     steps:
       - name: Checkout
