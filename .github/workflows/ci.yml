@@ -39,19 +39,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Diagnostic: ask the runner (which has full access to download.qt.io)
+      # what Qt versions/architectures are actually published for Windows, to
+      # explain why aqt cannot locate 6.11.0 there while Linux/macOS install it.
+      - name: Diagnose available Qt (Windows)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade aqtinstall
+          Write-Host "=== all desktop versions ==="
+          python -m aqt list-qt windows desktop
+          Write-Host "=== 6.11 series ==="
+          python -m aqt list-qt windows desktop --spec "6.11"
+          Write-Host "=== latest 6.11 ==="
+          python -m aqt list-qt windows desktop --spec "6.11" --latest-version
+          Write-Host "=== arches for 6.11.0 ==="
+          python -m aqt list-qt windows desktop --arch 6.11.0
+
       - name: Install Qt ${{ matrix.qt_version }}
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ matrix.qt_version }}
-          modules: qtnetworkauth
           cache: true
-          # aqtinstall 3.3.x aborts the Windows install when it cannot download
-          # the Updates.xml checksum ("Failed to locate XML data for Qt version
-          # 6.11.0"), while Linux/macOS install the same version fine. Pin to an
-          # older aqt that treats a missing checksum as a non-fatal warning, and
-          # force the official Qt server as the download base.
-          aqtversion: "==3.1.*"
-          extra: --base https://download.qt.io
 
       - name: Configure
         run: >
