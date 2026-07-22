@@ -45,6 +45,10 @@ jobs:
           version: ${{ matrix.qt_version }}
           modules: qtnetworkauth
           cache: true
+          # Force the official Qt server as the aqt download base. Auto-selected
+          # mirrors intermittently fail to serve the Windows metadata
+          # (Updates.xml), breaking `aqt` with "Failed to locate XML data".
+          extra: --base https://download.qt.io
 
       - name: Configure
         run: >
