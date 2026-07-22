@@ -45,9 +45,12 @@ jobs:
           version: ${{ matrix.qt_version }}
           modules: qtnetworkauth
           cache: true
-          # Force the official Qt server as the aqt download base. Auto-selected
-          # mirrors intermittently fail to serve the Windows metadata
-          # (Updates.xml), breaking `aqt` with "Failed to locate XML data".
+          # aqtinstall 3.3.x aborts the Windows install when it cannot download
+          # the Updates.xml checksum ("Failed to locate XML data for Qt version
+          # 6.11.0"), while Linux/macOS install the same version fine. Pin to an
+          # older aqt that treats a missing checksum as a non-fatal warning, and
+          # force the official Qt server as the download base.
+          aqtversion: "==3.1.*"
           extra: --base https://download.qt.io
 
       - name: Configure
