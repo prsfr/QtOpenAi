@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(QtOpenAi
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "Qt 6 client library for OpenAI-compatible chat completion APIs with tool calling"
     HOMEPAGE_URL "https://github.com/prsfr/qtopenai"
     LANGUAGES CXX)
@@ -27,6 +27,11 @@ endif()
 option(QTOPENAI_BUILD_TESTS    "Build QtOpenAi unit tests"   ${QTOPENAI_IS_TOPLEVEL})
 option(QTOPENAI_BUILD_EXAMPLES "Build QtOpenAi examples"     ${QTOPENAI_IS_TOPLEVEL})
 option(QTOPENAI_BUILD_SHARED   "Build QtOpenAi as shared libraries" ON)
+option(QTOPENAI_INSTALL        "Generate QtOpenAi install/export rules" ${QTOPENAI_IS_TOPLEVEL})
+
+include(GNUInstallDirs)
+set(QTOPENAI_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/QtOpenAi"
+    CACHE STRING "Install location for QtOpenAi CMake package files")
 
 if(QTOPENAI_BUILD_SHARED)
     set(BUILD_SHARED_LIBS ON)
@@ -61,4 +66,38 @@ endif()
 
 if(QTOPENAI_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+# --------------------------------------------------------------------------
+# Install / export: make the project consumable via find_package(QtOpenAi).
+# The per-target install(TARGETS ... EXPORT QtOpenAiTargets) rules live in the
+# module CMakeLists; here we emit the export set and the package config files.
+# --------------------------------------------------------------------------
+if(QTOPENAI_INSTALL)
+    include(CMakePackageConfigHelpers)
+
+    install(EXPORT QtOpenAiTargets
+        FILE QtOpenAiTargets.cmake
+        NAMESPACE QtOpenAi::
+        DESTINATION "${QTOPENAI_INSTALL_CMAKEDIR}")
+
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/QtOpenAiConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/QtOpenAiConfig.cmake"
+        INSTALL_DESTINATION "${QTOPENAI_INSTALL_CMAKEDIR}")
+
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/QtOpenAiConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion)
+
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/QtOpenAiConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/QtOpenAiConfigVersion.cmake"
+        DESTINATION "${QTOPENAI_INSTALL_CMAKEDIR}")
+
+    # Also make the build tree consumable without installing.
+    export(EXPORT QtOpenAiTargets
+        NAMESPACE QtOpenAi::
+        FILE "${CMAKE_CURRENT_BINARY_DIR}/QtOpenAiTargets.cmake")
 endif()
