@@ -1,0 +1,33 @@
+# Build directories
+/build/
+/build-*/
+cmake-build-*/
+out/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+*.cmake.stamp
+
+# Qt / moc / generated
+moc_*.cpp
+*.moc
+qrc_*.cpp
+ui_*.h
+*_autogen/
+
+# Editors / IDE
+.idea/
+.vscode/
+*.user
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets
+.env
+*.local
