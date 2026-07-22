@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    name: clang-format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+
+      - name: Check formatting
+        run: >
+          git ls-files '*.cpp' '*.h'
+          | xargs clang-format --dry-run --Werror
+
+  build-and-test:
+    name: ${{ matrix.os }} / Qt ${{ matrix.qt_version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      # Linux and macOS build & test against Qt 6.11.1. Windows uses 6.10.3
+      # because download.qt.io currently serves no retrievable checksum for the
+      # entire Qt 6.11 Windows series (qt6_6110 and qt6_6111 Updates.xml), so
+      # aqtinstall cannot install any 6.11 patch on Windows ("Failed to locate
+      # XML data"). This is an upstream packaging gap; see the tracking issue to
+      # restore Windows to 6.11 once the checksums are published. The library
+      # itself supports Qt 6.4+, so the compiler/platform coverage still holds.
+      matrix:
+        include:
+          - os: ubuntu-latest
+            qt_version: "6.11.1"
+          - os: macos-latest
+            qt_version: "6.11.1"
+          - os: windows-latest
+            qt_version: "6.10.3"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt ${{ matrix.qt_version }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt_version }}
+          cache: true
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DQTOPENAI_BUILD_TESTS=ON
+          -DQTOPENAI_BUILD_EXAMPLES=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        working-directory: build
+        run: ctest --build-config Release --output-on-failure
