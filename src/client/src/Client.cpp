@@ -124,23 +124,46 @@ QNetworkAccessManager *Client::networkAccessManager() const
     return d->manager;
 }
 
-ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequest &request)
-{
-    Q_D(Client);
+namespace {
 
+// Build the /chat/completions network request (URL + auth/content headers).
+QNetworkRequest chatRequest(const ClientPrivate *d)
+{
     QNetworkRequest networkRequest(d->endpointUrl(QStringLiteral("/chat/completions")));
     networkRequest.setHeader(QNetworkRequest::ContentTypeHeader,
                              QStringLiteral("application/json"));
-    if (!d->apiKey.isEmpty()) {
+    if (!d->apiKey.isEmpty())
         networkRequest.setRawHeader("Authorization", QByteArray("Bearer ") + d->apiKey.toUtf8());
-    }
     if (!d->organization.isEmpty())
         networkRequest.setRawHeader("OpenAI-Organization", d->organization.toUtf8());
+    return networkRequest;
+}
 
+} // namespace
+
+ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequest &request)
+{
+    Q_D(Client);
     const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
-    QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
-
+    QNetworkReply *reply = networkAccessManager()->post(chatRequest(d), body);
     return new ChatCompletionReply(reply);
+}
+
+ChatCompletionStreamReply *
+Client::createChatCompletionStream(const Core::ChatCompletionRequest &request)
+{
+    Q_D(Client);
+
+    // Force streaming on a copy so the caller's request is left untouched.
+    Core::ChatCompletionRequest streamed = request;
+    streamed.setStream(true);
+
+    QNetworkRequest networkRequest = chatRequest(d);
+    networkRequest.setRawHeader("Accept", "text/event-stream");
+
+    const QByteArray body = QJsonDocument(streamed.toJson()).toJson(QJsonDocument::Compact);
+    QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
+    return new ChatCompletionStreamReply(reply);
 }
 
 } // namespace Client

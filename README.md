@@ -82,6 +82,31 @@ connect(reply, &Client::ChatCompletionReply::finished, this,
 
 A complete, runnable version lives in [`examples/tool_loop.cpp`](examples/tool_loop.cpp).
 
+## Streaming (Server-Sent Events)
+
+Call `createChatCompletionStream()` for token-by-token output. The reply emits
+`contentDelta()` for each text fragment and, when the stream ends, `finished()`
+with the fully reassembled response (content concatenated, tool calls merged by
+index):
+
+```cpp
+Core::ChatCompletionRequest request("gpt-4o-mini", { Core::Message::user(prompt) });
+
+auto *stream = client.createChatCompletionStream(request);   // sets stream: true
+connect(stream, &Client::ChatCompletionStreamReply::contentDelta,
+        this, [](const QString &text) { std::cout << text.toStdString() << std::flush; });
+connect(stream, &Client::ChatCompletionStreamReply::finished, this,
+        [](const Core::ChatCompletionResponse &full) {
+            // full.firstMessage().content() / full.toolCalls() are complete here
+        });
+connect(stream, &Client::ChatCompletionStreamReply::failed, this,
+        [](const Client::ClientError &e) { qWarning() << e.message(); });
+```
+
+`Client::ChatCompletionAccumulator` performs the chunk→response reassembly and
+can also be driven directly over `ChatCompletionChunk` deltas you collect
+yourself.
+
 ## Building
 
 Requirements: CMake ≥ 3.21, a C++17 compiler, and Qt 6 (`Core`, `Network`,
