@@ -284,10 +284,10 @@ void applyQuery(QNetworkRequest &request, const QUrlQuery &extra)
 std::function<QNetworkReply *()> multipartPostFactory(QNetworkAccessManager *manager,
                                                       QNetworkRequest request,
                                                       QList<QPair<QString, QString>> fields,
-                                                      detail::FormFilePart file)
+                                                      QList<detail::FormFilePart> files)
 {
-    return [manager, request, fields = std::move(fields), file = std::move(file)]() mutable {
-        QHttpMultiPart *multiPart = detail::buildMultipart(fields, {file});
+    return [manager, request, fields = std::move(fields), files = std::move(files)]() mutable {
+        QHttpMultiPart *multiPart = detail::buildMultipart(fields, files);
         QNetworkRequest req = request;
         req.setHeader(QNetworkRequest::ContentTypeHeader,
                       QByteArray("multipart/form-data; boundary=") + multiPart->boundary());
@@ -588,7 +588,7 @@ TranscriptionReply *Client::createTranscription(const Core::TranscriptionRequest
     detail::FormFilePart file {"file", request.fileName(), request.fileData()};
     auto factory = multipartPostFactory(networkAccessManager(),
                                         apiRequest(d, QStringLiteral("/audio/transcriptions")),
-                                        request.formFields(), std::move(file));
+                                        request.formFields(), {std::move(file)});
     return new TranscriptionReply(std::move(factory), d->retryPolicy);
 }
 
@@ -598,8 +598,47 @@ TranscriptionReply *Client::createTranslation(const Core::TranslationRequest &re
     detail::FormFilePart file {"file", request.fileName(), request.fileData()};
     auto factory = multipartPostFactory(networkAccessManager(),
                                         apiRequest(d, QStringLiteral("/audio/translations")),
-                                        request.formFields(), std::move(file));
+                                        request.formFields(), {std::move(file)});
     return new TranscriptionReply(std::move(factory), d->retryPolicy);
+}
+
+ImageReply *Client::createImage(const Core::ImageGenerationRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req = apiRequest(d, QStringLiteral("/images/generations")), body]() {
+        return manager->post(req, body);
+    };
+    return new ImageReply(std::move(factory), d->retryPolicy);
+}
+
+ImageReply *Client::createImageEdit(const Core::ImageEditRequest &request)
+{
+    Q_D(Client);
+    QList<detail::FormFilePart> files;
+    const QList<Core::ImageEditRequest::ImageFile> images = request.images();
+    // A single image is uploaded as `image`; multiple use the `image[]` form.
+    const QByteArray imageField = images.size() > 1 ? QByteArray("image[]") : QByteArray("image");
+    for (const auto &image : images)
+        files.append({imageField, image.first, image.second});
+    if (request.hasMask())
+        files.append({"mask", request.maskFileName(), request.maskData()});
+
+    auto factory = multipartPostFactory(networkAccessManager(),
+                                        apiRequest(d, QStringLiteral("/images/edits")),
+                                        request.formFields(), std::move(files));
+    return new ImageReply(std::move(factory), d->retryPolicy);
+}
+
+ImageReply *Client::createImageVariation(const Core::ImageVariationRequest &request)
+{
+    Q_D(Client);
+    detail::FormFilePart file {"image", request.fileName(), request.imageData()};
+    auto factory = multipartPostFactory(networkAccessManager(),
+                                        apiRequest(d, QStringLiteral("/images/variations")),
+                                        request.formFields(), {std::move(file)});
+    return new ImageReply(std::move(factory), d->retryPolicy);
 }
 
 ModelListReply *Client::listModels()

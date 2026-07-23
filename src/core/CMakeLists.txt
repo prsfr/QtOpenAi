@@ -35,6 +35,10 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/TranscriptionRequest.h
     include/QtOpenAi/Core/TranscriptionResponse.h
     include/QtOpenAi/Core/TranslationRequest.h
+    include/QtOpenAi/Core/ImageGenerationRequest.h
+    include/QtOpenAi/Core/ImageEditRequest.h
+    include/QtOpenAi/Core/ImageVariationRequest.h
+    include/QtOpenAi/Core/ImageResponse.h
 )
 
 add_library(QtOpenAiCore
@@ -69,6 +73,10 @@ add_library(QtOpenAiCore
     src/TranscriptionRequest.cpp
     src/TranscriptionResponse.cpp
     src/TranslationRequest.cpp
+    src/ImageGenerationRequest.cpp
+    src/ImageEditRequest.cpp
+    src/ImageVariationRequest.cpp
+    src/ImageResponse.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.
