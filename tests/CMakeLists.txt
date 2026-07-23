@@ -43,6 +43,14 @@ qtopenai_add_test(tst_core_liststore
     SOURCES core/tst_liststore.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_embeddings
+    SOURCES core/tst_embeddings.cpp
+    LIBS QtOpenAi::Core)
+
+qtopenai_add_test(tst_core_models
+    SOURCES core/tst_models.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp
@@ -78,4 +86,8 @@ qtopenai_add_test(tst_client_completions
 
 qtopenai_add_test(tst_client_storedcompletions
     SOURCES client/tst_storedcompletions.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_embeddings
+    SOURCES client/tst_embeddings.cpp
     LIBS QtOpenAi::Client)

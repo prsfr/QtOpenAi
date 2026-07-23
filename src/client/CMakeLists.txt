@@ -18,6 +18,9 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ListParams.h
     include/QtOpenAi/Client/ChatCompletionListReply.h
     include/QtOpenAi/Client/ChatCompletionMessageListReply.h
+    include/QtOpenAi/Client/EmbeddingReply.h
+    include/QtOpenAi/Client/ModelReply.h
+    include/QtOpenAi/Client/ModelListReply.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -38,6 +41,9 @@ add_library(QtOpenAiClient
     src/CompletionReply.cpp
     src/ChatCompletionListReply.cpp
     src/ChatCompletionMessageListReply.cpp
+    src/EmbeddingReply.cpp
+    src/ModelReply.cpp
+    src/ModelListReply.cpp
     src/Client.cpp
 )
 

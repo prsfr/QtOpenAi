@@ -516,5 +516,35 @@ ChatCompletionMessageListReply *Client::listChatCompletionMessages(const QString
     return new ChatCompletionMessageListReply(std::move(factory), d->retryPolicy);
 }
 
+EmbeddingReply *Client::createEmbeddings(const Core::EmbeddingRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req = apiRequest(d, QStringLiteral("/embeddings")), body]() {
+        return manager->post(req, body);
+    };
+    return new EmbeddingReply(std::move(factory), d->retryPolicy);
+}
+
+ModelListReply *Client::listModels()
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req = apiRequest(d, QStringLiteral("/models"))]() {
+        return manager->get(req);
+    };
+    return new ModelListReply(std::move(factory), d->retryPolicy);
+}
+
+ModelReply *Client::getModel(const QString &modelId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/models/") + modelId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    return new ModelReply(std::move(factory), d->retryPolicy);
+}
+
 } // namespace Client
 } // namespace QtOpenAi
