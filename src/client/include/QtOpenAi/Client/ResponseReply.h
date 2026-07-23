@@ -60,9 +60,6 @@ private:
     ResponseReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
                   QObject *parent = nullptr);
 
-    // (Re)issue the underlying request; drives both the first attempt and retries.
-    void start();
-
     Q_DECLARE_PRIVATE(ResponseReply)
     QScopedPointer<ResponseReplyPrivate> d_ptr;
 };

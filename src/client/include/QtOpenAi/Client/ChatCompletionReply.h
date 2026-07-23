@@ -59,9 +59,6 @@ private:
     ChatCompletionReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
                         QObject *parent = nullptr);
 
-    // (Re)issue the underlying request; drives both the first attempt and retries.
-    void start();
-
     Q_DECLARE_PRIVATE(ChatCompletionReply)
     QScopedPointer<ChatCompletionReplyPrivate> d_ptr;
 };
