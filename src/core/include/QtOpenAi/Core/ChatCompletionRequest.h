@@ -9,6 +9,7 @@
 #include <QtCore/QList>
 #include <QtCore/QSharedDataPointer>
 #include <QtCore/QString>
+#include <QtCore/QStringList>
 
 #include <optional>
 
@@ -62,6 +63,79 @@ public:
 
     std::optional<bool> stream() const;
     void setStream(bool stream);
+
+    // --- Sampling / penalties ----------------------------------------------
+    std::optional<double> frequencyPenalty() const;
+    void setFrequencyPenalty(double penalty);
+
+    std::optional<double> presencePenalty() const;
+    void setPresencePenalty(double penalty);
+
+    // Token-id → bias map; omitted when empty.
+    QJsonObject logitBias() const;
+    void setLogitBias(const QJsonObject &logitBias);
+
+    std::optional<int> seed() const;
+    void setSeed(int seed);
+
+    // stop: a string or an array of up to 4 strings; unset omits the field.
+    std::optional<QJsonValue> stop() const;
+    void setStop(const QJsonValue &stop);
+
+    std::optional<bool> logprobs() const;
+    void setLogprobs(bool logprobs);
+
+    std::optional<int> topLogprobs() const;
+    void setTopLogprobs(int topLogprobs);
+
+    // --- Output control ----------------------------------------------------
+    // stream_options, e.g. { "include_usage": true }; omitted when empty.
+    QJsonObject streamOptions() const;
+    void setStreamOptions(const QJsonObject &options);
+
+    // modalities, e.g. ["text", "audio"]; omitted when empty.
+    QStringList modalities() const;
+    void setModalities(const QStringList &modalities);
+
+    // Predicted outputs object; omitted when empty.
+    QJsonObject prediction() const;
+    void setPrediction(const QJsonObject &prediction);
+
+    std::optional<bool> parallelToolCalls() const;
+    void setParallelToolCalls(bool parallelToolCalls);
+
+    // Deprecated alias for max_completion_tokens.
+    std::optional<int> maxTokens() const;
+    void setMaxTokens(int tokens);
+
+    // --- Routing / metadata ------------------------------------------------
+    QString serviceTier() const;
+    void setServiceTier(const QString &serviceTier);
+
+    std::optional<bool> store() const;
+    void setStore(bool store);
+
+    QJsonObject metadata() const;
+    void setMetadata(const QJsonObject &metadata);
+
+    QString user() const;
+    void setUser(const QString &user);
+
+    QString safetyIdentifier() const;
+    void setSafetyIdentifier(const QString &safetyIdentifier);
+
+    QString promptCacheKey() const;
+    void setPromptCacheKey(const QString &promptCacheKey);
+
+    // --- Reasoning models --------------------------------------------------
+    // "minimal", "low", "medium", "high"; empty omits it.
+    QString reasoningEffort() const;
+    void setReasoningEffort(const QString &effort);
+
+    // --- Built-in tools ----------------------------------------------------
+    // web_search_options object; omitted when empty.
+    QJsonObject webSearchOptions() const;
+    void setWebSearchOptions(const QJsonObject &options);
 
     // Extra provider-specific fields merged verbatim into the request body.
     QJsonObject extraBody() const;
