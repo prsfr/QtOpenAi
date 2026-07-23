@@ -11,18 +11,24 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ChatCompletionAccumulator.h
     include/QtOpenAi/Client/ChatCompletionStreamReply.h
     include/QtOpenAi/Client/ResponseReply.h
+    include/QtOpenAi/Client/ConversationReply.h
+    include/QtOpenAi/Client/ConversationItemsReply.h
     include/QtOpenAi/Client/Client.h
 )
 
 add_library(QtOpenAiClient
     ${QTOPENAI_CLIENT_PUBLIC_HEADERS}
     src/HttpSupport_p.h
+    src/RestReply_p.h
     src/ToolRegistry.cpp
     src/RetryPolicy.cpp
+    src/RestReply.cpp
     src/ChatCompletionReply.cpp
     src/ChatCompletionAccumulator.cpp
     src/ChatCompletionStreamReply.cpp
     src/ResponseReply.cpp
+    src/ConversationReply.cpp
+    src/ConversationItemsReply.cpp
     src/Client.cpp
 )
 

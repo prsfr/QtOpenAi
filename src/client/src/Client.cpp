@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/Client.h"
 
+#include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QUrlQuery>
 #include <QtNetwork/QNetworkAccessManager>
@@ -249,6 +250,15 @@ QNetworkRequest chatRequest(const ClientPrivate *d)
     return apiRequest(d, QStringLiteral("/chat/completions"));
 }
 
+// Serialise a list of output/input items to a JSON array.
+QJsonArray itemsToArray(const QList<Core::ResponseOutputItem> &items)
+{
+    QJsonArray array;
+    for (const Core::ResponseOutputItem &item : items)
+        array.append(item.toJson());
+    return array;
+}
+
 } // namespace
 
 ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequest &request)
@@ -315,6 +325,103 @@ ResponseReply *Client::deleteResponse(const QString &responseId)
     const QString path = QStringLiteral("/responses/") + responseId;
     auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
     return new ResponseReply(std::move(factory), d->retryPolicy);
+}
+
+ConversationReply *Client::createConversation(const QJsonObject &metadata,
+                                              const QList<Core::ResponseOutputItem> &items)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    if (!metadata.isEmpty())
+        bodyObject.insert(QStringLiteral("metadata"), metadata);
+    if (!items.isEmpty())
+        bodyObject.insert(QStringLiteral("items"), itemsToArray(items));
+    const QByteArray body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req = apiRequest(d, QStringLiteral("/conversations")), body]() {
+        return manager->post(req, body);
+    };
+    return new ConversationReply(std::move(factory), d->retryPolicy);
+}
+
+ConversationReply *Client::getConversation(const QString &conversationId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/conversations/") + conversationId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    return new ConversationReply(std::move(factory), d->retryPolicy);
+}
+
+ConversationReply *Client::updateConversation(const QString &conversationId,
+                                              const QJsonObject &metadata)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("metadata"), metadata);
+    const QByteArray body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/conversations/") + conversationId;
+    auto factory
+            = [manager, req = apiRequest(d, path), body]() { return manager->post(req, body); };
+    return new ConversationReply(std::move(factory), d->retryPolicy);
+}
+
+ConversationReply *Client::deleteConversation(const QString &conversationId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/conversations/") + conversationId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
+    return new ConversationReply(std::move(factory), d->retryPolicy);
+}
+
+ConversationItemsReply *Client::listConversationItems(const QString &conversationId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path
+            = QStringLiteral("/conversations/") + conversationId + QStringLiteral("/items");
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    return new ConversationItemsReply(std::move(factory), d->retryPolicy);
+}
+
+ConversationItemsReply *
+Client::createConversationItems(const QString &conversationId,
+                                const QList<Core::ResponseOutputItem> &items)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("items"), itemsToArray(items));
+    const QByteArray body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path
+            = QStringLiteral("/conversations/") + conversationId + QStringLiteral("/items");
+    auto factory
+            = [manager, req = apiRequest(d, path), body]() { return manager->post(req, body); };
+    return new ConversationItemsReply(std::move(factory), d->retryPolicy);
+}
+
+ConversationItemsReply *Client::getConversationItem(const QString &conversationId,
+                                                    const QString &itemId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/conversations/") + conversationId
+                         + QStringLiteral("/items/") + itemId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    return new ConversationItemsReply(std::move(factory), d->retryPolicy);
+}
+
+ConversationReply *Client::deleteConversationItem(const QString &conversationId,
+                                                  const QString &itemId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/conversations/") + conversationId
+                         + QStringLiteral("/items/") + itemId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
+    return new ConversationReply(std::move(factory), d->retryPolicy);
 }
 
 } // namespace Client
