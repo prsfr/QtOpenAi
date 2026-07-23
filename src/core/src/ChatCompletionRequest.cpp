@@ -16,6 +16,7 @@ public:
     QList<Message> messages;
     QList<Tool> tools;
     std::optional<QJsonValue> toolChoice;
+    std::optional<ResponseFormat> responseFormat;
     std::optional<double> temperature;
     std::optional<double> topP;
     std::optional<int> maxCompletionTokens;
@@ -78,6 +79,15 @@ std::optional<QJsonValue> ChatCompletionRequest::toolChoice() const { return d->
 void ChatCompletionRequest::setToolChoice(const QJsonValue &toolChoice)
 {
     d->toolChoice = toolChoice;
+}
+
+std::optional<ResponseFormat> ChatCompletionRequest::responseFormat() const
+{
+    return d->responseFormat;
+}
+void ChatCompletionRequest::setResponseFormat(const ResponseFormat &format)
+{
+    d->responseFormat = format;
 }
 
 std::optional<double> ChatCompletionRequest::temperature() const { return d->temperature; }
@@ -213,6 +223,8 @@ QJsonObject ChatCompletionRequest::toJson() const
 
     if (d->toolChoice)
         json.insert(QStringLiteral("tool_choice"), *d->toolChoice);
+    if (d->responseFormat)
+        json.insert(QStringLiteral("response_format"), d->responseFormat->toJson());
     if (d->temperature)
         json.insert(QStringLiteral("temperature"), *d->temperature);
     if (d->topP)
@@ -282,6 +294,9 @@ ChatCompletionRequest ChatCompletionRequest::fromJson(const QJsonObject &json)
 
     if (json.contains(QStringLiteral("tool_choice")))
         request.d->toolChoice = json.value(QStringLiteral("tool_choice"));
+    if (json.contains(QStringLiteral("response_format")))
+        request.d->responseFormat = ResponseFormat::fromJson(
+                json.value(QStringLiteral("response_format")).toObject());
     if (json.contains(QStringLiteral("temperature")))
         request.d->temperature = json.value(QStringLiteral("temperature")).toDouble();
     if (json.contains(QStringLiteral("top_p")))
@@ -332,9 +347,10 @@ bool ChatCompletionRequest::operator==(const ChatCompletionRequest &other) const
 {
     return d->model == other.d->model && d->messages == other.d->messages
            && d->tools == other.d->tools && d->toolChoice == other.d->toolChoice
-           && d->temperature == other.d->temperature && d->topP == other.d->topP
-           && d->maxCompletionTokens == other.d->maxCompletionTokens && d->n == other.d->n
-           && d->stream == other.d->stream && d->frequencyPenalty == other.d->frequencyPenalty
+           && d->responseFormat == other.d->responseFormat && d->temperature == other.d->temperature
+           && d->topP == other.d->topP && d->maxCompletionTokens == other.d->maxCompletionTokens
+           && d->n == other.d->n && d->stream == other.d->stream
+           && d->frequencyPenalty == other.d->frequencyPenalty
            && d->presencePenalty == other.d->presencePenalty && d->logitBias == other.d->logitBias
            && d->seed == other.d->seed && d->stop == other.d->stop
            && d->logprobs == other.d->logprobs && d->topLogprobs == other.d->topLogprobs

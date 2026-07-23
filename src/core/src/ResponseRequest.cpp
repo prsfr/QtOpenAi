@@ -17,6 +17,7 @@ public:
     QString instructions;
     QList<Tool> tools;
     std::optional<QJsonValue> toolChoice;
+    std::optional<ResponseFormat> textFormat;
     std::optional<int> maxOutputTokens;
     std::optional<double> temperature;
     std::optional<double> topP;
@@ -65,6 +66,9 @@ void ResponseRequest::addTool(const Tool &tool) { d->tools.append(tool); }
 std::optional<QJsonValue> ResponseRequest::toolChoice() const { return d->toolChoice; }
 void ResponseRequest::setToolChoice(const QJsonValue &toolChoice) { d->toolChoice = toolChoice; }
 
+std::optional<ResponseFormat> ResponseRequest::textFormat() const { return d->textFormat; }
+void ResponseRequest::setTextFormat(const ResponseFormat &format) { d->textFormat = format; }
+
 std::optional<int> ResponseRequest::maxOutputTokens() const { return d->maxOutputTokens; }
 void ResponseRequest::setMaxOutputTokens(int tokens) { d->maxOutputTokens = tokens; }
 
@@ -109,6 +113,11 @@ QJsonObject ResponseRequest::toJson() const
 
     if (d->toolChoice)
         json.insert(QStringLiteral("tool_choice"), *d->toolChoice);
+    if (d->textFormat) {
+        QJsonObject text;
+        text.insert(QStringLiteral("format"), d->textFormat->toTextFormatJson());
+        json.insert(QStringLiteral("text"), text);
+    }
     if (d->maxOutputTokens)
         json.insert(QStringLiteral("max_output_tokens"), *d->maxOutputTokens);
     if (d->temperature)
@@ -149,6 +158,10 @@ ResponseRequest ResponseRequest::fromJson(const QJsonObject &json)
 
     if (json.contains(QStringLiteral("tool_choice")))
         request.d->toolChoice = json.value(QStringLiteral("tool_choice"));
+    const QJsonObject text = json.value(QStringLiteral("text")).toObject();
+    if (text.contains(QStringLiteral("format")))
+        request.d->textFormat
+                = ResponseFormat::fromJson(text.value(QStringLiteral("format")).toObject());
     if (json.contains(QStringLiteral("max_output_tokens")))
         request.d->maxOutputTokens = json.value(QStringLiteral("max_output_tokens")).toInt();
     if (json.contains(QStringLiteral("temperature")))
@@ -171,7 +184,8 @@ bool ResponseRequest::operator==(const ResponseRequest &other) const
 {
     return d->model == other.d->model && d->input == other.d->input
            && d->instructions == other.d->instructions && d->tools == other.d->tools
-           && d->toolChoice == other.d->toolChoice && d->maxOutputTokens == other.d->maxOutputTokens
+           && d->toolChoice == other.d->toolChoice && d->textFormat == other.d->textFormat
+           && d->maxOutputTokens == other.d->maxOutputTokens
            && d->temperature == other.d->temperature && d->topP == other.d->topP
            && d->store == other.d->store && d->previousResponseId == other.d->previousResponseId
            && d->reasoningEffort == other.d->reasoningEffort && d->metadata == other.d->metadata

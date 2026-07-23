@@ -59,6 +59,10 @@ qtopenai_add_test(tst_core_chatrequestparams
     SOURCES core/tst_chatrequestparams.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_responseformat
+    SOURCES core/tst_responseformat.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp

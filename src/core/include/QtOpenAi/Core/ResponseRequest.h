@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QtOpenAi/Core/GlobalCore.h>
+#include <QtOpenAi/Core/ResponseFormat.h>
 #include <QtOpenAi/Core/Tool.h>
 
 #include <QtCore/QJsonObject>
@@ -54,6 +55,11 @@ public:
     // tool_choice: "auto", "none", "required", or a specific tool object.
     std::optional<QJsonValue> toolChoice() const;
     void setToolChoice(const QJsonValue &toolChoice);
+
+    // text.format: constrained decoding (text / json_object / json_schema).
+    // The schema fields are inlined under text.format per the Responses schema.
+    std::optional<ResponseFormat> textFormat() const;
+    void setTextFormat(const ResponseFormat &format);
 
     std::optional<int> maxOutputTokens() const;
     void setMaxOutputTokens(int tokens);

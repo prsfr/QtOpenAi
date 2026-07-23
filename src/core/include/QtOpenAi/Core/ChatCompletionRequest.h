@@ -3,6 +3,7 @@
 
 #include <QtOpenAi/Core/GlobalCore.h>
 #include <QtOpenAi/Core/Message.h>
+#include <QtOpenAi/Core/ResponseFormat.h>
 #include <QtOpenAi/Core/Tool.h>
 
 #include <QtCore/QJsonObject>
@@ -48,6 +49,10 @@ public:
     // Stored as an opaque JSON value; unset means the field is omitted.
     std::optional<QJsonValue> toolChoice() const;
     void setToolChoice(const QJsonValue &toolChoice);
+
+    // response_format: constrained decoding (text / json_object / json_schema).
+    std::optional<ResponseFormat> responseFormat() const;
+    void setResponseFormat(const ResponseFormat &format);
 
     std::optional<double> temperature() const;
     void setTemperature(double temperature);
