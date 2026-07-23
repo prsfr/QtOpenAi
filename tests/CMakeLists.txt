@@ -23,6 +23,10 @@ qtopenai_add_test(tst_core_chunk
     SOURCES core/tst_chunk.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_responses
+    SOURCES core/tst_responses.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp
@@ -38,4 +42,8 @@ qtopenai_add_test(tst_client_streaming
 
 qtopenai_add_test(tst_client_resilience
     SOURCES client/tst_resilience.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_responses
+    SOURCES client/tst_responses.cpp
     LIBS QtOpenAi::Client)

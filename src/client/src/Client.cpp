@@ -218,11 +218,11 @@ QNetworkAccessManager *Client::networkAccessManager() const
 
 namespace {
 
-// Build the /chat/completions network request (URL + auth/content/custom
+// Build a network request for an endpoint path (URL + auth/content/custom
 // headers + timeout), applying the configured auth scheme.
-QNetworkRequest chatRequest(const ClientPrivate *d)
+QNetworkRequest apiRequest(const ClientPrivate *d, const QString &path)
 {
-    QNetworkRequest networkRequest(d->endpointUrl(QStringLiteral("/chat/completions")));
+    QNetworkRequest networkRequest(d->endpointUrl(path));
     networkRequest.setHeader(QNetworkRequest::ContentTypeHeader,
                              QStringLiteral("application/json"));
     if (!d->apiKey.isEmpty()) {
@@ -241,6 +241,12 @@ QNetworkRequest chatRequest(const ClientPrivate *d)
     if (d->requestTimeoutMs > 0)
         networkRequest.setTransferTimeout(d->requestTimeoutMs);
     return networkRequest;
+}
+
+// The /chat/completions request, retaining the original spelling for callers.
+QNetworkRequest chatRequest(const ClientPrivate *d)
+{
+    return apiRequest(d, QStringLiteral("/chat/completions"));
 }
 
 } // namespace
@@ -270,6 +276,45 @@ Client::createChatCompletionStream(const Core::ChatCompletionRequest &request)
     const QByteArray body = QJsonDocument(streamed.toJson()).toJson(QJsonDocument::Compact);
     QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
     return new ChatCompletionStreamReply(reply);
+}
+
+ResponseReply *Client::createResponse(const Core::ResponseRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req = apiRequest(d, QStringLiteral("/responses")), body]() {
+        return manager->post(req, body);
+    };
+    return new ResponseReply(std::move(factory), d->retryPolicy);
+}
+
+ResponseReply *Client::getResponse(const QString &responseId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/responses/") + responseId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    return new ResponseReply(std::move(factory), d->retryPolicy);
+}
+
+ResponseReply *Client::cancelResponse(const QString &responseId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/responses/") + responseId + QStringLiteral("/cancel");
+    auto factory
+            = [manager, req = apiRequest(d, path)]() { return manager->post(req, QByteArray()); };
+    return new ResponseReply(std::move(factory), d->retryPolicy);
+}
+
+ResponseReply *Client::deleteResponse(const QString &responseId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/responses/") + responseId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
+    return new ResponseReply(std::move(factory), d->retryPolicy);
 }
 
 } // namespace Client

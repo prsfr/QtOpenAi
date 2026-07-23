@@ -4,8 +4,10 @@
 #include <QtOpenAi/Client/ChatCompletionReply.h>
 #include <QtOpenAi/Client/ChatCompletionStreamReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
+#include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
+#include <QtOpenAi/Core/ResponseRequest.h>
 
 #include <QtCore/QByteArray>
 #include <QtCore/QHash>
@@ -99,6 +101,21 @@ public:
     // policy (enabled by default).
     ChatCompletionStreamReply *
     createChatCompletionStream(const Core::ChatCompletionRequest &request);
+
+    // --- Responses API (POST/GET/DELETE /responses) ------------------------
+    // Create a response. Ownership follows the reply's auto-delete policy
+    // (enabled by default); pass a parent to tie its lifetime elsewhere.
+    ResponseReply *createResponse(const Core::ResponseRequest &request);
+
+    // Retrieve a previously created (stored) response by id.
+    ResponseReply *getResponse(const QString &responseId);
+
+    // Cancel an in-progress background response.
+    ResponseReply *cancelResponse(const QString &responseId);
+
+    // Delete a stored response. On success the reply's response() carries the
+    // deletion acknowledgement (object "response.deleted").
+    ResponseReply *deleteResponse(const QString &responseId);
 
 Q_SIGNALS:
     void baseUrlChanged();
