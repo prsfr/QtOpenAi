@@ -271,6 +271,17 @@ ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequ
     return new ChatCompletionReply(std::move(factory), d->retryPolicy);
 }
 
+ModerationReply *Client::createModeration(const Core::ModerationRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req = apiRequest(d, QStringLiteral("/moderations")), body]() {
+        return manager->post(req, body);
+    };
+    return new ModerationReply(std::move(factory), d->retryPolicy);
+}
+
 ChatCompletionStreamReply *
 Client::createChatCompletionStream(const Core::ChatCompletionRequest &request)
 {

@@ -31,6 +31,10 @@ qtopenai_add_test(tst_core_conversations
     SOURCES core/tst_conversations.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_moderations
+    SOURCES core/tst_moderations.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp
@@ -54,4 +58,8 @@ qtopenai_add_test(tst_client_responses
 
 qtopenai_add_test(tst_client_conversations
     SOURCES client/tst_conversations.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_moderations
+    SOURCES client/tst_moderations.cpp
     LIBS QtOpenAi::Client)

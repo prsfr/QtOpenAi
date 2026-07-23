@@ -13,6 +13,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ResponseReply.h
     include/QtOpenAi/Client/ConversationReply.h
     include/QtOpenAi/Client/ConversationItemsReply.h
+    include/QtOpenAi/Client/ModerationReply.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -29,6 +30,7 @@ add_library(QtOpenAiClient
     src/ResponseReply.cpp
     src/ConversationReply.cpp
     src/ConversationItemsReply.cpp
+    src/ModerationReply.cpp
     src/Client.cpp
 )
 
