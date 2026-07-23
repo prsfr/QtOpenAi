@@ -12,6 +12,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/Tool.h
     include/QtOpenAi/Core/Usage.h
     include/QtOpenAi/Core/Choice.h
+    include/QtOpenAi/Core/ResponseFormat.h
     include/QtOpenAi/Core/ChatCompletionRequest.h
     include/QtOpenAi/Core/ChatCompletionResponse.h
     include/QtOpenAi/Core/ChatCompletionChunk.h
@@ -44,6 +45,7 @@ add_library(QtOpenAiCore
     src/Tool.cpp
     src/Usage.cpp
     src/Choice.cpp
+    src/ResponseFormat.cpp
     src/ChatCompletionRequest.cpp
     src/ChatCompletionResponse.cpp
     src/ChatCompletionChunk.cpp

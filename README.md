@@ -122,6 +122,39 @@ a response message is exposed via `Message::audioId()` / `audioData()` /
 `audioTranscript()`. A message serialises `content` as a string when it holds a
 single string and as an array once it has parts.
 
+## Structured outputs (`response_format`)
+
+`Core::ResponseFormat` constrains decoding to plain text, a JSON object, or a
+JSON schema. Build one with the static helpers and attach it to a request:
+
+```cpp
+using namespace QtOpenAi::Core;
+
+QJsonObject schema {
+    {"type", "object"},
+    {"properties", QJsonObject {
+        {"name", QJsonObject {{"type", "string"}}},
+        {"age",  QJsonObject {{"type", "integer"}}},
+    }},
+    {"required", QJsonArray {"name", "age"}},
+    {"additionalProperties", false},
+};
+
+ChatCompletionRequest request("gpt-4o", { Message::user("Extract the person.") });
+request.setResponseFormat(ResponseFormat::jsonSchema("person", schema));  // strict by default
+```
+
+The same value type feeds the Responses API, where the schema fields are inlined
+under `text.format` rather than nested — use `ResponseRequest::setTextFormat()`:
+
+```cpp
+ResponseRequest response("gpt-4o", "Extract the person.");
+response.setTextFormat(ResponseFormat::jsonSchema("person", schema));
+```
+
+`ResponseFormat::text()` and `ResponseFormat::jsonObject()` cover the simpler
+modes.
+
 ## Streaming (Server-Sent Events)
 
 Call `createChatCompletionStream()` for token-by-token output. The reply emits
