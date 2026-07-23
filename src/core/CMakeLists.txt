@@ -20,6 +20,8 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/ResponseRequest.h
     include/QtOpenAi/Core/Conversation.h
     include/QtOpenAi/Core/ConversationItemList.h
+    include/QtOpenAi/Core/ModerationRequest.h
+    include/QtOpenAi/Core/ModerationResponse.h
 )
 
 add_library(QtOpenAiCore
@@ -41,6 +43,8 @@ add_library(QtOpenAiCore
     src/ResponseRequest.cpp
     src/Conversation.cpp
     src/ConversationItemList.cpp
+    src/ModerationRequest.cpp
+    src/ModerationResponse.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

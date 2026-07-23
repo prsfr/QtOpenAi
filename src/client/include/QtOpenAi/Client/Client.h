@@ -6,9 +6,11 @@
 #include <QtOpenAi/Client/ConversationItemsReply.h>
 #include <QtOpenAi/Client/ConversationReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
+#include <QtOpenAi/Client/ModerationReply.h>
 #include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
+#include <QtOpenAi/Core/ModerationRequest.h>
 #include <QtOpenAi/Core/ResponseOutputItem.h>
 #include <QtOpenAi/Core/ResponseRequest.h>
 
@@ -106,6 +108,9 @@ public:
     // policy (enabled by default).
     ChatCompletionStreamReply *
     createChatCompletionStream(const Core::ChatCompletionRequest &request);
+
+    // Classify text/image input against the moderation policy (POST /moderations).
+    ModerationReply *createModeration(const Core::ModerationRequest &request);
 
     // --- Responses API (POST/GET/DELETE /responses) ------------------------
     // Create a response. Ownership follows the reply's auto-delete policy
