@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-#include "QtOpenAi/Client/ChatCompletionStreamReply.h"
+#include "QtOpenAi/Client/CompletionStreamReply.h"
 
 #include "HttpSupport_p.h"
-#include "QtOpenAi/Client/ChatCompletionAccumulator.h"
 #include "SseParser_p.h"
 
+#include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtNetwork/QNetworkReply>
@@ -12,63 +12,87 @@
 namespace QtOpenAi {
 namespace Client {
 
-class ChatCompletionStreamReplyPrivate
+class CompletionStreamReplyPrivate
 {
 public:
     QNetworkReply *networkReply = nullptr;
-    ChatCompletionAccumulator accumulator;
+    detail::SseParser parser;
     ClientError error;
     RateLimit rateLimit;
-    detail::SseParser parser;
+    // Accumulated fields reassembled from the streamed chunks.
+    QString id;
+    QString model;
+    QString text;
+    QString finishReason;
     bool finished = false;
     bool success = false;
-    bool sawDone = false; // received the terminating [DONE] sentinel
+    bool sawDone = false;
     bool autoDelete = true;
+
+    Core::CompletionResponse response() const
+    {
+        Core::CompletionResponse response;
+        response.setId(id);
+        response.setModel(model);
+        Core::CompletionChoice choice;
+        choice.setText(text);
+        choice.setIndex(0);
+        choice.setFinishReason(finishReason);
+        response.setChoices({choice});
+        return response;
+    }
 };
 
-ChatCompletionStreamReply::ChatCompletionStreamReply(QNetworkReply *reply, QObject *parent)
+CompletionStreamReply::CompletionStreamReply(QNetworkReply *reply, QObject *parent)
     : QObject(parent)
-    , d_ptr(new ChatCompletionStreamReplyPrivate)
+    , d_ptr(new CompletionStreamReplyPrivate)
 {
-    Q_D(ChatCompletionStreamReply);
+    Q_D(CompletionStreamReply);
     d->networkReply = reply;
     reply->setParent(this);
 
     connect(reply, &QNetworkReply::readyRead, this, [this]() {
-        Q_D(ChatCompletionStreamReply);
+        Q_D(CompletionStreamReply);
         const QList<QByteArray> payloads = d->parser.feed(d->networkReply->readAll());
         for (const QByteArray &data : payloads) {
             if (data == "[DONE]") {
                 d->sawDone = true;
                 continue;
             }
-
             const QJsonDocument doc = QJsonDocument::fromJson(data);
             if (!doc.isObject())
                 continue;
+            const QJsonObject object = doc.object();
 
-            const Core::ChatCompletionChunk chunk
-                    = Core::ChatCompletionChunk::fromJson(doc.object());
-            d->accumulator.add(chunk);
-            Q_EMIT delta(chunk);
+            if (const QString id = object.value(QStringLiteral("id")).toString(); !id.isEmpty())
+                d->id = id;
+            if (const QString model = object.value(QStringLiteral("model")).toString();
+                !model.isEmpty())
+                d->model = model;
 
-            if (!chunk.choices().isEmpty()) {
-                const Core::ChoiceDelta first = chunk.choices().first().delta();
-                if (first.hasContent() && !first.content().isEmpty())
-                    Q_EMIT contentDelta(first.content());
+            const QJsonArray choices = object.value(QStringLiteral("choices")).toArray();
+            if (choices.isEmpty())
+                continue;
+            const QJsonObject choice = choices.first().toObject();
+            const QString fragment = choice.value(QStringLiteral("text")).toString();
+            if (const QString reason = choice.value(QStringLiteral("finish_reason")).toString();
+                !reason.isEmpty())
+                d->finishReason = reason;
+            if (!fragment.isEmpty()) {
+                d->text += fragment;
+                Q_EMIT textDelta(fragment);
             }
         }
     });
 
     connect(reply, &QNetworkReply::finished, this, [this]() {
-        Q_D(ChatCompletionStreamReply);
+        Q_D(CompletionStreamReply);
         d->finished = true;
         QNetworkReply *reply = d->networkReply;
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         d->rateLimit = detail::parseRateLimit(reply);
 
         if (reply->error() != QNetworkReply::NoError || status >= 400) {
-            // Error responses are delivered as a single JSON body, not SSE.
             QString message = reply->errorString();
             ClientError err(status >= 400 ? ClientError::Kind::Http : ClientError::Kind::Network,
                             message, status);
@@ -89,7 +113,7 @@ ChatCompletionStreamReply::ChatCompletionStreamReply(QNetworkReply *reply, QObje
             Q_EMIT failed(d->error);
         } else {
             d->success = true;
-            Q_EMIT finished(d->accumulator.response());
+            Q_EMIT finished(d->response());
         }
 
         Q_EMIT done();
@@ -98,53 +122,53 @@ ChatCompletionStreamReply::ChatCompletionStreamReply(QNetworkReply *reply, QObje
     });
 }
 
-ChatCompletionStreamReply::~ChatCompletionStreamReply() = default;
+CompletionStreamReply::~CompletionStreamReply() = default;
 
-bool ChatCompletionStreamReply::isFinished() const
+bool CompletionStreamReply::isFinished() const
 {
-    Q_D(const ChatCompletionStreamReply);
+    Q_D(const CompletionStreamReply);
     return d->finished;
 }
 
-bool ChatCompletionStreamReply::isSuccess() const
+bool CompletionStreamReply::isSuccess() const
 {
-    Q_D(const ChatCompletionStreamReply);
+    Q_D(const CompletionStreamReply);
     return d->success;
 }
 
-Core::ChatCompletionResponse ChatCompletionStreamReply::response() const
+Core::CompletionResponse CompletionStreamReply::response() const
 {
-    Q_D(const ChatCompletionStreamReply);
-    return d->accumulator.response();
+    Q_D(const CompletionStreamReply);
+    return d->response();
 }
 
-ClientError ChatCompletionStreamReply::error() const
+ClientError CompletionStreamReply::error() const
 {
-    Q_D(const ChatCompletionStreamReply);
+    Q_D(const CompletionStreamReply);
     return d->error;
 }
 
-RateLimit ChatCompletionStreamReply::rateLimit() const
+RateLimit CompletionStreamReply::rateLimit() const
 {
-    Q_D(const ChatCompletionStreamReply);
+    Q_D(const CompletionStreamReply);
     return d->rateLimit;
 }
 
-void ChatCompletionStreamReply::setAutoDelete(bool enabled)
+void CompletionStreamReply::setAutoDelete(bool enabled)
 {
-    Q_D(ChatCompletionStreamReply);
+    Q_D(CompletionStreamReply);
     d->autoDelete = enabled;
 }
 
-bool ChatCompletionStreamReply::autoDelete() const
+bool CompletionStreamReply::autoDelete() const
 {
-    Q_D(const ChatCompletionStreamReply);
+    Q_D(const CompletionStreamReply);
     return d->autoDelete;
 }
 
-void ChatCompletionStreamReply::abort()
+void CompletionStreamReply::abort()
 {
-    Q_D(ChatCompletionStreamReply);
+    Q_D(CompletionStreamReply);
     if (d->networkReply && d->networkReply->isRunning())
         d->networkReply->abort();
 }

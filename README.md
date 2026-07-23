@@ -123,6 +123,11 @@ connect(stream, &Client::ChatCompletionStreamReply::failed, this,
 can also be driven directly over `ChatCompletionChunk` deltas you collect
 yourself.
 
+The legacy `/completions` endpoint streams too: `createCompletionStream()`
+returns a `CompletionStreamReply` emitting `textDelta()` and, on completion,
+`finished(CompletionResponse)`. All three streaming replies share one internal
+SSE-framing parser.
+
 ## Responses API (`/responses`)
 
 The modern, unified Responses API is supported alongside Chat Completions. A
@@ -151,10 +156,22 @@ Stored responses can be retrieved, cancelled, or deleted by id via
 `ResponseReply` sharing the same retry and rate-limit machinery as
 `ChatCompletionReply`.
 
-> Streaming events (`response.output_text.delta`, …) and the auxiliary endpoints
-> (`input_items`, `compact`, `input_tokens`) are tracked separately and land in a
-> follow-up; the request/response types and the create/get/cancel/delete
-> endpoints are covered here.
+For streaming, `createResponseStream()` returns a `ResponseStreamReply` that
+surfaces the typed event sequence — `outputTextDelta()` and
+`functionCallArgumentsDelta()` for the common cases, `event(type, data)` for
+everything else — and `finished(Response)` on `response.completed`:
+
+```cpp
+auto *stream = client.createResponseStream(request);   // sets stream: true
+connect(stream, &Client::ResponseStreamReply::outputTextDelta,
+        this, [](const QString &text) { std::cout << text.toStdString() << std::flush; });
+connect(stream, &Client::ResponseStreamReply::finished, this,
+        [](const Core::Response &full) { /* full.outputText() is complete here */ });
+```
+
+> The auxiliary endpoints (`input_items`, `compact`, `input_tokens`) are tracked
+> separately and land in a follow-up; the request/response types, the
+> create/get/cancel/delete endpoints, and streaming are covered here.
 
 ## Conversations API (`/conversations`)
 
