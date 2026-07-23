@@ -18,12 +18,15 @@
 #include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/ResponseStreamReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
+#include <QtOpenAi/Client/TranscriptionReply.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
 #include <QtOpenAi/Core/EmbeddingRequest.h>
 #include <QtOpenAi/Core/ModerationRequest.h>
 #include <QtOpenAi/Core/ResponseOutputItem.h>
 #include <QtOpenAi/Core/ResponseRequest.h>
+#include <QtOpenAi/Core/TranscriptionRequest.h>
+#include <QtOpenAi/Core/TranslationRequest.h>
 
 #include <QtCore/QByteArray>
 #include <QtCore/QHash>
@@ -201,6 +204,16 @@ public:
     // --- Embeddings (/embeddings) ------------------------------------------
     // Create embeddings for the request's input.
     EmbeddingReply *createEmbeddings(const Core::EmbeddingRequest &request);
+
+    // --- Audio: speech-to-text ---------------------------------------------
+    // Transcribe audio in its source language (POST /audio/transcriptions).
+    // Uploads the request's audio bytes as multipart/form-data. Ownership
+    // follows the reply's auto-delete policy (enabled by default).
+    TranscriptionReply *createTranscription(const Core::TranscriptionRequest &request);
+
+    // Translate audio into English (POST /audio/translations). Same multipart
+    // upload; the reply carries the translated transcript.
+    TranscriptionReply *createTranslation(const Core::TranslationRequest &request);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.

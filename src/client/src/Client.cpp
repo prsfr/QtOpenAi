@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/Client.h"
 
+#include "Multipart_p.h"
+
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QUrlQuery>
+#include <QtNetwork/QHttpMultiPart>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
@@ -272,6 +275,26 @@ void applyQuery(QNetworkRequest &request, const QUrlQuery &extra)
         query.addQueryItem(item.first, item.second);
     url.setQuery(query);
     request.setUrl(url);
+}
+
+// Build a request factory that POSTs a multipart/form-data body. A fresh
+// QHttpMultiPart is created per attempt (they are single-use) and parented to
+// the reply so it is freed with it. The Content-Type header is set from the
+// generated boundary, overriding the JSON default from apiRequest().
+std::function<QNetworkReply *()> multipartPostFactory(QNetworkAccessManager *manager,
+                                                      QNetworkRequest request,
+                                                      QList<QPair<QString, QString>> fields,
+                                                      detail::FormFilePart file)
+{
+    return [manager, request, fields = std::move(fields), file = std::move(file)]() mutable {
+        QHttpMultiPart *multiPart = detail::buildMultipart(fields, {file});
+        QNetworkRequest req = request;
+        req.setHeader(QNetworkRequest::ContentTypeHeader,
+                      QByteArray("multipart/form-data; boundary=") + multiPart->boundary());
+        QNetworkReply *reply = manager->post(req, multiPart);
+        multiPart->setParent(reply);
+        return reply;
+    };
 }
 
 } // namespace
@@ -557,6 +580,26 @@ EmbeddingReply *Client::createEmbeddings(const Core::EmbeddingRequest &request)
         return manager->post(req, body);
     };
     return new EmbeddingReply(std::move(factory), d->retryPolicy);
+}
+
+TranscriptionReply *Client::createTranscription(const Core::TranscriptionRequest &request)
+{
+    Q_D(Client);
+    detail::FormFilePart file {"file", request.fileName(), request.fileData()};
+    auto factory = multipartPostFactory(networkAccessManager(),
+                                        apiRequest(d, QStringLiteral("/audio/transcriptions")),
+                                        request.formFields(), std::move(file));
+    return new TranscriptionReply(std::move(factory), d->retryPolicy);
+}
+
+TranscriptionReply *Client::createTranslation(const Core::TranslationRequest &request)
+{
+    Q_D(Client);
+    detail::FormFilePart file {"file", request.fileName(), request.fileData()};
+    auto factory = multipartPostFactory(networkAccessManager(),
+                                        apiRequest(d, QStringLiteral("/audio/translations")),
+                                        request.formFields(), std::move(file));
+    return new TranscriptionReply(std::move(factory), d->retryPolicy);
 }
 
 ModelListReply *Client::listModels()

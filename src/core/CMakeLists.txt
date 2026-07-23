@@ -32,6 +32,9 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/EmbeddingRequest.h
     include/QtOpenAi/Core/EmbeddingResponse.h
     include/QtOpenAi/Core/Model.h
+    include/QtOpenAi/Core/TranscriptionRequest.h
+    include/QtOpenAi/Core/TranscriptionResponse.h
+    include/QtOpenAi/Core/TranslationRequest.h
 )
 
 add_library(QtOpenAiCore
@@ -63,6 +66,9 @@ add_library(QtOpenAiCore
     src/EmbeddingRequest.cpp
     src/EmbeddingResponse.cpp
     src/Model.cpp
+    src/TranscriptionRequest.cpp
+    src/TranscriptionResponse.cpp
+    src/TranslationRequest.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.
