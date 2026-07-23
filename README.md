@@ -301,6 +301,34 @@ connect(models, &Client::ModelListReply::finished, this,
 `Core::ModelList` is `ListPage<Model>`, the same page type the other list
 endpoints return.
 
+## Speech-to-text (`/audio/transcriptions`, `/audio/translations`)
+
+Transcribe audio in its source language, or translate it into English. Both
+endpoints upload the audio as `multipart/form-data`, so the request carries the
+raw file bytes plus a filename; the client builds the multipart body (and
+rebuilds it on retries) internally:
+
+```cpp
+QByteArray audio = /* read a .wav/.mp3/... into memory */;
+
+Core::TranscriptionRequest request(audio, "clip.wav", "whisper-1");
+request.setResponseFormat("verbose_json");   // json / text / srt / verbose_json / vtt
+request.setTimestampGranularities({ "segment", "word" });
+
+auto *reply = client.createTranscription(request);
+connect(reply, &Client::TranscriptionReply::finished, this,
+        [](const Core::TranscriptionResponse &r) {
+            qInfo() << r.text();
+            for (const auto &segment : r.segments())
+                qInfo() << segment.start() << segment.end() << segment.text();
+        });
+```
+
+`createTranslation(Core::TranslationRequest)` works the same way and returns the
+same `TranscriptionReply`. For the plain `text` / `srt` / `vtt` response formats
+the transcript is surfaced through `response().text()`. The internal multipart
+builder is reused by the other file-upload endpoints (image edits, ...).
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
