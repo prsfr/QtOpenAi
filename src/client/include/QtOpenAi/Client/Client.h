@@ -11,6 +11,7 @@
 #include <QtOpenAi/Client/ConversationReply.h>
 #include <QtOpenAi/Client/EmbeddingReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
+#include <QtOpenAi/Client/ImageReply.h>
 #include <QtOpenAi/Client/ListParams.h>
 #include <QtOpenAi/Client/ModelListReply.h>
 #include <QtOpenAi/Client/ModelReply.h>
@@ -22,6 +23,9 @@
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
 #include <QtOpenAi/Core/EmbeddingRequest.h>
+#include <QtOpenAi/Core/ImageEditRequest.h>
+#include <QtOpenAi/Core/ImageGenerationRequest.h>
+#include <QtOpenAi/Core/ImageVariationRequest.h>
 #include <QtOpenAi/Core/ModerationRequest.h>
 #include <QtOpenAi/Core/ResponseOutputItem.h>
 #include <QtOpenAi/Core/ResponseRequest.h>
@@ -214,6 +218,17 @@ public:
     // Translate audio into English (POST /audio/translations). Same multipart
     // upload; the reply carries the translated transcript.
     TranscriptionReply *createTranslation(const Core::TranslationRequest &request);
+
+    // --- Images (/images) --------------------------------------------------
+    // Generate images from a text prompt (POST /images/generations).
+    ImageReply *createImage(const Core::ImageGenerationRequest &request);
+
+    // Edit an image given a prompt (and optional mask) (POST /images/edits).
+    // Uploads the source image(s)/mask as multipart/form-data.
+    ImageReply *createImageEdit(const Core::ImageEditRequest &request);
+
+    // Produce variations of a source image (POST /images/variations, dall-e-2).
+    ImageReply *createImageVariation(const Core::ImageVariationRequest &request);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.

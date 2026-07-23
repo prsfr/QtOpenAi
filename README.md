@@ -329,6 +329,34 @@ same `TranscriptionReply`. For the plain `text` / `srt` / `vtt` response formats
 the transcript is surfaced through `response().text()`. The internal multipart
 builder is reused by the other file-upload endpoints (image edits, ...).
 
+## Images (`/images/generations`, `/edits`, `/variations`)
+
+Generate images from a prompt, or edit/vary an existing one. Generation is a
+plain JSON request; edits and variations upload the source image(s) — and, for
+edits, an optional mask — as `multipart/form-data`, reusing the same upload
+builder as the audio endpoints. All three return an `ImageReply`:
+
+```cpp
+Core::ImageGenerationRequest gen("a red cube on a white table", "gpt-image-1");
+gen.setSize("1024x1024");
+gen.setQuality("high");
+
+auto *reply = client.createImage(gen);
+connect(reply, &Client::ImageReply::finished, this,
+        [](const Core::ImageResponse &r) {
+            const Core::Image image = r.firstImage();
+            // image.url() or image.b64Json(), plus image.revisedPrompt()
+        });
+
+// Edit with an optional mask (transparent areas mark where to paint):
+Core::ImageEditRequest edit(pngBytes, "in.png", "give the cube a hat");
+edit.setMask("mask.png", maskBytes);
+client.createImageEdit(edit);
+
+// Variations of a source image (dall-e-2):
+client.createImageVariation(Core::ImageVariationRequest(pngBytes, "in.png", "dall-e-2"));
+```
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
