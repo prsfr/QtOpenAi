@@ -107,6 +107,39 @@ connect(stream, &Client::ChatCompletionStreamReply::failed, this,
 can also be driven directly over `ChatCompletionChunk` deltas you collect
 yourself.
 
+## Responses API (`/responses`)
+
+The modern, unified Responses API is supported alongside Chat Completions. A
+request takes an `input` (a plain string or a structured item array) and returns
+a `Response` whose `output` is a list of typed items — assistant messages,
+function calls, and reasoning summaries:
+
+```cpp
+Core::ResponseRequest request("gpt-5", "Tell me a joke");
+request.setInstructions("Be concise");
+request.setReasoningEffort("low");
+
+auto *reply = client.createResponse(request);
+connect(reply, &Client::ResponseReply::finished, this,
+        [](const Core::Response &response) {
+            qInfo().noquote() << response.outputText();   // assistant text
+            for (const auto &call : response.functionCalls())
+                qInfo() << call.name() << call.arguments();
+        });
+connect(reply, &Client::ResponseReply::failed, this,
+        [](const Client::ClientError &e) { qWarning() << e.message(); });
+```
+
+Stored responses can be retrieved, cancelled, or deleted by id via
+`getResponse()`, `cancelResponse()`, and `deleteResponse()`. Each returns a
+`ResponseReply` sharing the same retry and rate-limit machinery as
+`ChatCompletionReply`.
+
+> Streaming events (`response.output_text.delta`, …) and the auxiliary endpoints
+> (`input_items`, `compact`, `input_tokens`) are tracked separately and land in a
+> follow-up; the request/response types and the create/get/cancel/delete
+> endpoints are covered here.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and

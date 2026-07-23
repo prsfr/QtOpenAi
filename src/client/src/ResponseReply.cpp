@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-#include "QtOpenAi/Client/ChatCompletionReply.h"
+#include "QtOpenAi/Client/ResponseReply.h"
 
 #include "HttpSupport_p.h"
 
@@ -11,13 +11,13 @@
 namespace QtOpenAi {
 namespace Client {
 
-class ChatCompletionReplyPrivate
+class ResponseReplyPrivate
 {
 public:
     std::function<QNetworkReply *()> factory;
     RetryPolicy policy;
     QNetworkReply *networkReply = nullptr;
-    Core::ChatCompletionResponse response;
+    Core::Response response;
     ClientError error;
     RateLimit rateLimit;
     int retryCount = 0;
@@ -26,12 +26,12 @@ public:
     bool autoDelete = true;
 };
 
-ChatCompletionReply::ChatCompletionReply(std::function<QNetworkReply *()> requestFactory,
-                                         RetryPolicy policy, QObject *parent)
+ResponseReply::ResponseReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
+                             QObject *parent)
     : QObject(parent)
-    , d_ptr(new ChatCompletionReplyPrivate)
+    , d_ptr(new ResponseReplyPrivate)
 {
-    Q_D(ChatCompletionReply);
+    Q_D(ResponseReply);
     d->factory = std::move(requestFactory);
     d->policy = std::move(policy);
 
@@ -40,16 +40,16 @@ ChatCompletionReply::ChatCompletionReply(std::function<QNetworkReply *()> reques
     QTimer::singleShot(0, this, [this]() { start(); });
 }
 
-ChatCompletionReply::~ChatCompletionReply() = default;
+ResponseReply::~ResponseReply() = default;
 
-void ChatCompletionReply::start()
+void ResponseReply::start()
 {
-    Q_D(ChatCompletionReply);
+    Q_D(ResponseReply);
     d->networkReply = d->factory();
     d->networkReply->setParent(this);
 
     connect(d->networkReply, &QNetworkReply::finished, this, [this]() {
-        Q_D(ChatCompletionReply);
+        Q_D(ResponseReply);
         QNetworkReply *reply = d->networkReply;
         const QByteArray body = reply->readAll();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -101,7 +101,7 @@ void ChatCompletionReply::start()
                     QStringLiteral("invalid JSON response: %1").arg(parseError.errorString()),
                     status);
         } else {
-            d->response = Core::ChatCompletionResponse::fromJson(doc.object());
+            d->response = Core::Response::fromJson(doc.object());
             d->success = true;
         }
 
@@ -116,57 +116,57 @@ void ChatCompletionReply::start()
     });
 }
 
-bool ChatCompletionReply::isFinished() const
+bool ResponseReply::isFinished() const
 {
-    Q_D(const ChatCompletionReply);
+    Q_D(const ResponseReply);
     return d->finished;
 }
 
-bool ChatCompletionReply::isSuccess() const
+bool ResponseReply::isSuccess() const
 {
-    Q_D(const ChatCompletionReply);
+    Q_D(const ResponseReply);
     return d->success;
 }
 
-Core::ChatCompletionResponse ChatCompletionReply::response() const
+Core::Response ResponseReply::response() const
 {
-    Q_D(const ChatCompletionReply);
+    Q_D(const ResponseReply);
     return d->response;
 }
 
-ClientError ChatCompletionReply::error() const
+ClientError ResponseReply::error() const
 {
-    Q_D(const ChatCompletionReply);
+    Q_D(const ResponseReply);
     return d->error;
 }
 
-RateLimit ChatCompletionReply::rateLimit() const
+RateLimit ResponseReply::rateLimit() const
 {
-    Q_D(const ChatCompletionReply);
+    Q_D(const ResponseReply);
     return d->rateLimit;
 }
 
-int ChatCompletionReply::retryCount() const
+int ResponseReply::retryCount() const
 {
-    Q_D(const ChatCompletionReply);
+    Q_D(const ResponseReply);
     return d->retryCount;
 }
 
-void ChatCompletionReply::setAutoDelete(bool enabled)
+void ResponseReply::setAutoDelete(bool enabled)
 {
-    Q_D(ChatCompletionReply);
+    Q_D(ResponseReply);
     d->autoDelete = enabled;
 }
 
-bool ChatCompletionReply::autoDelete() const
+bool ResponseReply::autoDelete() const
 {
-    Q_D(const ChatCompletionReply);
+    Q_D(const ResponseReply);
     return d->autoDelete;
 }
 
-void ChatCompletionReply::abort()
+void ResponseReply::abort()
 {
-    Q_D(ChatCompletionReply);
+    Q_D(ResponseReply);
     if (d->networkReply && d->networkReply->isRunning())
         d->networkReply->abort();
 }

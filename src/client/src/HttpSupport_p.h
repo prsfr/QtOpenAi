@@ -8,6 +8,7 @@
 
 #include <QtCore/QByteArray>
 #include <QtCore/QDateTime>
+#include <QtCore/QRandomGenerator>
 #include <QtNetwork/QNetworkReply>
 
 namespace QtOpenAi {
@@ -105,6 +106,17 @@ inline RateLimit parseRateLimit(QNetworkReply *reply)
     if (reply->hasRawHeader("Retry-After"))
         info.retryAfterMs = retryAfterToMs(reply->rawHeader("Retry-After"));
     return info;
+}
+
+// Compute the delay before the next retry, honouring Retry-After and jitter.
+inline int retryDelayMs(const RetryPolicy &policy, int attempt, const RateLimit &rateLimit)
+{
+    int delay = policy.backoffDelayMs(attempt);
+    if (policy.respectRetryAfter && rateLimit.retryAfterMs >= 0)
+        delay = rateLimit.retryAfterMs;
+    if (policy.jitter && delay > 0)
+        delay = QRandomGenerator::global()->bounded(delay + 1);
+    return delay;
 }
 
 } // namespace detail
