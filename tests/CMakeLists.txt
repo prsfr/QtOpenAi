@@ -91,3 +91,7 @@ qtopenai_add_test(tst_client_storedcompletions
 qtopenai_add_test(tst_client_embeddings
     SOURCES client/tst_embeddings.cpp
     LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_streaming_extra
+    SOURCES client/tst_streaming_extra.cpp
+    LIBS QtOpenAi::Client)

@@ -308,6 +308,22 @@ CompletionReply *Client::createCompletion(const Core::CompletionRequest &request
     return new CompletionReply(std::move(factory), d->retryPolicy);
 }
 
+CompletionStreamReply *Client::createCompletionStream(const Core::CompletionRequest &request)
+{
+    Q_D(Client);
+
+    // Force streaming on a copy so the caller's request is left untouched.
+    Core::CompletionRequest streamed = request;
+    streamed.setStream(true);
+
+    QNetworkRequest networkRequest = apiRequest(d, QStringLiteral("/completions"));
+    networkRequest.setRawHeader("Accept", "text/event-stream");
+
+    const QByteArray body = QJsonDocument(streamed.toJson()).toJson(QJsonDocument::Compact);
+    QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
+    return new CompletionStreamReply(reply);
+}
+
 ChatCompletionStreamReply *
 Client::createChatCompletionStream(const Core::ChatCompletionRequest &request)
 {
@@ -334,6 +350,22 @@ ResponseReply *Client::createResponse(const Core::ResponseRequest &request)
         return manager->post(req, body);
     };
     return new ResponseReply(std::move(factory), d->retryPolicy);
+}
+
+ResponseStreamReply *Client::createResponseStream(const Core::ResponseRequest &request)
+{
+    Q_D(Client);
+
+    // Force streaming on a copy so the caller's request is left untouched.
+    Core::ResponseRequest streamed = request;
+    streamed.setStream(true);
+
+    QNetworkRequest networkRequest = apiRequest(d, QStringLiteral("/responses"));
+    networkRequest.setRawHeader("Accept", "text/event-stream");
+
+    const QByteArray body = QJsonDocument(streamed.toJson()).toJson(QJsonDocument::Compact);
+    QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
+    return new ResponseStreamReply(reply);
 }
 
 ResponseReply *Client::getResponse(const QString &responseId)

@@ -21,6 +21,8 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/EmbeddingReply.h
     include/QtOpenAi/Client/ModelReply.h
     include/QtOpenAi/Client/ModelListReply.h
+    include/QtOpenAi/Client/CompletionStreamReply.h
+    include/QtOpenAi/Client/ResponseStreamReply.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -28,6 +30,7 @@ add_library(QtOpenAiClient
     ${QTOPENAI_CLIENT_PUBLIC_HEADERS}
     src/HttpSupport_p.h
     src/RestReply_p.h
+    src/SseParser_p.h
     src/ToolRegistry.cpp
     src/RetryPolicy.cpp
     src/RestReply.cpp
@@ -44,6 +47,8 @@ add_library(QtOpenAiClient
     src/EmbeddingReply.cpp
     src/ModelReply.cpp
     src/ModelListReply.cpp
+    src/CompletionStreamReply.cpp
+    src/ResponseStreamReply.cpp
     src/Client.cpp
 )
 

@@ -6,6 +6,7 @@
 #include <QtOpenAi/Client/ChatCompletionReply.h>
 #include <QtOpenAi/Client/ChatCompletionStreamReply.h>
 #include <QtOpenAi/Client/CompletionReply.h>
+#include <QtOpenAi/Client/CompletionStreamReply.h>
 #include <QtOpenAi/Client/ConversationItemsReply.h>
 #include <QtOpenAi/Client/ConversationReply.h>
 #include <QtOpenAi/Client/EmbeddingReply.h>
@@ -15,6 +16,7 @@
 #include <QtOpenAi/Client/ModelReply.h>
 #include <QtOpenAi/Client/ModerationReply.h>
 #include <QtOpenAi/Client/ResponseReply.h>
+#include <QtOpenAi/Client/ResponseStreamReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
@@ -126,10 +128,20 @@ public:
     // reply's auto-delete policy (enabled by default).
     CompletionReply *createCompletion(const Core::CompletionRequest &request);
 
+    // Streamed legacy text completion (Server-Sent Events). Forces the request's
+    // `stream` flag to true and returns a CompletionStreamReply emitting text
+    // deltas. Ownership follows the reply's auto-delete policy.
+    CompletionStreamReply *createCompletionStream(const Core::CompletionRequest &request);
+
     // --- Responses API (POST/GET/DELETE /responses) ------------------------
     // Create a response. Ownership follows the reply's auto-delete policy
     // (enabled by default); pass a parent to tie its lifetime elsewhere.
     ResponseReply *createResponse(const Core::ResponseRequest &request);
+
+    // Streamed response (Server-Sent Events). Forces the request's `stream` flag
+    // to true and returns a ResponseStreamReply emitting typed events. Ownership
+    // follows the reply's auto-delete policy.
+    ResponseStreamReply *createResponseStream(const Core::ResponseRequest &request);
 
     // Retrieve a previously created (stored) response by id.
     ResponseReply *getResponse(const QString &responseId);
