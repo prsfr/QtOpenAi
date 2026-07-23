@@ -130,12 +130,14 @@ ResponseOutputItem ResponseOutputItem::fromJson(const QJsonObject &json)
     item.d->status = detail::stringOr(json, QStringLiteral("status"));
     item.d->role = detail::stringOr(json, QStringLiteral("role"));
 
-    // message: gather text from output_text content parts.
+    // message: gather text from text content parts. Assistant items use
+    // "output_text"; conversation input items use "input_text" — accept both.
     const QJsonArray content = json.value(QStringLiteral("content")).toArray();
     QString text;
     for (const QJsonValue &value : content) {
         const QJsonObject part = value.toObject();
-        if (part.value(QStringLiteral("type")).toString() == QLatin1String("output_text"))
+        const QString partType = part.value(QStringLiteral("type")).toString();
+        if (partType == QLatin1String("output_text") || partType == QLatin1String("input_text"))
             text += part.value(QStringLiteral("text")).toString();
     }
     item.d->text = text;

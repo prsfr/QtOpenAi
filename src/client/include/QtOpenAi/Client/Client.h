@@ -3,14 +3,19 @@
 
 #include <QtOpenAi/Client/ChatCompletionReply.h>
 #include <QtOpenAi/Client/ChatCompletionStreamReply.h>
+#include <QtOpenAi/Client/ConversationItemsReply.h>
+#include <QtOpenAi/Client/ConversationReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
 #include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
+#include <QtOpenAi/Core/ResponseOutputItem.h>
 #include <QtOpenAi/Core/ResponseRequest.h>
 
 #include <QtCore/QByteArray>
 #include <QtCore/QHash>
+#include <QtCore/QJsonObject>
+#include <QtCore/QList>
 #include <QtCore/QObject>
 #include <QtCore/QString>
 #include <QtCore/QUrl>
@@ -116,6 +121,33 @@ public:
     // Delete a stored response. On success the reply's response() carries the
     // deletion acknowledgement (object "response.deleted").
     ResponseReply *deleteResponse(const QString &responseId);
+
+    // --- Conversations API (/conversations) --------------------------------
+    // Create a conversation, optionally seeded with items and metadata.
+    ConversationReply *createConversation(const QJsonObject &metadata = {},
+                                          const QList<Core::ResponseOutputItem> &items = {});
+
+    ConversationReply *getConversation(const QString &conversationId);
+
+    // Replace the conversation's metadata.
+    ConversationReply *updateConversation(const QString &conversationId,
+                                          const QJsonObject &metadata);
+
+    ConversationReply *deleteConversation(const QString &conversationId);
+
+    // List the items in a conversation (most-recent-first by default).
+    ConversationItemsReply *listConversationItems(const QString &conversationId);
+
+    // Append items to a conversation.
+    ConversationItemsReply *createConversationItems(const QString &conversationId,
+                                                    const QList<Core::ResponseOutputItem> &items);
+
+    // Fetch a single conversation item (surfaced as a one-item list).
+    ConversationItemsReply *getConversationItem(const QString &conversationId,
+                                                const QString &itemId);
+
+    // Delete an item; on success the reply carries the updated conversation.
+    ConversationReply *deleteConversationItem(const QString &conversationId, const QString &itemId);
 
 Q_SIGNALS:
     void baseUrlChanged();

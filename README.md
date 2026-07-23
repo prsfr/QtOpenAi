@@ -140,6 +140,31 @@ Stored responses can be retrieved, cancelled, or deleted by id via
 > follow-up; the request/response types and the create/get/cancel/delete
 > endpoints are covered here.
 
+## Conversations API (`/conversations`)
+
+Stateful conversations persist item history server-side for use with the
+Responses API. Items reuse the Responses item model (`Core::ResponseOutputItem`):
+
+```cpp
+auto *created = client.createConversation(/*metadata*/ {},
+        { Core::ResponseOutputItem::message("Hello", "user") });
+connect(created, &Client::ConversationReply::finished, this,
+        [&](const Core::Conversation &conv) {
+            auto *items = client.listConversationItems(conv.id());
+            connect(items, &Client::ConversationItemsReply::finished, this,
+                    [](const Core::ConversationItemList &page) {
+                        for (const auto &item : page.items())
+                            qInfo().noquote() << item.role() << item.text();
+                    });
+        });
+```
+
+`createConversation`, `getConversation`, `updateConversation`,
+`deleteConversation`, `listConversationItems`, `createConversationItems`,
+`getConversationItem`, and `deleteConversationItem` are available. The typed
+replies are built on a shared internal request engine (retries, rate-limit
+headers) so every endpoint gets the same resilience for free.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
