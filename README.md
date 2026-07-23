@@ -203,6 +203,30 @@ connect(list, &Client::ChatCompletionListReply::finished, this,
 `Core::ListPage<T>` (aliased as `ChatCompletionList` / `ChatCompletionMessageList`),
 the shared page type reused by every list endpoint.
 
+## Embeddings & models
+
+Turn text into vectors and enumerate the available models:
+
+```cpp
+auto *embed = client.createEmbeddings(
+        Core::EmbeddingRequest("text-embedding-3-small", "hello world"));
+connect(embed, &Client::EmbeddingReply::finished, this,
+        [](const Core::EmbeddingResponse &response) {
+            const QList<double> vector = response.firstVector();
+            qInfo() << "dims:" << vector.size();
+        });
+
+auto *models = client.listModels();   // also getModel(id)
+connect(models, &Client::ModelListReply::finished, this,
+        [](const Core::ModelList &list) {
+            for (const auto &model : list.data)
+                qInfo() << model.id() << model.ownedBy();
+        });
+```
+
+`Core::ModelList` is `ListPage<Model>`, the same page type the other list
+endpoints return.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and

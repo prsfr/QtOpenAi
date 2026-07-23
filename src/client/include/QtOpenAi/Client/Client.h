@@ -8,13 +8,17 @@
 #include <QtOpenAi/Client/CompletionReply.h>
 #include <QtOpenAi/Client/ConversationItemsReply.h>
 #include <QtOpenAi/Client/ConversationReply.h>
+#include <QtOpenAi/Client/EmbeddingReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
 #include <QtOpenAi/Client/ListParams.h>
+#include <QtOpenAi/Client/ModelListReply.h>
+#include <QtOpenAi/Client/ModelReply.h>
 #include <QtOpenAi/Client/ModerationReply.h>
 #include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
+#include <QtOpenAi/Core/EmbeddingRequest.h>
 #include <QtOpenAi/Core/ModerationRequest.h>
 #include <QtOpenAi/Core/ResponseOutputItem.h>
 #include <QtOpenAi/Core/ResponseRequest.h>
@@ -181,6 +185,17 @@ public:
     // List the input messages of a stored chat completion.
     ChatCompletionMessageListReply *listChatCompletionMessages(const QString &completionId,
                                                                const ListParams &params = {});
+
+    // --- Embeddings (/embeddings) ------------------------------------------
+    // Create embeddings for the request's input.
+    EmbeddingReply *createEmbeddings(const Core::EmbeddingRequest &request);
+
+    // --- Models (/models) --------------------------------------------------
+    // List the available models.
+    ModelListReply *listModels();
+
+    // Retrieve a single model by id.
+    ModelReply *getModel(const QString &modelId);
 
 Q_SIGNALS:
     void baseUrlChanged();

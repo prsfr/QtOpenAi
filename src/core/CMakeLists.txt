@@ -27,6 +27,9 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/CompletionRequest.h
     include/QtOpenAi/Core/ListPage.h
     include/QtOpenAi/Core/ChatCompletionList.h
+    include/QtOpenAi/Core/EmbeddingRequest.h
+    include/QtOpenAi/Core/EmbeddingResponse.h
+    include/QtOpenAi/Core/Model.h
 )
 
 add_library(QtOpenAiCore
@@ -53,6 +56,9 @@ add_library(QtOpenAiCore
     src/CompletionChoice.cpp
     src/CompletionResponse.cpp
     src/CompletionRequest.cpp
+    src/EmbeddingRequest.cpp
+    src/EmbeddingResponse.cpp
+    src/Model.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.
