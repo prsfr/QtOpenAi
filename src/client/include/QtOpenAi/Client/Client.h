@@ -19,6 +19,7 @@
 #include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/ResponseStreamReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
+#include <QtOpenAi/Client/SpeechReply.h>
 #include <QtOpenAi/Client/TranscriptionReply.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
@@ -29,6 +30,7 @@
 #include <QtOpenAi/Core/ModerationRequest.h>
 #include <QtOpenAi/Core/ResponseOutputItem.h>
 #include <QtOpenAi/Core/ResponseRequest.h>
+#include <QtOpenAi/Core/SpeechRequest.h>
 #include <QtOpenAi/Core/TranscriptionRequest.h>
 #include <QtOpenAi/Core/TranslationRequest.h>
 
@@ -218,6 +220,11 @@ public:
     // Translate audio into English (POST /audio/translations). Same multipart
     // upload; the reply carries the translated transcript.
     TranscriptionReply *createTranslation(const Core::TranslationRequest &request);
+    // --- Audio: text-to-speech (/audio/speech) -----------------------------
+    // Synthesise speech from text. The reply exposes the raw audio bytes and
+    // the response Content-Type. Ownership follows the reply's auto-delete
+    // policy (enabled by default).
+    SpeechReply *createSpeech(const Core::SpeechRequest &request);
 
     // --- Images (/images) --------------------------------------------------
     // Generate images from a text prompt (POST /images/generations).

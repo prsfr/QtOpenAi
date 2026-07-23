@@ -641,6 +641,17 @@ ImageReply *Client::createImageVariation(const Core::ImageVariationRequest &requ
     return new ImageReply(std::move(factory), d->retryPolicy);
 }
 
+SpeechReply *Client::createSpeech(const Core::SpeechRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req = apiRequest(d, QStringLiteral("/audio/speech")), body]() {
+        return manager->post(req, body);
+    };
+    return new SpeechReply(std::move(factory), d->retryPolicy);
+}
+
 ModelListReply *Client::listModels()
 {
     Q_D(Client);

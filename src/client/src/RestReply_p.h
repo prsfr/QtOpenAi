@@ -33,6 +33,9 @@ public:
 
     RateLimit rateLimit() const;
     int retryCount() const;
+    // Content-Type of the last successful response (e.g. "audio/mpeg"); useful
+    // for endpoints that return a binary blob rather than JSON.
+    QByteArray contentType() const;
     void abort();
 
 Q_SIGNALS:
@@ -50,6 +53,7 @@ private:
     RetryPolicy m_policy;
     QNetworkReply *m_networkReply = nullptr;
     RateLimit m_rateLimit;
+    QByteArray m_contentType;
     int m_retryCount = 0;
 };
 

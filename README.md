@@ -355,6 +355,26 @@ client.createImageEdit(edit);
 
 // Variations of a source image (dall-e-2):
 client.createImageVariation(Core::ImageVariationRequest(pngBytes, "in.png", "dall-e-2"));
+## Text-to-speech (`/audio/speech`)
+
+Synthesise spoken audio from text. Unlike the JSON endpoints, `/audio/speech`
+returns a binary audio blob, so `SpeechReply` surfaces the raw bytes verbatim
+(with the response `Content-Type`) rather than a parsed value type:
+
+```cpp
+Core::SpeechRequest request("gpt-4o-mini-tts", "Hello from Qt!", "alloy");
+request.setResponseFormat("mp3");   // opus / aac / flac / wav / pcm
+request.setSpeed(1.0);
+
+auto *speech = client.createSpeech(request);
+connect(speech, &Client::SpeechReply::finished, this,
+        [](const QByteArray &audio) {
+            QFile out("hello.mp3");
+            out.open(QIODevice::WriteOnly);
+            out.write(audio);   // speech->contentType() == "audio/mpeg"
+        });
+connect(speech, &Client::SpeechReply::failed, this,
+        [](const Client::ClientError &e) { qWarning() << e.message(); });
 ```
 
 ## Resilience & configuration
