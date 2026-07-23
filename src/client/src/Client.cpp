@@ -2,6 +2,7 @@
 #include "QtOpenAi/Client/Client.h"
 
 #include <QtCore/QJsonDocument>
+#include <QtCore/QUrlQuery>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
@@ -19,10 +20,17 @@ public:
     QUrl baseUrl = QUrl(QLatin1String(kDefaultBaseUrl));
     QString apiKey;
     QString organization;
+    Client::AuthScheme authScheme = Client::AuthScheme::BearerToken;
+    QString apiVersion;
+    RetryPolicy retryPolicy;
+    int requestTimeoutMs = 0;
+    QString userAgent;
+    QHash<QByteArray, QByteArray> defaultHeaders;
     QNetworkAccessManager *manager = nullptr;
     bool ownsManager = false;
 
-    // Join the base URL with an endpoint path, tolerating trailing slashes.
+    // Join the base URL with an endpoint path (tolerating trailing slashes) and
+    // append the Azure api-version query parameter when configured.
     QUrl endpointUrl(const QString &path) const
     {
         QString base = baseUrl.toString();
@@ -31,7 +39,13 @@ public:
         QString suffix = path;
         if (!suffix.startsWith(QLatin1Char('/')))
             suffix.prepend(QLatin1Char('/'));
-        return QUrl(base + suffix);
+        QUrl url(base + suffix);
+        if (!apiVersion.isEmpty()) {
+            QUrlQuery query(url);
+            query.addQueryItem(QStringLiteral("api-version"), apiVersion);
+            url.setQuery(query);
+        }
+        return url;
     }
 };
 
@@ -101,6 +115,84 @@ void Client::setOrganization(const QString &organization)
     Q_EMIT organizationChanged();
 }
 
+Client::AuthScheme Client::authScheme() const
+{
+    Q_D(const Client);
+    return d->authScheme;
+}
+
+void Client::setAuthScheme(AuthScheme scheme)
+{
+    Q_D(Client);
+    d->authScheme = scheme;
+}
+
+QString Client::apiVersion() const
+{
+    Q_D(const Client);
+    return d->apiVersion;
+}
+
+void Client::setApiVersion(const QString &apiVersion)
+{
+    Q_D(Client);
+    d->apiVersion = apiVersion;
+}
+
+RetryPolicy Client::retryPolicy() const
+{
+    Q_D(const Client);
+    return d->retryPolicy;
+}
+
+void Client::setRetryPolicy(const RetryPolicy &policy)
+{
+    Q_D(Client);
+    d->retryPolicy = policy;
+}
+
+int Client::requestTimeoutMs() const
+{
+    Q_D(const Client);
+    return d->requestTimeoutMs;
+}
+
+void Client::setRequestTimeoutMs(int timeoutMs)
+{
+    Q_D(Client);
+    d->requestTimeoutMs = timeoutMs;
+}
+
+QString Client::userAgent() const
+{
+    Q_D(const Client);
+    return d->userAgent;
+}
+
+void Client::setUserAgent(const QString &userAgent)
+{
+    Q_D(Client);
+    d->userAgent = userAgent;
+}
+
+void Client::setDefaultHeader(const QByteArray &name, const QByteArray &value)
+{
+    Q_D(Client);
+    d->defaultHeaders.insert(name, value);
+}
+
+void Client::removeDefaultHeader(const QByteArray &name)
+{
+    Q_D(Client);
+    d->defaultHeaders.remove(name);
+}
+
+QHash<QByteArray, QByteArray> Client::defaultHeaders() const
+{
+    Q_D(const Client);
+    return d->defaultHeaders;
+}
+
 void Client::setNetworkAccessManager(QNetworkAccessManager *manager)
 {
     Q_D(Client);
@@ -126,16 +218,28 @@ QNetworkAccessManager *Client::networkAccessManager() const
 
 namespace {
 
-// Build the /chat/completions network request (URL + auth/content headers).
+// Build the /chat/completions network request (URL + auth/content/custom
+// headers + timeout), applying the configured auth scheme.
 QNetworkRequest chatRequest(const ClientPrivate *d)
 {
     QNetworkRequest networkRequest(d->endpointUrl(QStringLiteral("/chat/completions")));
     networkRequest.setHeader(QNetworkRequest::ContentTypeHeader,
                              QStringLiteral("application/json"));
-    if (!d->apiKey.isEmpty())
-        networkRequest.setRawHeader("Authorization", QByteArray("Bearer ") + d->apiKey.toUtf8());
+    if (!d->apiKey.isEmpty()) {
+        if (d->authScheme == Client::AuthScheme::AzureApiKey)
+            networkRequest.setRawHeader("api-key", d->apiKey.toUtf8());
+        else
+            networkRequest.setRawHeader("Authorization",
+                                        QByteArray("Bearer ") + d->apiKey.toUtf8());
+    }
     if (!d->organization.isEmpty())
         networkRequest.setRawHeader("OpenAI-Organization", d->organization.toUtf8());
+    if (!d->userAgent.isEmpty())
+        networkRequest.setHeader(QNetworkRequest::UserAgentHeader, d->userAgent);
+    for (auto it = d->defaultHeaders.constBegin(); it != d->defaultHeaders.constEnd(); ++it)
+        networkRequest.setRawHeader(it.key(), it.value());
+    if (d->requestTimeoutMs > 0)
+        networkRequest.setTransferTimeout(d->requestTimeoutMs);
     return networkRequest;
 }
 
@@ -145,8 +249,10 @@ ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequ
 {
     Q_D(Client);
     const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
-    QNetworkReply *reply = networkAccessManager()->post(chatRequest(d), body);
-    return new ChatCompletionReply(reply);
+    QNetworkAccessManager *manager = networkAccessManager();
+    // Capture what a retry needs to re-issue the request.
+    auto factory = [manager, req = chatRequest(d), body]() { return manager->post(req, body); };
+    return new ChatCompletionReply(std::move(factory), d->retryPolicy);
 }
 
 ChatCompletionStreamReply *

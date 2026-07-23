@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/ChatCompletionReply.h"
 
+#include "HttpSupport_p.h"
+
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QRandomGenerator>
 #include <QtCore/QTimer>
 #include <QtNetwork/QNetworkReply>
 
@@ -12,43 +15,83 @@ namespace Client {
 class ChatCompletionReplyPrivate
 {
 public:
+    std::function<QNetworkReply *()> factory;
+    RetryPolicy policy;
     QNetworkReply *networkReply = nullptr;
     Core::ChatCompletionResponse response;
     ClientError error;
+    RateLimit rateLimit;
+    int retryCount = 0;
     bool finished = false;
     bool success = false;
     bool autoDelete = true;
 };
 
-ChatCompletionReply::ChatCompletionReply(QNetworkReply *reply, QObject *parent)
+ChatCompletionReply::ChatCompletionReply(std::function<QNetworkReply *()> requestFactory,
+                                         RetryPolicy policy, QObject *parent)
     : QObject(parent)
     , d_ptr(new ChatCompletionReplyPrivate)
 {
     Q_D(ChatCompletionReply);
-    d->networkReply = reply;
-    reply->setParent(this);
+    d->factory = std::move(requestFactory);
+    d->policy = std::move(policy);
 
-    connect(reply, &QNetworkReply::finished, this, [this]() {
+    // Kick off the first attempt on the next event-loop turn so callers can
+    // connect to the signals before anything can fire.
+    QTimer::singleShot(0, this, [this]() { start(); });
+}
+
+ChatCompletionReply::~ChatCompletionReply() = default;
+
+// Compute the delay before the next retry, honouring Retry-After and jitter.
+static int retryDelayMs(const RetryPolicy &policy, int attempt, const RateLimit &rateLimit)
+{
+    int delay = policy.backoffDelayMs(attempt);
+    if (policy.respectRetryAfter && rateLimit.retryAfterMs >= 0)
+        delay = rateLimit.retryAfterMs;
+    if (policy.jitter && delay > 0)
+        delay = QRandomGenerator::global()->bounded(delay + 1);
+    return delay;
+}
+
+void ChatCompletionReply::start()
+{
+    Q_D(ChatCompletionReply);
+    d->networkReply = d->factory();
+    d->networkReply->setParent(this);
+
+    connect(d->networkReply, &QNetworkReply::finished, this, [this]() {
         Q_D(ChatCompletionReply);
-        d->finished = true;
         QNetworkReply *reply = d->networkReply;
         const QByteArray body = reply->readAll();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        d->rateLimit = detail::parseRateLimit(reply);
 
-        auto fail = [this, d](ClientError::Kind kind, const QString &message, int http) {
-            d->success = false;
-            d->error = ClientError(kind, message, http);
-        };
+        const bool networkError = reply->error() != QNetworkReply::NoError && status < 400;
+        const bool httpError = status >= 400 || reply->error() != QNetworkReply::NoError;
 
-        // Attempt to parse the (error or success) JSON body once.
+        // Decide whether this failure is retryable and we still have budget.
+        const bool retryable = (networkError && d->policy.retryOnNetworkError)
+                               || (status >= 400 && d->policy.isRetryableStatus(status));
+        if (retryable && d->retryCount < d->policy.maxRetries) {
+            const int attempt = d->retryCount;
+            ++d->retryCount;
+            const int delay = retryDelayMs(d->policy, attempt, d->rateLimit);
+            reply->deleteLater();
+            d->networkReply = nullptr;
+            Q_EMIT retrying(d->retryCount, delay);
+            QTimer::singleShot(delay, this, [this]() { start(); });
+            return;
+        }
+
+        d->finished = true;
         QJsonParseError parseError;
         const QJsonDocument doc = QJsonDocument::fromJson(body, &parseError);
 
-        if (reply->error() != QNetworkReply::NoError && status < 400) {
-            // Transport failure without an HTTP error body.
-            fail(ClientError::Kind::Network, reply->errorString(), status);
-        } else if (status >= 400 || reply->error() != QNetworkReply::NoError) {
-            // HTTP error: pull structured details from the error envelope.
+        if (networkError) {
+            d->success = false;
+            d->error = ClientError(ClientError::Kind::Network, reply->errorString(), status);
+        } else if (httpError) {
             QString message = reply->errorString();
             ClientError err(ClientError::Kind::Http, message, status);
             if (doc.isObject()) {
@@ -64,8 +107,11 @@ ChatCompletionReply::ChatCompletionReply(QNetworkReply *reply, QObject *parent)
             d->success = false;
             d->error = err;
         } else if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
-            fail(ClientError::Kind::Parse,
-                 QStringLiteral("invalid JSON response: %1").arg(parseError.errorString()), status);
+            d->success = false;
+            d->error = ClientError(
+                    ClientError::Kind::Parse,
+                    QStringLiteral("invalid JSON response: %1").arg(parseError.errorString()),
+                    status);
         } else {
             d->response = Core::ChatCompletionResponse::fromJson(doc.object());
             d->success = true;
@@ -81,8 +127,6 @@ ChatCompletionReply::ChatCompletionReply(QNetworkReply *reply, QObject *parent)
             deleteLater();
     });
 }
-
-ChatCompletionReply::~ChatCompletionReply() = default;
 
 bool ChatCompletionReply::isFinished() const
 {
@@ -106,6 +150,18 @@ ClientError ChatCompletionReply::error() const
 {
     Q_D(const ChatCompletionReply);
     return d->error;
+}
+
+RateLimit ChatCompletionReply::rateLimit() const
+{
+    Q_D(const ChatCompletionReply);
+    return d->rateLimit;
+}
+
+int ChatCompletionReply::retryCount() const
+{
+    Q_D(const ChatCompletionReply);
+    return d->retryCount;
 }
 
 void ChatCompletionReply::setAutoDelete(bool enabled)

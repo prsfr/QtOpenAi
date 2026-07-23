@@ -35,3 +35,7 @@ qtopenai_add_test(tst_client_reply
 qtopenai_add_test(tst_client_streaming
     SOURCES client/tst_streaming.cpp
     LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_resilience
+    SOURCES client/tst_resilience.cpp
+    LIBS QtOpenAi::Client)
