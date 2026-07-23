@@ -98,6 +98,30 @@ connect(reply, &Client::ChatCompletionReply::finished, this,
 
 A complete, runnable version lives in [`examples/tool_loop.cpp`](examples/tool_loop.cpp).
 
+## Multimodal input
+
+A `Message` can carry a plain string (as above) or an array of typed
+`Core::ContentPart`s — text, images, audio, or files. The string API is
+unchanged, so existing code keeps working:
+
+```cpp
+using namespace QtOpenAi::Core;
+
+auto message = Message::user({
+    ContentPart::text("What's in this image?"),
+    ContentPart::imageUrl("https://example.com/cat.png", /*detail=*/"high"),
+    // or a base64 data URI: ContentPart::imageUrl("data:image/png;base64,...")
+});
+
+ChatCompletionRequest request("gpt-4o", { message });
+```
+
+Audio (`ContentPart::inputAudio(base64, "wav")`) and file
+(`ContentPart::file(fileId)`) parts work the same way. Assistant audio output on
+a response message is exposed via `Message::audioId()` / `audioData()` /
+`audioTranscript()`. A message serialises `content` as a string when it holds a
+single string and as an array once it has parts.
+
 ## Streaming (Server-Sent Events)
 
 Call `createChatCompletionStream()` for token-by-token output. The reply emits
