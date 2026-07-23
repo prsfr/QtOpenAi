@@ -22,6 +22,9 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/ConversationItemList.h
     include/QtOpenAi/Core/ModerationRequest.h
     include/QtOpenAi/Core/ModerationResponse.h
+    include/QtOpenAi/Core/CompletionChoice.h
+    include/QtOpenAi/Core/CompletionResponse.h
+    include/QtOpenAi/Core/CompletionRequest.h
 )
 
 add_library(QtOpenAiCore
@@ -45,6 +48,9 @@ add_library(QtOpenAiCore
     src/ConversationItemList.cpp
     src/ModerationRequest.cpp
     src/ModerationResponse.cpp
+    src/CompletionChoice.cpp
+    src/CompletionResponse.cpp
+    src/CompletionRequest.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.
