@@ -3,6 +3,7 @@
 
 #include <QtOpenAi/Client/ChatCompletionReply.h>
 #include <QtOpenAi/Client/ChatCompletionStreamReply.h>
+#include <QtOpenAi/Client/CompletionReply.h>
 #include <QtOpenAi/Client/ConversationItemsReply.h>
 #include <QtOpenAi/Client/ConversationReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
@@ -10,6 +11,7 @@
 #include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
+#include <QtOpenAi/Core/CompletionRequest.h>
 #include <QtOpenAi/Core/ModerationRequest.h>
 #include <QtOpenAi/Core/ResponseOutputItem.h>
 #include <QtOpenAi/Core/ResponseRequest.h>
@@ -111,6 +113,11 @@ public:
 
     // Classify text/image input against the moderation policy (POST /moderations).
     ModerationReply *createModeration(const Core::ModerationRequest &request);
+
+    // Legacy text completion (POST /completions). Mainly for OpenAI-compatible
+    // servers that only expose the deprecated endpoint. Ownership follows the
+    // reply's auto-delete policy (enabled by default).
+    CompletionReply *createCompletion(const Core::CompletionRequest &request);
 
     // --- Responses API (POST/GET/DELETE /responses) ------------------------
     // Create a response. Ownership follows the reply's auto-delete policy
