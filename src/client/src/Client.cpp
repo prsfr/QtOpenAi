@@ -259,6 +259,21 @@ QJsonArray itemsToArray(const QList<Core::ResponseOutputItem> &items)
     return array;
 }
 
+// Merge extra query items (e.g. pagination) into a built request's URL,
+// preserving any already present (such as the Azure api-version parameter).
+void applyQuery(QNetworkRequest &request, const QUrlQuery &extra)
+{
+    if (extra.isEmpty())
+        return;
+    QUrl url = request.url();
+    QUrlQuery query(url);
+    const auto items = extra.queryItems();
+    for (const auto &item : items)
+        query.addQueryItem(item.first, item.second);
+    url.setQuery(query);
+    request.setUrl(url);
+}
+
 } // namespace
 
 ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequest &request)
@@ -444,6 +459,61 @@ ConversationReply *Client::deleteConversationItem(const QString &conversationId,
                          + QStringLiteral("/items/") + itemId;
     auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
     return new ConversationReply(std::move(factory), d->retryPolicy);
+}
+
+ChatCompletionListReply *Client::listChatCompletions(const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, QStringLiteral("/chat/completions"));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req]() { return manager->get(req); };
+    return new ChatCompletionListReply(std::move(factory), d->retryPolicy);
+}
+
+ChatCompletionReply *Client::getChatCompletion(const QString &completionId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/chat/completions/") + completionId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    return new ChatCompletionReply(std::move(factory), d->retryPolicy);
+}
+
+ChatCompletionReply *Client::updateChatCompletion(const QString &completionId,
+                                                  const QJsonObject &metadata)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("metadata"), metadata);
+    const QByteArray body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/chat/completions/") + completionId;
+    auto factory
+            = [manager, req = apiRequest(d, path), body]() { return manager->post(req, body); };
+    return new ChatCompletionReply(std::move(factory), d->retryPolicy);
+}
+
+ChatCompletionReply *Client::deleteChatCompletion(const QString &completionId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/chat/completions/") + completionId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
+    return new ChatCompletionReply(std::move(factory), d->retryPolicy);
+}
+
+ChatCompletionMessageListReply *Client::listChatCompletionMessages(const QString &completionId,
+                                                                   const ListParams &params)
+{
+    Q_D(Client);
+    const QString path
+            = QStringLiteral("/chat/completions/") + completionId + QStringLiteral("/messages");
+    QNetworkRequest req = apiRequest(d, path);
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req]() { return manager->get(req); };
+    return new ChatCompletionMessageListReply(std::move(factory), d->retryPolicy);
 }
 
 } // namespace Client

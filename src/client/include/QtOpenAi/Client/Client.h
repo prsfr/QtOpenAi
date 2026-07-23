@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Client/ChatCompletionListReply.h>
+#include <QtOpenAi/Client/ChatCompletionMessageListReply.h>
 #include <QtOpenAi/Client/ChatCompletionReply.h>
 #include <QtOpenAi/Client/ChatCompletionStreamReply.h>
 #include <QtOpenAi/Client/CompletionReply.h>
 #include <QtOpenAi/Client/ConversationItemsReply.h>
 #include <QtOpenAi/Client/ConversationReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
+#include <QtOpenAi/Client/ListParams.h>
 #include <QtOpenAi/Client/ModerationReply.h>
 #include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
@@ -160,6 +163,24 @@ public:
 
     // Delete an item; on success the reply carries the updated conversation.
     ConversationReply *deleteConversationItem(const QString &conversationId, const QString &itemId);
+
+    // --- Stored Chat Completions management (/chat/completions/{id}) --------
+    // List stored chat completions (created with store: true).
+    ChatCompletionListReply *listChatCompletions(const ListParams &params = {});
+
+    // Retrieve a stored chat completion by id.
+    ChatCompletionReply *getChatCompletion(const QString &completionId);
+
+    // Replace a stored completion's metadata.
+    ChatCompletionReply *updateChatCompletion(const QString &completionId,
+                                              const QJsonObject &metadata);
+
+    // Delete a stored chat completion.
+    ChatCompletionReply *deleteChatCompletion(const QString &completionId);
+
+    // List the input messages of a stored chat completion.
+    ChatCompletionMessageListReply *listChatCompletionMessages(const QString &completionId,
+                                                               const ListParams &params = {});
 
 Q_SIGNALS:
     void baseUrlChanged();
