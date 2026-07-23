@@ -15,6 +15,10 @@ qtopenai_add_test(tst_core_serialization
     SOURCES core/tst_serialization.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_multimodal
+    SOURCES core/tst_multimodal.cpp
+    LIBS QtOpenAi::Core)
+
 qtopenai_add_test(tst_core_valuesemantics
     SOURCES core/tst_valuesemantics.cpp
     LIBS QtOpenAi::Core)

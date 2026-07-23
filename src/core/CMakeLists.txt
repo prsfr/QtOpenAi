@@ -7,6 +7,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/Enums.h
     include/QtOpenAi/Core/FunctionCall.h
     include/QtOpenAi/Core/ToolCall.h
+    include/QtOpenAi/Core/ContentPart.h
     include/QtOpenAi/Core/Message.h
     include/QtOpenAi/Core/Tool.h
     include/QtOpenAi/Core/Usage.h
@@ -38,6 +39,7 @@ add_library(QtOpenAiCore
     src/Enums.cpp
     src/FunctionCall.cpp
     src/ToolCall.cpp
+    src/ContentPart.cpp
     src/Message.cpp
     src/Tool.cpp
     src/Usage.cpp

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/ContentPart.h>
 #include <QtOpenAi/Core/Enums.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 #include <QtOpenAi/Core/ToolCall.h>
@@ -36,9 +37,18 @@ public:
     Role role() const;
     void setRole(Role role);
 
+    // Plain-text content. When the message uses structured content parts,
+    // content() returns the concatenation of their text parts.
     QString content() const;
     void setContent(const QString &content);
     bool hasContent() const;
+
+    // Structured multimodal content (text/image/audio/file parts). When
+    // non-empty, the message serialises `content` as an array; otherwise the
+    // plain string form is used, so existing string-only code is unaffected.
+    QList<ContentPart> contentParts() const;
+    void setContentParts(const QList<ContentPart> &parts);
+    void addContentPart(const ContentPart &part);
 
     // Optional participant name (OpenAI `name` field).
     QString name() const;
@@ -57,12 +67,24 @@ public:
     QString refusal() const;
     void setRefusal(const QString &refusal);
 
+    // Assistant audio output (the response message's `audio` object): a
+    // generated id, base64 audio data, and a text transcript. Serialised under
+    // `audio` when any field is set.
+    QString audioId() const;
+    void setAudioId(const QString &audioId);
+    QString audioData() const;
+    void setAudioData(const QString &audioData);
+    QString audioTranscript() const;
+    void setAudioTranscript(const QString &transcript);
+
     QJsonObject toJson() const;
     static Message fromJson(const QJsonObject &json);
 
     // Named constructors for the common message shapes.
     static Message system(const QString &content);
     static Message user(const QString &content);
+    // Multimodal user message from structured content parts.
+    static Message user(const QList<ContentPart> &parts);
     static Message assistant(const QString &content);
     static Message toolResult(const QString &toolCallId, const QString &content);
 
