@@ -45,8 +45,20 @@ using namespace QtOpenAi;
 
 Client::ToolRegistry registry;
 
-// 1) std::function handler
-registry.registerFunction("add", "Add two integers", schema,
+// The JSON-Schema is what advertises the parameters to the model: it tells the
+// model that this tool takes integer arguments named "a" and "b". The handler's
+// args keys must match these property names.
+const QJsonObject addSchema {
+    { "type", "object" },
+    { "properties", QJsonObject {
+        { "a", QJsonObject {{ "type", "integer" }, { "description", "First addend" }} },
+        { "b", QJsonObject {{ "type", "integer" }, { "description", "Second addend" }} },
+    }},
+    { "required", QJsonArray { "a", "b" } },
+};
+
+// 1) std::function handler — reads the same "a"/"b" the schema declared
+registry.registerFunction("add", "Add two integers", addSchema,
     [](const QJsonObject &args) {
         return QString::number(args["a"].toInt() + args["b"].toInt());
     });
@@ -60,6 +72,10 @@ connect(&registry, &Client::ToolRegistry::toolInvoked,
             qInfo() << name << "->" << result;
         });
 ```
+
+> Hand-writing the schema is only needed until #39 lands — it will derive the
+> `parameters` schema straight from a `Q_GADGET`/QObject via the meta-object
+> system, so the property names can't drift from the handler.
 
 Advertise the tools in a request and dispatch the model's calls:
 
