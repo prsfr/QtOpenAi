@@ -15,6 +15,9 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ConversationItemsReply.h
     include/QtOpenAi/Client/ModerationReply.h
     include/QtOpenAi/Client/CompletionReply.h
+    include/QtOpenAi/Client/ListParams.h
+    include/QtOpenAi/Client/ChatCompletionListReply.h
+    include/QtOpenAi/Client/ChatCompletionMessageListReply.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -33,6 +36,8 @@ add_library(QtOpenAiClient
     src/ConversationItemsReply.cpp
     src/ModerationReply.cpp
     src/CompletionReply.cpp
+    src/ChatCompletionListReply.cpp
+    src/ChatCompletionMessageListReply.cpp
     src/Client.cpp
 )
 

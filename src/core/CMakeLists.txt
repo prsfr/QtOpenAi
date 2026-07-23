@@ -25,6 +25,8 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/CompletionChoice.h
     include/QtOpenAi/Core/CompletionResponse.h
     include/QtOpenAi/Core/CompletionRequest.h
+    include/QtOpenAi/Core/ListPage.h
+    include/QtOpenAi/Core/ChatCompletionList.h
 )
 
 add_library(QtOpenAiCore

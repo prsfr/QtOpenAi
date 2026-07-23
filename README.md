@@ -165,6 +165,28 @@ connect(created, &Client::ConversationReply::finished, this,
 replies are built on a shared internal request engine (retries, rate-limit
 headers) so every endpoint gets the same resilience for free.
 
+## Stored chat completions
+
+When a completion is created with `store: true`, the management surface lets you
+list, retrieve, update, and delete it — with cursor pagination via `ListParams`:
+
+```cpp
+Client::ListParams params;
+params.limit = 20;
+auto *list = client.listChatCompletions(params);
+connect(list, &Client::ChatCompletionListReply::finished, this,
+        [](const Core::ChatCompletionList &page) {
+            for (const auto &completion : page.data)
+                qInfo() << completion.id() << completion.model();
+            // page.hasMore / page.lastId drive the next request's `after`
+        });
+```
+
+`getChatCompletion`, `updateChatCompletion`, `deleteChatCompletion`, and
+`listChatCompletionMessages` round out the set. List results use the generic
+`Core::ListPage<T>` (aliased as `ChatCompletionList` / `ChatCompletionMessageList`),
+the shared page type reused by every list endpoint.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
