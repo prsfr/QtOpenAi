@@ -456,6 +456,32 @@ client.setAuthScheme(Client::Client::AuthScheme::AzureApiKey);  // api-key: <key
 client.setApiVersion("2024-06-01");                             // ?api-version=...
 ```
 
+## Examples
+
+Runnable programs live in [`examples/`](examples) and are built with
+`QTOPENAI_BUILD_EXAMPLES` (on by default for a top-level build). Each reads
+`OPENAI_API_KEY` (and optional `OPENAI_BASE_URL`) from the environment, so they
+work against any OpenAI-compatible endpoint:
+
+```sh
+export OPENAI_API_KEY=sk-...
+./build/bin/streaming "Write a haiku about Qt."
+```
+
+| Program             | Endpoint / feature                                   |
+|---------------------|------------------------------------------------------|
+| `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
+| `streaming`         | Streamed chat completion (SSE), token by token       |
+| `responses`         | Responses API (`/responses`)                         |
+| `structured_output` | Structured Outputs (`response_format` json_schema)   |
+| `vision`            | Multimodal input (text + image content parts)        |
+| `embeddings`        | Embeddings (`/embeddings`)                            |
+| `moderations`       | Moderation (`/moderations`)                           |
+| `tts`               | Text-to-speech (`/audio/speech`)                      |
+| `transcribe`        | Speech-to-text (`/audio/transcriptions`)             |
+| `image`             | Image generation (`/images/generations`)             |
+| `video`             | Video / Sora: create → poll → download (`/videos`)   |
+
 ## Building
 
 Requirements: CMake ≥ 3.21, a C++17 compiler, and Qt 6 (`Core`, `Network`,
