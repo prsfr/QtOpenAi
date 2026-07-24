@@ -39,6 +39,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/ImageEditRequest.h
     include/QtOpenAi/Core/ImageVariationRequest.h
     include/QtOpenAi/Core/ImageResponse.h
+    include/QtOpenAi/Core/SpeechRequest.h
 )
 
 add_library(QtOpenAiCore
@@ -77,6 +78,7 @@ add_library(QtOpenAiCore
     src/ImageEditRequest.cpp
     src/ImageVariationRequest.cpp
     src/ImageResponse.cpp
+    src/SpeechRequest.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

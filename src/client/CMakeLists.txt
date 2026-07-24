@@ -25,6 +25,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ResponseStreamReply.h
     include/QtOpenAi/Client/TranscriptionReply.h
     include/QtOpenAi/Client/ImageReply.h
+    include/QtOpenAi/Client/SpeechReply.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -54,6 +55,7 @@ add_library(QtOpenAiClient
     src/ResponseStreamReply.cpp
     src/TranscriptionReply.cpp
     src/ImageReply.cpp
+    src/SpeechReply.cpp
     src/Client.cpp
 )
 

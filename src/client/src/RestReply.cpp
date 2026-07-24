@@ -25,6 +25,7 @@ RestReply::~RestReply() = default;
 
 RateLimit RestReply::rateLimit() const { return m_rateLimit; }
 int RestReply::retryCount() const { return m_retryCount; }
+QByteArray RestReply::contentType() const { return m_contentType; }
 
 void RestReply::abort()
 {
@@ -82,6 +83,7 @@ void RestReply::start()
             return;
         }
 
+        m_contentType = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
         Q_EMIT succeeded(body, status);
     });
 }
