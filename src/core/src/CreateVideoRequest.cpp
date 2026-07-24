@@ -83,10 +83,7 @@ QJsonObject CreateVideoRequest::toJson() const
     detail::insertIfNotEmpty(json, QStringLiteral("seconds"), d->seconds);
     detail::insertIfNotEmpty(json, QStringLiteral("size"), d->size);
 
-    for (auto it = d->extraBody.constBegin(); it != d->extraBody.constEnd(); ++it) {
-        if (!json.contains(it.key()))
-            json.insert(it.key(), it.value());
-    }
+    detail::mergeExtraBody(json, d->extraBody);
     return json;
 }
 
