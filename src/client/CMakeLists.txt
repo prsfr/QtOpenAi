@@ -43,6 +43,7 @@ add_library(QtOpenAiClient
     src/SseParser_p.h
     src/Multipart_p.h
     src/ToolRegistry.cpp
+    src/ClientError.cpp
     src/RetryPolicy.cpp
     src/RestReply.cpp
     src/RestReplyBase.cpp
