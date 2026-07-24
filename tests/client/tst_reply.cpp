@@ -9,63 +9,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
-// A throwaway HTTP/1.1 server that replies to a single request with a canned
-// status line and JSON body. Lets us exercise the full Client -> reply path
-// (request building, transport, response parsing) without any network access.
-class StubServer : public QObject
-{
-    Q_OBJECT
-public:
-    StubServer(int status, QByteArray body, QObject *parent = nullptr)
-        : QObject(parent)
-        , m_status(status)
-        , m_body(std::move(body))
-    {
-        m_server.listen(QHostAddress::LocalHost, 0);
-        connect(&m_server, &QTcpServer::newConnection, this, &StubServer::onConnection);
-    }
-
-    QUrl baseUrl() const
-    {
-        return QUrl(QStringLiteral("http://127.0.0.1:%1/v1").arg(m_server.serverPort()));
-    }
-
-    QByteArray requestBody() const { return m_requestBody; }
-
-private slots:
-    void onConnection()
-    {
-        QTcpSocket *socket = m_server.nextPendingConnection();
-        connect(socket, &QTcpSocket::readyRead, this, [this, socket]() {
-            m_requestBuffer += socket->readAll();
-            // Wait until headers are complete, then capture the body.
-            const int headerEnd = m_requestBuffer.indexOf("\r\n\r\n");
-            if (headerEnd < 0)
-                return;
-            m_requestBody = m_requestBuffer.mid(headerEnd + 4);
-
-            const QByteArray reason = m_status < 400 ? "OK" : "Error";
-            QByteArray response = "HTTP/1.1 " + QByteArray::number(m_status) + " " + reason
-                                  + "\r\n"
-                                    "Content-Type: application/json\r\n"
-                                    "Content-Length: "
-                                  + QByteArray::number(m_body.size())
-                                  + "\r\n"
-                                    "Connection: close\r\n\r\n"
-                                  + m_body;
-            socket->write(response);
-            socket->flush();
-            socket->disconnectFromHost();
-        });
-    }
-
-private:
-    QTcpServer m_server;
-    int m_status;
-    QByteArray m_body;
-    QByteArray m_requestBuffer;
-    QByteArray m_requestBody;
-};
+#include "support/StubServer.h"
 
 class TestReply : public QObject
 {

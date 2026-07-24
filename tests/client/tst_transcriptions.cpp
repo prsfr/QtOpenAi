@@ -8,76 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
-// A one-shot stub server that reads a full Content-Length-delimited request
-// (so the multipart body is captured) and returns a fixed JSON body.
-class StubServer : public QObject
-{
-    Q_OBJECT
-public:
-    explicit StubServer(QByteArray body, QObject *parent = nullptr)
-        : QObject(parent)
-        , m_body(std::move(body))
-    {
-        m_server.listen(QHostAddress::LocalHost, 0);
-        connect(&m_server, &QTcpServer::newConnection, this, &StubServer::onConnection);
-    }
-
-    QUrl baseUrl() const
-    {
-        return QUrl(QStringLiteral("http://127.0.0.1:%1/v1").arg(m_server.serverPort()));
-    }
-
-    QByteArray requestLine() const { return m_requestLine; }
-    QByteArray requestHeaders() const { return m_headers; }
-    QByteArray requestBody() const { return m_requestBody; }
-
-private slots:
-    void onConnection()
-    {
-        QTcpSocket *socket = m_server.nextPendingConnection();
-        auto buffer = std::make_shared<QByteArray>();
-        connect(socket, &QTcpSocket::readyRead, this, [this, socket, buffer]() {
-            *buffer += socket->readAll();
-            const int headerEnd = buffer->indexOf("\r\n\r\n");
-            if (headerEnd < 0)
-                return;
-            // Wait until the whole declared body has arrived.
-            const QByteArray head = buffer->left(headerEnd);
-            int contentLength = 0;
-            for (const QByteArray &line : head.split('\n')) {
-                const QByteArray l = line.trimmed().toLower();
-                if (l.startsWith("content-length:"))
-                    contentLength = l.mid(15).trimmed().toInt();
-            }
-            if (buffer->size() < headerEnd + 4 + contentLength)
-                return;
-
-            if (m_requestLine.isEmpty()) {
-                m_requestLine = buffer->left(buffer->indexOf("\r\n"));
-                m_headers = head;
-                m_requestBody = buffer->mid(headerEnd + 4);
-            }
-
-            QByteArray response = "HTTP/1.1 200 OK\r\n"
-                                  "Content-Type: application/json\r\n"
-                                  "Content-Length: "
-                                  + QByteArray::number(m_body.size())
-                                  + "\r\n"
-                                    "Connection: close\r\n\r\n"
-                                  + m_body;
-            socket->write(response);
-            socket->flush();
-            socket->disconnectFromHost();
-        });
-    }
-
-private:
-    QTcpServer m_server;
-    QByteArray m_body;
-    QByteArray m_requestLine;
-    QByteArray m_headers;
-    QByteArray m_requestBody;
-};
+#include "support/StubServer.h"
 
 class TestTranscriptionsClient : public QObject
 {
