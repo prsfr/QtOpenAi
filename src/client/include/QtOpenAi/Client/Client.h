@@ -21,8 +21,13 @@
 #include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Client/SpeechReply.h>
 #include <QtOpenAi/Client/TranscriptionReply.h>
+#include <QtOpenAi/Client/VideoContentReply.h>
+#include <QtOpenAi/Client/VideoListReply.h>
+#include <QtOpenAi/Client/VideoPoller.h>
+#include <QtOpenAi/Client/VideoReply.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
+#include <QtOpenAi/Core/CreateVideoRequest.h>
 #include <QtOpenAi/Core/EmbeddingRequest.h>
 #include <QtOpenAi/Core/ImageEditRequest.h>
 #include <QtOpenAi/Core/ImageGenerationRequest.h>
@@ -236,6 +241,37 @@ public:
 
     // Produce variations of a source image (POST /images/variations, dall-e-2).
     ImageReply *createImageVariation(const Core::ImageVariationRequest &request);
+
+    // --- Video / Sora (/videos) --------------------------------------------
+    // Start an asynchronous video-generation job (POST /videos). The returned
+    // job starts in the `queued` state; poll getVideo() (or use pollVideo()) to
+    // follow its progress. When the request carries an input reference the body
+    // is uploaded as multipart/form-data, otherwise as JSON.
+    VideoReply *createVideo(const Core::CreateVideoRequest &request);
+
+    // Retrieve a single video job's current state (GET /videos/{id}).
+    VideoReply *getVideo(const QString &videoId);
+
+    // List video jobs (GET /videos), most-recent-first by default.
+    VideoListReply *listVideos(const ListParams &params = {});
+
+    // Delete a video job (DELETE /videos/{id}). On success the reply's job()
+    // carries the deletion acknowledgement.
+    VideoReply *deleteVideo(const QString &videoId);
+
+    // Create a new job that remixes an existing completed video with a new
+    // prompt (POST /videos/{id}/remix).
+    VideoReply *remixVideo(const QString &videoId, const QString &prompt);
+
+    // Download the rendered video bytes of a completed job
+    // (GET /videos/{id}/content). The reply exposes the raw bytes and the
+    // response Content-Type, mirroring createSpeech().
+    VideoContentReply *downloadVideoContent(const QString &videoId);
+
+    // Poll a video job until it reaches a terminal state. Returns a VideoPoller
+    // that emits progressed()/completed()/failed(); call start() to begin.
+    // Ownership follows the poller's auto-delete policy (enabled by default).
+    VideoPoller *pollVideo(const QString &videoId, int pollIntervalMs = 2000);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.

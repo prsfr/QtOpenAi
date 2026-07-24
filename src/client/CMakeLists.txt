@@ -26,6 +26,10 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/TranscriptionReply.h
     include/QtOpenAi/Client/ImageReply.h
     include/QtOpenAi/Client/SpeechReply.h
+    include/QtOpenAi/Client/VideoReply.h
+    include/QtOpenAi/Client/VideoListReply.h
+    include/QtOpenAi/Client/VideoContentReply.h
+    include/QtOpenAi/Client/VideoPoller.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -56,6 +60,10 @@ add_library(QtOpenAiClient
     src/TranscriptionReply.cpp
     src/ImageReply.cpp
     src/SpeechReply.cpp
+    src/VideoReply.cpp
+    src/VideoListReply.cpp
+    src/VideoContentReply.cpp
+    src/VideoPoller.cpp
     src/Client.cpp
 )
 
