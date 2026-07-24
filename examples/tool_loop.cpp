@@ -70,8 +70,8 @@ int main(int argc, char **argv)
                      });
 
     // --- Build the initial request ---------------------------------------
-    Core::ChatCompletionRequest request(QStringLiteral("gpt-4o-mini"),
-                                        {Core::Message::user(question)});
+    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    Core::ChatCompletionRequest request(model, {Core::Message::user(question)});
     request.setTools(registry.tools());
 
     // Drive the conversation with a small recursive lambda over replies.

@@ -34,7 +34,9 @@ int main(int argc, char **argv)
 
     Client::Client client(QUrl(baseUrl), apiKey);
 
-    Core::EmbeddingRequest request(QStringLiteral("text-embedding-3-small"), text);
+    const QString model
+            = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("text-embedding-3-small"));
+    Core::EmbeddingRequest request(model, text);
 
     Client::EmbeddingReply *reply = client.createEmbeddings(request);
 

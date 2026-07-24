@@ -35,6 +35,10 @@ int main(int argc, char **argv)
     Client::Client client(QUrl(baseUrl), apiKey);
 
     Core::ModerationRequest request(text);
+    // Optional: override the moderation model (e.g. for a local endpoint).
+    const QString model = env.value(QStringLiteral("OPENAI_MODEL"));
+    if (!model.isEmpty())
+        request.setModel(model);
 
     Client::ModerationReply *reply = client.createModeration(request);
 

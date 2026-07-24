@@ -37,7 +37,9 @@ int main(int argc, char **argv)
 
     Client::Client client(QUrl(baseUrl), apiKey);
 
-    Core::SpeechRequest request(QStringLiteral("gpt-4o-mini-tts"), text, QStringLiteral("alloy"));
+    const QString model
+            = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini-tts"));
+    Core::SpeechRequest request(model, text, QStringLiteral("alloy"));
     request.setResponseFormat(QStringLiteral("mp3")); // opus / aac / flac / wav / pcm
 
     Client::SpeechReply *reply = client.createSpeech(request);

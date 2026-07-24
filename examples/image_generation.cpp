@@ -38,7 +38,8 @@ int main(int argc, char **argv)
 
     Client::Client client(QUrl(baseUrl), apiKey);
 
-    Core::ImageGenerationRequest request(prompt, QStringLiteral("gpt-image-1"));
+    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-image-1"));
+    Core::ImageGenerationRequest request(prompt, model);
     request.setSize(QStringLiteral("1024x1024"));
 
     Client::ImageReply *reply = client.createImage(request);
