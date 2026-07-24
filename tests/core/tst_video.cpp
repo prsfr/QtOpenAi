@@ -177,10 +177,13 @@ void TestVideo::createRequestFormFields()
     CreateVideoRequest request(QStringLiteral("a cat surfing"), QStringLiteral("sora-2"));
     request.setSeconds(QStringLiteral("8"));
     request.setSize(QStringLiteral("720x1280"));
+    // extra_body must reach the multipart path too, not just the JSON body.
+    request.setExtraBody({{QStringLiteral("model_variant"), QStringLiteral("pro")}});
 
     const QList<CreateVideoRequest::FormField> fields = request.formFields();
     QCOMPARE(fieldValue(fields, QStringLiteral("prompt")), QStringLiteral("a cat surfing"));
     QCOMPARE(fieldValue(fields, QStringLiteral("model")), QStringLiteral("sora-2"));
+    QCOMPARE(fieldValue(fields, QStringLiteral("model_variant")), QStringLiteral("pro"));
     QCOMPARE(fieldValue(fields, QStringLiteral("seconds")), QStringLiteral("8"));
     QCOMPARE(fieldValue(fields, QStringLiteral("size")), QStringLiteral("720x1280"));
 }

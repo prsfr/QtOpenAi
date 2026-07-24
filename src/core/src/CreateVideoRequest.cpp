@@ -65,14 +65,13 @@ void CreateVideoRequest::setExtraBody(const QJsonObject &extra) { d->extraBody =
 
 QList<CreateVideoRequest::FormField> CreateVideoRequest::formFields() const
 {
+    // Derive the multipart fields from the JSON body so the two encodings stay
+    // in lock-step (and extra_body flows to both); scalar JSON values are
+    // stringified for form transport.
     QList<FormField> fields;
-    fields.append({QStringLiteral("prompt"), d->prompt});
-    if (!d->model.isEmpty())
-        fields.append({QStringLiteral("model"), d->model});
-    if (!d->seconds.isEmpty())
-        fields.append({QStringLiteral("seconds"), d->seconds});
-    if (!d->size.isEmpty())
-        fields.append({QStringLiteral("size"), d->size});
+    const QJsonObject json = toJson();
+    for (auto it = json.constBegin(); it != json.constEnd(); ++it)
+        fields.append({it.key(), it.value().toVariant().toString()});
     return fields;
 }
 

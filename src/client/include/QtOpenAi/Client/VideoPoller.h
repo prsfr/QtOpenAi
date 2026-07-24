@@ -21,6 +21,11 @@ class VideoPollerPrivate;
 // terminal state — emitting completed() — or when a request fails, emitting
 // failed(). Created by Client::pollVideo(); auto-deletes after it stops unless
 // disabled.
+//
+// The get / typed-reply / isTerminal() coupling is the natural seam to
+// generalise into a shared poll-until-terminal helper if a second asynchronous
+// job type (e.g. the Batch API) lands; kept video-specific until then to avoid
+// speculative abstraction.
 class QTOPENAI_CLIENT_EXPORT VideoPoller : public QObject
 {
     Q_OBJECT
@@ -59,6 +64,10 @@ Q_SIGNALS:
 private:
     friend class Client;
     VideoPoller(Client *client, QString videoId, int intervalMs, QObject *parent = nullptr);
+
+    // Mark polling as finished and honour the auto-delete policy. Callers emit
+    // their terminal signal (completed/failed) around this.
+    void finish();
 
     Q_DECLARE_PRIVATE(VideoPoller)
     QScopedPointer<VideoPollerPrivate> d_ptr;

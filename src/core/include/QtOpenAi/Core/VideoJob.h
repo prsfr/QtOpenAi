@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/Enums.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 #include <QtOpenAi/Core/ListPage.h>
 
@@ -11,20 +12,6 @@
 
 namespace QtOpenAi {
 namespace Core {
-
-// The lifecycle state of a video-generation job (Sora). Mirrors the OpenAI
-// `status` field. A job is terminal once it reaches Completed or Failed.
-enum class VideoStatus {
-    Queued,
-    InProgress,
-    Completed,
-    Failed,
-};
-
-// Convert a VideoStatus to/from its OpenAI wire representation. An unrecognised
-// value decodes to Queued (the initial, non-terminal state).
-QTOPENAI_CORE_EXPORT QString videoStatusToString(VideoStatus status);
-QTOPENAI_CORE_EXPORT VideoStatus videoStatusFromString(const QString &value);
 
 class VideoJobData;
 
