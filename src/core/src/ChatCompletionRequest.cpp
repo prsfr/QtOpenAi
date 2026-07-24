@@ -272,10 +272,7 @@ QJsonObject ChatCompletionRequest::toJson() const
         json.insert(QStringLiteral("web_search_options"), d->webSearchOptions);
 
     // Merge any provider-specific extra fields last (without overriding core).
-    for (auto it = d->extraBody.constBegin(); it != d->extraBody.constEnd(); ++it) {
-        if (!json.contains(it.key()))
-            json.insert(it.key(), it.value());
-    }
+    detail::mergeExtraBody(json, d->extraBody);
     return json;
 }
 

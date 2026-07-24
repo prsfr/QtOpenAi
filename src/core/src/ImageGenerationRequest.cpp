@@ -108,10 +108,7 @@ QJsonObject ImageGenerationRequest::toJson() const
     detail::insertIfNotEmpty(json, QStringLiteral("moderation"), d->moderation);
     detail::insertIfNotEmpty(json, QStringLiteral("user"), d->user);
 
-    for (auto it = d->extraBody.constBegin(); it != d->extraBody.constEnd(); ++it) {
-        if (!json.contains(it.key()))
-            json.insert(it.key(), it.value());
-    }
+    detail::mergeExtraBody(json, d->extraBody);
     return json;
 }
 

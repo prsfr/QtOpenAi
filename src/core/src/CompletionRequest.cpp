@@ -122,10 +122,7 @@ QJsonObject CompletionRequest::toJson() const
     if (d->stream)
         json.insert(QStringLiteral("stream"), *d->stream);
 
-    for (auto it = d->extraBody.constBegin(); it != d->extraBody.constEnd(); ++it) {
-        if (!json.contains(it.key()))
-            json.insert(it.key(), it.value());
-    }
+    detail::mergeExtraBody(json, d->extraBody);
     return json;
 }
 

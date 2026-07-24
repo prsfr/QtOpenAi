@@ -8,66 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
-// A one-shot stub server returning a fixed binary body with a chosen
-// Content-Type, and recording the request line + body.
-class StubServer : public QObject
-{
-    Q_OBJECT
-public:
-    StubServer(QByteArray body, QByteArray contentType, QObject *parent = nullptr)
-        : QObject(parent)
-        , m_body(std::move(body))
-        , m_contentType(std::move(contentType))
-    {
-        m_server.listen(QHostAddress::LocalHost, 0);
-        connect(&m_server, &QTcpServer::newConnection, this, &StubServer::onConnection);
-    }
-
-    QUrl baseUrl() const
-    {
-        return QUrl(QStringLiteral("http://127.0.0.1:%1/v1").arg(m_server.serverPort()));
-    }
-
-    QByteArray requestLine() const { return m_requestLine; }
-    QByteArray requestBody() const { return m_requestBody; }
-
-private slots:
-    void onConnection()
-    {
-        QTcpSocket *socket = m_server.nextPendingConnection();
-        auto buffer = std::make_shared<QByteArray>();
-        connect(socket, &QTcpSocket::readyRead, this, [this, socket, buffer]() {
-            *buffer += socket->readAll();
-            const int headerEnd = buffer->indexOf("\r\n\r\n");
-            if (headerEnd < 0)
-                return;
-            if (m_requestLine.isEmpty()) {
-                m_requestLine = buffer->left(buffer->indexOf("\r\n"));
-                m_requestBody = buffer->mid(headerEnd + 4);
-            }
-
-            QByteArray response = "HTTP/1.1 200 OK\r\n"
-                                  "Content-Type: "
-                                  + m_contentType
-                                  + "\r\n"
-                                    "Content-Length: "
-                                  + QByteArray::number(m_body.size())
-                                  + "\r\n"
-                                    "Connection: close\r\n\r\n"
-                                  + m_body;
-            socket->write(response);
-            socket->flush();
-            socket->disconnectFromHost();
-        });
-    }
-
-private:
-    QTcpServer m_server;
-    QByteArray m_body;
-    QByteArray m_contentType;
-    QByteArray m_requestLine;
-    QByteArray m_requestBody;
-};
+#include "support/StubServer.h"
 
 class TestSpeechClient : public QObject
 {
