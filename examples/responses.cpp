@@ -34,7 +34,8 @@ int main(int argc, char **argv)
 
     Client::Client client(QUrl(baseUrl), apiKey);
 
-    Core::ResponseRequest request(QStringLiteral("gpt-4o-mini"), input);
+    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    Core::ResponseRequest request(model, input);
 
     Client::ResponseReply *reply = client.createResponse(request);
 

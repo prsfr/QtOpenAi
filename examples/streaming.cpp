@@ -34,8 +34,8 @@ int main(int argc, char **argv)
 
     Client::Client client(QUrl(baseUrl), apiKey);
 
-    Core::ChatCompletionRequest request(QStringLiteral("gpt-4o-mini"),
-                                        {Core::Message::user(question)});
+    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    Core::ChatCompletionRequest request(model, {Core::Message::user(question)});
 
     Client::ChatCompletionStreamReply *stream = client.createChatCompletionStream(request);
 

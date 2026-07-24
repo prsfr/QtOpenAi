@@ -45,8 +45,8 @@ int main(int argc, char **argv)
 
     Client::Client client(QUrl(baseUrl), apiKey);
 
-    Core::TranscriptionRequest request(audio, QFileInfo(path).fileName(),
-                                       QStringLiteral("whisper-1"));
+    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("whisper-1"));
+    Core::TranscriptionRequest request(audio, QFileInfo(path).fileName(), model);
 
     Client::TranscriptionReply *reply = client.createTranscription(request);
 

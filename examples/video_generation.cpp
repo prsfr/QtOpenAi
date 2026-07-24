@@ -41,7 +41,8 @@ int main(int argc, char **argv)
     // Keep the client alive for the whole flow; it parents nothing here.
     auto *client = new Client::Client(QUrl(baseUrl), apiKey, &app);
 
-    Core::CreateVideoRequest request(prompt, QStringLiteral("sora-2"));
+    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("sora-2"));
+    Core::CreateVideoRequest request(prompt, model);
     request.setSize(QStringLiteral("720x1280"));
     request.setSeconds(QStringLiteral("8"));
 

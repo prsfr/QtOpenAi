@@ -460,11 +460,14 @@ client.setApiVersion("2024-06-01");                             // ?api-version=
 
 Runnable programs live in [`examples/`](examples) and are built with
 `QTOPENAI_BUILD_EXAMPLES` (on by default for a top-level build). Each reads
-`OPENAI_API_KEY` (and optional `OPENAI_BASE_URL`) from the environment, so they
-work against any OpenAI-compatible endpoint:
+`OPENAI_API_KEY`, optional `OPENAI_BASE_URL`, and optional `OPENAI_MODEL` from
+the environment, so they work against any OpenAI-compatible endpoint — including
+local model servers (Ollama, vLLM, LM Studio, ...):
 
 ```sh
-export OPENAI_API_KEY=sk-...
+export OPENAI_API_KEY=sk-...        # any non-empty value for a keyless local server
+export OPENAI_BASE_URL=http://localhost:11434/v1
+export OPENAI_MODEL=llama3.1        # overrides each example's default model
 ./build/bin/streaming "Write a haiku about Qt."
 ```
 

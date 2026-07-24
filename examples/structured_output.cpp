@@ -55,9 +55,9 @@ int main(int argc, char **argv)
             {QStringLiteral("additionalProperties"), false},
     };
 
+    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
     Core::ChatCompletionRequest request(
-            QStringLiteral("gpt-4o-mini"),
-            {Core::Message::user(QStringLiteral("Extract the person from: ") + input)});
+            model, {Core::Message::user(QStringLiteral("Extract the person from: ") + input)});
     request.setResponseFormat(Core::ResponseFormat::jsonSchema(QStringLiteral("person"), schema));
 
     Client::ChatCompletionReply *reply = client.createChatCompletion(request);

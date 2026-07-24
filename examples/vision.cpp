@@ -43,8 +43,8 @@ int main(int argc, char **argv)
             Core::ContentPart::imageUrl(imageUrl),
     };
 
-    Core::ChatCompletionRequest request(QStringLiteral("gpt-4o-mini"),
-                                        {Core::Message::user(parts)});
+    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    Core::ChatCompletionRequest request(model, {Core::Message::user(parts)});
 
     Client::ChatCompletionReply *reply = client.createChatCompletion(request);
 
