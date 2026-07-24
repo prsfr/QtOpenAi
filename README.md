@@ -355,6 +355,8 @@ client.createImageEdit(edit);
 
 // Variations of a source image (dall-e-2):
 client.createImageVariation(Core::ImageVariationRequest(pngBytes, "in.png", "dall-e-2"));
+```
+
 ## Text-to-speech (`/audio/speech`)
 
 Synthesise spoken audio from text. Unlike the JSON endpoints, `/audio/speech`
