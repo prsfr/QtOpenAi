@@ -7,6 +7,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class ModerationReplyPrivate;
+
 // A moderation request (POST /moderations).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
 class QTOPENAI_CLIENT_EXPORT ModerationReply : public RestReplyBase
@@ -25,7 +27,7 @@ private:
 
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
-    Core::ModerationResponse m_response;
+    Q_DECLARE_PRIVATE(ModerationReply)
 };
 
 } // namespace Client

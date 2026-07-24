@@ -6,6 +6,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class BinaryReplyPrivate;
+
 // A reply for endpoints that return a raw binary blob rather than JSON. The
 // bytes are surfaced verbatim together with the response Content-Type, exactly
 // as the server sent them (no decoding). Used directly for generic content
@@ -32,8 +34,7 @@ protected:
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
 private:
-    QByteArray m_data;
-    QByteArray m_contentType;
+    Q_DECLARE_PRIVATE(BinaryReply)
 };
 
 } // namespace Client

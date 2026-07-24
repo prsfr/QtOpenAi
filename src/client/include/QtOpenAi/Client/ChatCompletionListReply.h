@@ -7,6 +7,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class ChatCompletionListReplyPrivate;
+
 // A list of stored chat completions (GET /chat/completions).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
 class QTOPENAI_CLIENT_EXPORT ChatCompletionListReply : public RestReplyBase
@@ -25,7 +27,7 @@ private:
 
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
-    Core::ChatCompletionList m_list;
+    Q_DECLARE_PRIVATE(ChatCompletionListReply)
 };
 
 } // namespace Client

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/RestReplyBase.h"
 
+#include "RestReplyBase_p.h"
 #include "RestReply_p.h"
 
 #include <QtCore/QJsonDocument>
@@ -8,20 +9,11 @@
 namespace QtOpenAi {
 namespace Client {
 
-class RestReplyBasePrivate
-{
-public:
-    RestReply *engine = nullptr;
-    ClientError error;
-    bool finished = false;
-    bool success = false;
-    bool autoDelete = true;
-};
-
-RestReplyBase::RestReplyBase(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
+RestReplyBase::RestReplyBase(RestReplyBasePrivate &dd,
+                             std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
                              QObject *parent)
     : QObject(parent)
-    , d_ptr(new RestReplyBasePrivate)
+    , d_ptr(&dd)
 {
     Q_D(RestReplyBase);
     d->engine = new RestReply(std::move(requestFactory), std::move(policy), this);

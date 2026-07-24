@@ -7,6 +7,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class TranscriptionReplyPrivate;
+
 // A speech-to-text request (POST /audio/transcriptions or /audio/translations).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
 class QTOPENAI_CLIENT_EXPORT TranscriptionReply : public RestReplyBase
@@ -25,7 +27,7 @@ private:
 
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
-    Core::TranscriptionResponse m_response;
+    Q_DECLARE_PRIVATE(TranscriptionReply)
 };
 
 } // namespace Client

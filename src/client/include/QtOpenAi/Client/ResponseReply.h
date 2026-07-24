@@ -7,6 +7,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class ResponseReplyPrivate;
+
 // A Responses API request (POST/GET/DELETE/cancel /responses); on delete the
 // response() carries the deletion acknowledgement.
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
@@ -26,7 +28,7 @@ private:
 
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
-    Core::Response m_response;
+    Q_DECLARE_PRIVATE(ResponseReply)
 };
 
 } // namespace Client

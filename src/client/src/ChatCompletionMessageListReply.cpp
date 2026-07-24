@@ -1,23 +1,37 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/ChatCompletionMessageListReply.h"
 
+#include "RestReplyBase_p.h"
+
 namespace QtOpenAi {
 namespace Client {
 
+class ChatCompletionMessageListReplyPrivate : public RestReplyBasePrivate
+{
+public:
+    Core::ChatCompletionMessageList list;
+};
+
 ChatCompletionMessageListReply::ChatCompletionMessageListReply(
         std::function<QNetworkReply *()> requestFactory, RetryPolicy policy, QObject *parent)
-    : RestReplyBase(std::move(requestFactory), std::move(policy), parent)
+    : RestReplyBase(*new ChatCompletionMessageListReplyPrivate, std::move(requestFactory),
+                    std::move(policy), parent)
 { }
 
-Core::ChatCompletionMessageList ChatCompletionMessageListReply::list() const { return m_list; }
+Core::ChatCompletionMessageList ChatCompletionMessageListReply::list() const
+{
+    Q_D(const ChatCompletionMessageListReply);
+    return d->list;
+}
 
 bool ChatCompletionMessageListReply::dispatchSuccess(const QByteArray &body, int httpStatus)
 {
+    Q_D(ChatCompletionMessageListReply);
     QJsonObject object;
     if (!parseJsonObject(body, httpStatus, object))
         return false;
-    m_list = Core::ChatCompletionMessageList::fromJson(object);
-    Q_EMIT finished(m_list);
+    d->list = Core::ChatCompletionMessageList::fromJson(object);
+    Q_EMIT finished(d->list);
     return true;
 }
 

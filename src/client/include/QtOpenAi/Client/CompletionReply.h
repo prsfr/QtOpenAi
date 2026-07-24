@@ -7,6 +7,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class CompletionReplyPrivate;
+
 // A legacy text completion (POST /completions).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
 class QTOPENAI_CLIENT_EXPORT CompletionReply : public RestReplyBase
@@ -25,7 +27,7 @@ private:
 
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
-    Core::CompletionResponse m_response;
+    Q_DECLARE_PRIVATE(CompletionReply)
 };
 
 } // namespace Client
