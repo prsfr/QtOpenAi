@@ -7,6 +7,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class ConversationReplyPrivate;
+
 // A conversation resource (/conversations); the reply also carries the
 // acknowledgement returned by delete operations.
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
@@ -26,7 +28,7 @@ private:
 
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
-    Core::Conversation m_conversation;
+    Q_DECLARE_PRIVATE(ConversationReply)
 };
 
 } // namespace Client

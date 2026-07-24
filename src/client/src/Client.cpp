@@ -297,37 +297,60 @@ std::function<QNetworkReply *()> multipartPostFactory(QNetworkAccessManager *man
     };
 }
 
+// Serialise a request body object into a compact JSON payload.
+QByteArray compactJson(const QJsonObject &json)
+{
+    return QJsonDocument(json).toJson(QJsonDocument::Compact);
+}
+
+// Request factories capturing everything a retry needs to re-issue the call.
+// One per HTTP verb; the multipart POST variant lives in multipartPostFactory().
+std::function<QNetworkReply *()> getFactory(QNetworkAccessManager *manager, QNetworkRequest request)
+{
+    return [manager, request = std::move(request)]() { return manager->get(request); };
+}
+
+std::function<QNetworkReply *()> deleteFactory(QNetworkAccessManager *manager,
+                                               QNetworkRequest request)
+{
+    return [manager, request = std::move(request)]() { return manager->deleteResource(request); };
+}
+
+std::function<QNetworkReply *()> postFactory(QNetworkAccessManager *manager,
+                                             QNetworkRequest request, QByteArray body = {})
+{
+    return [manager, request = std::move(request), body = std::move(body)]() {
+        return manager->post(request, body);
+    };
+}
+
 } // namespace
 
 ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
     // Capture what a retry needs to re-issue the request.
-    auto factory = [manager, req = chatRequest(d), body]() { return manager->post(req, body); };
+    auto factory = postFactory(manager, chatRequest(d), body);
     return new ChatCompletionReply(std::move(factory), d->retryPolicy);
 }
 
 ModerationReply *Client::createModeration(const Core::ModerationRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req = apiRequest(d, QStringLiteral("/moderations")), body]() {
-        return manager->post(req, body);
-    };
+    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/moderations")), body);
     return new ModerationReply(std::move(factory), d->retryPolicy);
 }
 
 CompletionReply *Client::createCompletion(const Core::CompletionRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req = apiRequest(d, QStringLiteral("/completions")), body]() {
-        return manager->post(req, body);
-    };
+    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/completions")), body);
     return new CompletionReply(std::move(factory), d->retryPolicy);
 }
 
@@ -342,7 +365,7 @@ CompletionStreamReply *Client::createCompletionStream(const Core::CompletionRequ
     QNetworkRequest networkRequest = apiRequest(d, QStringLiteral("/completions"));
     networkRequest.setRawHeader("Accept", "text/event-stream");
 
-    const QByteArray body = QJsonDocument(streamed.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(streamed.toJson());
     QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
     return new CompletionStreamReply(reply);
 }
@@ -359,7 +382,7 @@ Client::createChatCompletionStream(const Core::ChatCompletionRequest &request)
     QNetworkRequest networkRequest = chatRequest(d);
     networkRequest.setRawHeader("Accept", "text/event-stream");
 
-    const QByteArray body = QJsonDocument(streamed.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(streamed.toJson());
     QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
     return new ChatCompletionStreamReply(reply);
 }
@@ -367,11 +390,9 @@ Client::createChatCompletionStream(const Core::ChatCompletionRequest &request)
 ResponseReply *Client::createResponse(const Core::ResponseRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req = apiRequest(d, QStringLiteral("/responses")), body]() {
-        return manager->post(req, body);
-    };
+    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/responses")), body);
     return new ResponseReply(std::move(factory), d->retryPolicy);
 }
 
@@ -386,7 +407,7 @@ ResponseStreamReply *Client::createResponseStream(const Core::ResponseRequest &r
     QNetworkRequest networkRequest = apiRequest(d, QStringLiteral("/responses"));
     networkRequest.setRawHeader("Accept", "text/event-stream");
 
-    const QByteArray body = QJsonDocument(streamed.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(streamed.toJson());
     QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
     return new ResponseStreamReply(reply);
 }
@@ -396,7 +417,7 @@ ResponseReply *Client::getResponse(const QString &responseId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/responses/") + responseId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    auto factory = getFactory(manager, apiRequest(d, path));
     return new ResponseReply(std::move(factory), d->retryPolicy);
 }
 
@@ -405,8 +426,7 @@ ResponseReply *Client::cancelResponse(const QString &responseId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/responses/") + responseId + QStringLiteral("/cancel");
-    auto factory
-            = [manager, req = apiRequest(d, path)]() { return manager->post(req, QByteArray()); };
+    auto factory = postFactory(manager, apiRequest(d, path));
     return new ResponseReply(std::move(factory), d->retryPolicy);
 }
 
@@ -415,7 +435,7 @@ ResponseReply *Client::deleteResponse(const QString &responseId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/responses/") + responseId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
+    auto factory = deleteFactory(manager, apiRequest(d, path));
     return new ResponseReply(std::move(factory), d->retryPolicy);
 }
 
@@ -428,11 +448,9 @@ ConversationReply *Client::createConversation(const QJsonObject &metadata,
         bodyObject.insert(QStringLiteral("metadata"), metadata);
     if (!items.isEmpty())
         bodyObject.insert(QStringLiteral("items"), itemsToArray(items));
-    const QByteArray body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req = apiRequest(d, QStringLiteral("/conversations")), body]() {
-        return manager->post(req, body);
-    };
+    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/conversations")), body);
     return new ConversationReply(std::move(factory), d->retryPolicy);
 }
 
@@ -441,7 +459,7 @@ ConversationReply *Client::getConversation(const QString &conversationId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/conversations/") + conversationId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    auto factory = getFactory(manager, apiRequest(d, path));
     return new ConversationReply(std::move(factory), d->retryPolicy);
 }
 
@@ -451,11 +469,10 @@ ConversationReply *Client::updateConversation(const QString &conversationId,
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("metadata"), metadata);
-    const QByteArray body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/conversations/") + conversationId;
-    auto factory
-            = [manager, req = apiRequest(d, path), body]() { return manager->post(req, body); };
+    auto factory = postFactory(manager, apiRequest(d, path), body);
     return new ConversationReply(std::move(factory), d->retryPolicy);
 }
 
@@ -464,7 +481,7 @@ ConversationReply *Client::deleteConversation(const QString &conversationId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/conversations/") + conversationId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
+    auto factory = deleteFactory(manager, apiRequest(d, path));
     return new ConversationReply(std::move(factory), d->retryPolicy);
 }
 
@@ -474,7 +491,7 @@ ConversationItemsReply *Client::listConversationItems(const QString &conversatio
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path
             = QStringLiteral("/conversations/") + conversationId + QStringLiteral("/items");
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    auto factory = getFactory(manager, apiRequest(d, path));
     return new ConversationItemsReply(std::move(factory), d->retryPolicy);
 }
 
@@ -485,12 +502,11 @@ Client::createConversationItems(const QString &conversationId,
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("items"), itemsToArray(items));
-    const QByteArray body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path
             = QStringLiteral("/conversations/") + conversationId + QStringLiteral("/items");
-    auto factory
-            = [manager, req = apiRequest(d, path), body]() { return manager->post(req, body); };
+    auto factory = postFactory(manager, apiRequest(d, path), body);
     return new ConversationItemsReply(std::move(factory), d->retryPolicy);
 }
 
@@ -501,7 +517,7 @@ ConversationItemsReply *Client::getConversationItem(const QString &conversationI
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/conversations/") + conversationId
                          + QStringLiteral("/items/") + itemId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    auto factory = getFactory(manager, apiRequest(d, path));
     return new ConversationItemsReply(std::move(factory), d->retryPolicy);
 }
 
@@ -512,7 +528,7 @@ ConversationReply *Client::deleteConversationItem(const QString &conversationId,
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/conversations/") + conversationId
                          + QStringLiteral("/items/") + itemId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
+    auto factory = deleteFactory(manager, apiRequest(d, path));
     return new ConversationReply(std::move(factory), d->retryPolicy);
 }
 
@@ -522,7 +538,7 @@ ChatCompletionListReply *Client::listChatCompletions(const ListParams &params)
     QNetworkRequest req = apiRequest(d, QStringLiteral("/chat/completions"));
     applyQuery(req, params.toQuery());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req]() { return manager->get(req); };
+    auto factory = getFactory(manager, req);
     return new ChatCompletionListReply(std::move(factory), d->retryPolicy);
 }
 
@@ -531,7 +547,7 @@ ChatCompletionReply *Client::getChatCompletion(const QString &completionId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/chat/completions/") + completionId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    auto factory = getFactory(manager, apiRequest(d, path));
     return new ChatCompletionReply(std::move(factory), d->retryPolicy);
 }
 
@@ -541,11 +557,10 @@ ChatCompletionReply *Client::updateChatCompletion(const QString &completionId,
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("metadata"), metadata);
-    const QByteArray body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/chat/completions/") + completionId;
-    auto factory
-            = [manager, req = apiRequest(d, path), body]() { return manager->post(req, body); };
+    auto factory = postFactory(manager, apiRequest(d, path), body);
     return new ChatCompletionReply(std::move(factory), d->retryPolicy);
 }
 
@@ -554,7 +569,7 @@ ChatCompletionReply *Client::deleteChatCompletion(const QString &completionId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/chat/completions/") + completionId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
+    auto factory = deleteFactory(manager, apiRequest(d, path));
     return new ChatCompletionReply(std::move(factory), d->retryPolicy);
 }
 
@@ -567,18 +582,16 @@ ChatCompletionMessageListReply *Client::listChatCompletionMessages(const QString
     QNetworkRequest req = apiRequest(d, path);
     applyQuery(req, params.toQuery());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req]() { return manager->get(req); };
+    auto factory = getFactory(manager, req);
     return new ChatCompletionMessageListReply(std::move(factory), d->retryPolicy);
 }
 
 EmbeddingReply *Client::createEmbeddings(const Core::EmbeddingRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req = apiRequest(d, QStringLiteral("/embeddings")), body]() {
-        return manager->post(req, body);
-    };
+    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/embeddings")), body);
     return new EmbeddingReply(std::move(factory), d->retryPolicy);
 }
 
@@ -605,11 +618,9 @@ TranscriptionReply *Client::createTranslation(const Core::TranslationRequest &re
 ImageReply *Client::createImage(const Core::ImageGenerationRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req = apiRequest(d, QStringLiteral("/images/generations")), body]() {
-        return manager->post(req, body);
-    };
+    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/images/generations")), body);
     return new ImageReply(std::move(factory), d->retryPolicy);
 }
 
@@ -654,11 +665,9 @@ VideoReply *Client::createVideo(const Core::CreateVideoRequest &request)
                                             request.formFields(), {std::move(file)});
         return new VideoReply(std::move(factory), d->retryPolicy);
     }
-    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req = apiRequest(d, QStringLiteral("/videos")), body]() {
-        return manager->post(req, body);
-    };
+    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/videos")), body);
     return new VideoReply(std::move(factory), d->retryPolicy);
 }
 
@@ -667,7 +676,7 @@ VideoReply *Client::getVideo(const QString &videoId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/videos/") + videoId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    auto factory = getFactory(manager, apiRequest(d, path));
     return new VideoReply(std::move(factory), d->retryPolicy);
 }
 
@@ -677,7 +686,7 @@ VideoListReply *Client::listVideos(const ListParams &params)
     QNetworkRequest req = apiRequest(d, QStringLiteral("/videos"));
     applyQuery(req, params.toQuery());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req]() { return manager->get(req); };
+    auto factory = getFactory(manager, req);
     return new VideoListReply(std::move(factory), d->retryPolicy);
 }
 
@@ -686,7 +695,7 @@ VideoReply *Client::deleteVideo(const QString &videoId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/videos/") + videoId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
+    auto factory = deleteFactory(manager, apiRequest(d, path));
     return new VideoReply(std::move(factory), d->retryPolicy);
 }
 
@@ -695,11 +704,10 @@ VideoReply *Client::remixVideo(const QString &videoId, const QString &prompt)
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("prompt"), prompt);
-    const QByteArray body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/videos/") + videoId + QStringLiteral("/remix");
-    auto factory
-            = [manager, req = apiRequest(d, path), body]() { return manager->post(req, body); };
+    auto factory = postFactory(manager, apiRequest(d, path), body);
     return new VideoReply(std::move(factory), d->retryPolicy);
 }
 
@@ -708,7 +716,7 @@ VideoContentReply *Client::downloadVideoContent(const QString &videoId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/videos/") + videoId + QStringLiteral("/content");
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    auto factory = getFactory(manager, apiRequest(d, path));
     return new VideoContentReply(std::move(factory), d->retryPolicy);
 }
 
@@ -720,11 +728,9 @@ VideoPoller *Client::pollVideo(const QString &videoId, int pollIntervalMs)
 SpeechReply *Client::createSpeech(const Core::SpeechRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req = apiRequest(d, QStringLiteral("/audio/speech")), body]() {
-        return manager->post(req, body);
-    };
+    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/audio/speech")), body);
     return new SpeechReply(std::move(factory), d->retryPolicy);
 }
 
@@ -732,9 +738,7 @@ ModelListReply *Client::listModels()
 {
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = [manager, req = apiRequest(d, QStringLiteral("/models"))]() {
-        return manager->get(req);
-    };
+    auto factory = getFactory(manager, apiRequest(d, QStringLiteral("/models")));
     return new ModelListReply(std::move(factory), d->retryPolicy);
 }
 
@@ -743,7 +747,7 @@ ModelReply *Client::getModel(const QString &modelId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/models/") + modelId;
-    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    auto factory = getFactory(manager, apiRequest(d, path));
     return new ModelReply(std::move(factory), d->retryPolicy);
 }
 

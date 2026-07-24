@@ -7,6 +7,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class ConversationItemsReplyPrivate;
+
 // The items of a conversation (/conversations/{id}/items).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
 class QTOPENAI_CLIENT_EXPORT ConversationItemsReply : public RestReplyBase
@@ -27,7 +29,7 @@ private:
 
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
-    Core::ConversationItemList m_items;
+    Q_DECLARE_PRIVATE(ConversationItemsReply)
 };
 
 } // namespace Client

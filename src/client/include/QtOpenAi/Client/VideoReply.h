@@ -7,6 +7,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class VideoReplyPrivate;
+
 // An asynchronous handle for a single-video request (POST /videos, GET
 // /videos/{id}, POST /videos/{id}/remix, DELETE /videos/{id}). All return a
 // VideoJob shape, so this reply serves them all. See RestReplyBase for the
@@ -27,7 +29,7 @@ private:
 
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
-    Core::VideoJob m_job;
+    Q_DECLARE_PRIVATE(VideoReply)
 };
 
 } // namespace Client

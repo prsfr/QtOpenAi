@@ -4,13 +4,18 @@
 #include <QtOpenAi/Client/GlobalClient.h>
 
 #include <QtCore/QMetaType>
+#include <QtCore/QSharedDataPointer>
 #include <QtCore/QString>
 
 namespace QtOpenAi {
 namespace Client {
 
+class ClientErrorData;
+
 // Describes a failed API interaction: a category, an HTTP status (when known),
-// the provider's error `type`/`code`, and a human-readable message.
+// the provider's error `type`/`code`, and a human-readable message. An
+// implicitly-shared value type; its data lives behind a d-pointer so the layout
+// stays ABI-stable.
 class QTOPENAI_CLIENT_EXPORT ClientError
 {
     Q_GADGET
@@ -27,32 +32,29 @@ public:
     };
     Q_ENUM(Kind)
 
-    ClientError() = default;
-    ClientError(Kind kind, QString message, int httpStatus = 0)
-        : m_kind(kind)
-        , m_httpStatus(httpStatus)
-        , m_message(std::move(message))
-    { }
+    ClientError();
+    ClientError(Kind kind, QString message, int httpStatus = 0);
+    ClientError(const ClientError &other);
+    ClientError(ClientError &&other) noexcept;
+    ClientError &operator=(const ClientError &other);
+    ClientError &operator=(ClientError &&other) noexcept;
+    ~ClientError();
 
-    Kind kind() const { return m_kind; }
-    int httpStatus() const { return m_httpStatus; }
-    QString message() const { return m_message; }
+    Kind kind() const;
+    int httpStatus() const;
+    QString message() const;
 
-    QString type() const { return m_type; }
-    void setType(const QString &type) { m_type = type; }
+    QString type() const;
+    void setType(const QString &type);
 
-    QString code() const { return m_code; }
-    void setCode(const QString &code) { m_code = code; }
+    QString code() const;
+    void setCode(const QString &code);
 
-    bool isError() const { return m_kind != Kind::NoError; }
+    bool isError() const;
     explicit operator bool() const { return isError(); }
 
 private:
-    Kind m_kind = Kind::NoError;
-    int m_httpStatus = 0;
-    QString m_message;
-    QString m_type;
-    QString m_code;
+    QSharedDataPointer<ClientErrorData> d;
 };
 
 } // namespace Client

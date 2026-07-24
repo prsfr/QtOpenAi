@@ -39,9 +39,11 @@ add_library(QtOpenAiClient
     ${QTOPENAI_CLIENT_PUBLIC_HEADERS}
     src/HttpSupport_p.h
     src/RestReply_p.h
+    src/RestReplyBase_p.h
     src/SseParser_p.h
     src/Multipart_p.h
     src/ToolRegistry.cpp
+    src/ClientError.cpp
     src/RetryPolicy.cpp
     src/RestReply.cpp
     src/RestReplyBase.cpp

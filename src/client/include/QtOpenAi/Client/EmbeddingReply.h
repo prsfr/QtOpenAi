@@ -7,6 +7,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class EmbeddingReplyPrivate;
+
 // An embeddings request (POST /embeddings).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
 class QTOPENAI_CLIENT_EXPORT EmbeddingReply : public RestReplyBase
@@ -25,7 +27,7 @@ private:
 
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
-    Core::EmbeddingResponse m_response;
+    Q_DECLARE_PRIVATE(EmbeddingReply)
 };
 
 } // namespace Client

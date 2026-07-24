@@ -7,6 +7,8 @@
 namespace QtOpenAi {
 namespace Client {
 
+class ImageReplyPrivate;
+
 // An images request (POST /images/generations, /edits or /variations).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
 class QTOPENAI_CLIENT_EXPORT ImageReply : public RestReplyBase
@@ -25,7 +27,7 @@ private:
 
     bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
 
-    Core::ImageResponse m_response;
+    Q_DECLARE_PRIVATE(ImageReply)
 };
 
 } // namespace Client
