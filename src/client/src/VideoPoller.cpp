@@ -100,12 +100,9 @@ void VideoPoller::start()
     d->timer->stop();
 
     if (!d->client) {
-        d->polling = false;
-        d->finished = true;
+        finish();
         Q_EMIT failed(ClientError(ClientError::Kind::Network,
                                   QStringLiteral("client no longer available"), 0));
-        if (d->autoDelete)
-            deleteLater();
         return;
     }
 
@@ -117,11 +114,8 @@ void VideoPoller::start()
         d->job = job;
         Q_EMIT progressed(job);
         if (job.isTerminal()) {
-            d->polling = false;
-            d->finished = true;
+            finish();
             Q_EMIT completed(job);
-            if (d->autoDelete)
-                deleteLater();
         } else {
             d->timer->start(d->intervalMs);
         }
@@ -130,12 +124,18 @@ void VideoPoller::start()
         Q_D(VideoPoller);
         if (!d->polling)
             return;
-        d->polling = false;
-        d->finished = true;
+        finish();
         Q_EMIT failed(error);
-        if (d->autoDelete)
-            deleteLater();
     });
+}
+
+void VideoPoller::finish()
+{
+    Q_D(VideoPoller);
+    d->polling = false;
+    d->finished = true;
+    if (d->autoDelete)
+        deleteLater();
 }
 
 void VideoPoller::stop()

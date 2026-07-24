@@ -68,5 +68,31 @@ FinishReason finishReasonFromString(const QString &value)
     return FinishReason::None;
 }
 
+QString videoStatusToString(VideoStatus status)
+{
+    switch (status) {
+    case VideoStatus::Queued:
+        return QStringLiteral("queued");
+    case VideoStatus::InProgress:
+        return QStringLiteral("in_progress");
+    case VideoStatus::Completed:
+        return QStringLiteral("completed");
+    case VideoStatus::Failed:
+        return QStringLiteral("failed");
+    }
+    return QStringLiteral("queued");
+}
+
+VideoStatus videoStatusFromString(const QString &value)
+{
+    if (value == QLatin1String("in_progress"))
+        return VideoStatus::InProgress;
+    if (value == QLatin1String("completed"))
+        return VideoStatus::Completed;
+    if (value == QLatin1String("failed"))
+        return VideoStatus::Failed;
+    return VideoStatus::Queued;
+}
+
 } // namespace Core
 } // namespace QtOpenAi
