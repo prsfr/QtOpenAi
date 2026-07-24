@@ -641,6 +641,82 @@ ImageReply *Client::createImageVariation(const Core::ImageVariationRequest &requ
     return new ImageReply(std::move(factory), d->retryPolicy);
 }
 
+VideoReply *Client::createVideo(const Core::CreateVideoRequest &request)
+{
+    Q_D(Client);
+    // A JSON body suffices unless a reference file must be uploaded, in which
+    // case the request must go out as multipart/form-data.
+    if (request.hasInputReference()) {
+        detail::FormFilePart file {"input_reference", request.inputReferenceFileName(),
+                                   request.inputReferenceData()};
+        auto factory = multipartPostFactory(networkAccessManager(),
+                                            apiRequest(d, QStringLiteral("/videos")),
+                                            request.formFields(), {std::move(file)});
+        return new VideoReply(std::move(factory), d->retryPolicy);
+    }
+    const QByteArray body = QJsonDocument(request.toJson()).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req = apiRequest(d, QStringLiteral("/videos")), body]() {
+        return manager->post(req, body);
+    };
+    return new VideoReply(std::move(factory), d->retryPolicy);
+}
+
+VideoReply *Client::getVideo(const QString &videoId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/videos/") + videoId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    return new VideoReply(std::move(factory), d->retryPolicy);
+}
+
+VideoListReply *Client::listVideos(const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, QStringLiteral("/videos"));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = [manager, req]() { return manager->get(req); };
+    return new VideoListReply(std::move(factory), d->retryPolicy);
+}
+
+VideoReply *Client::deleteVideo(const QString &videoId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/videos/") + videoId;
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->deleteResource(req); };
+    return new VideoReply(std::move(factory), d->retryPolicy);
+}
+
+VideoReply *Client::remixVideo(const QString &videoId, const QString &prompt)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("prompt"), prompt);
+    const QByteArray body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/videos/") + videoId + QStringLiteral("/remix");
+    auto factory
+            = [manager, req = apiRequest(d, path), body]() { return manager->post(req, body); };
+    return new VideoReply(std::move(factory), d->retryPolicy);
+}
+
+VideoContentReply *Client::downloadVideoContent(const QString &videoId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/videos/") + videoId + QStringLiteral("/content");
+    auto factory = [manager, req = apiRequest(d, path)]() { return manager->get(req); };
+    return new VideoContentReply(std::move(factory), d->retryPolicy);
+}
+
+VideoPoller *Client::pollVideo(const QString &videoId, int pollIntervalMs)
+{
+    return new VideoPoller(this, videoId, pollIntervalMs);
+}
+
 SpeechReply *Client::createSpeech(const Core::SpeechRequest &request)
 {
     Q_D(Client);

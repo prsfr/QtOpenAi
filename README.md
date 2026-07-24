@@ -377,6 +377,53 @@ connect(speech, &Client::SpeechReply::failed, this,
         [](const Client::ClientError &e) { qWarning() << e.message(); });
 ```
 
+## Video / Sora (`/videos`)
+
+Sora renders video asynchronously: creating a job returns it in the `queued`
+state, and you poll until it becomes `completed` (or `failed`) before
+downloading the rendered bytes. `createVideo` sends a JSON body, or uploads an
+optional reference image as `multipart/form-data` when one is attached:
+
+```cpp
+Core::CreateVideoRequest request("a cat surfing a wave at sunset", "sora-2");
+request.setSize("720x1280");
+request.setSeconds("8");
+
+auto *job = client.createVideo(request);
+connect(job, &Client::VideoReply::finished, this,
+        [&client](const Core::VideoJob &v) {
+            // v.id(), v.status() == Core::VideoStatus::Queued, v.progress()
+        });
+```
+
+Rather than driving `getVideo` by hand, `pollVideo` returns a `VideoPoller` that
+issues `GET /videos/{id}` on a timer and reports every state until the job is
+terminal:
+
+```cpp
+auto *poller = client.pollVideo(videoId, /*pollIntervalMs=*/2000);
+connect(poller, &Client::VideoPoller::progressed, this,
+        [](const Core::VideoJob &v) { qInfo() << v.progress() << "%"; });
+connect(poller, &Client::VideoPoller::completed, this,
+        [&client](const Core::VideoJob &v) {
+            if (v.status() != Core::VideoStatus::Completed) {
+                qWarning() << v.errorMessage();
+                return;
+            }
+            // Download the rendered bytes (binary, like createSpeech):
+            auto *content = client.downloadVideoContent(v.id());
+            connect(content, &Client::VideoContentReply::finished, [](const QByteArray &mp4) {
+                QFile out("out.mp4");
+                out.open(QIODevice::WriteOnly);
+                out.write(mp4);   // content->contentType() == "video/mp4"
+            });
+        });
+poller->start();
+```
+
+`listVideos`, `remixVideo`, and `deleteVideo` round out the surface. Characters,
+edits, and extensions are not yet implemented (limited availability).
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and

@@ -75,6 +75,10 @@ qtopenai_add_test(tst_core_speech
     SOURCES core/tst_speech.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_video
+    SOURCES core/tst_video.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp
@@ -130,4 +134,8 @@ qtopenai_add_test(tst_client_images
 
 qtopenai_add_test(tst_client_speech
     SOURCES client/tst_speech.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_video
+    SOURCES client/tst_video.cpp
     LIBS QtOpenAi::Client)
