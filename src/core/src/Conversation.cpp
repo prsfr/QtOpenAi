@@ -55,8 +55,7 @@ Conversation Conversation::fromJson(const QJsonObject &json)
     conversation.d->id = detail::stringOr(json, QStringLiteral("id"));
     conversation.d->object
             = detail::stringOr(json, QStringLiteral("object"), QStringLiteral("conversation"));
-    conversation.d->createdAt
-            = static_cast<qint64>(json.value(QStringLiteral("created_at")).toDouble());
+    conversation.d->createdAt = detail::int64Or(json, QStringLiteral("created_at"));
     conversation.d->metadata = json.value(QStringLiteral("metadata")).toObject();
     return conversation;
 }

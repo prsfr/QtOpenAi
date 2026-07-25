@@ -91,7 +91,7 @@ ChatCompletionResponse ChatCompletionResponse::fromJson(const QJsonObject &json)
     response.d->id = detail::stringOr(json, QStringLiteral("id"));
     response.d->object
             = detail::stringOr(json, QStringLiteral("object"), QStringLiteral("chat.completion"));
-    response.d->created = static_cast<qint64>(json.value(QStringLiteral("created")).toDouble());
+    response.d->created = detail::int64Or(json, QStringLiteral("created"));
     response.d->model = detail::stringOr(json, QStringLiteral("model"));
     response.d->systemFingerprint = detail::stringOr(json, QStringLiteral("system_fingerprint"));
 

@@ -734,6 +734,56 @@ SpeechReply *Client::createSpeech(const Core::SpeechRequest &request)
     return new SpeechReply(std::move(factory), d->retryPolicy);
 }
 
+FileReply *Client::uploadFile(const Core::FileUploadRequest &request)
+{
+    Q_D(Client);
+    detail::FormFilePart file {"file", request.fileName(), request.fileData()};
+    auto factory
+            = multipartPostFactory(networkAccessManager(), apiRequest(d, QStringLiteral("/files")),
+                                   request.formFields(), {std::move(file)});
+    return new FileReply(std::move(factory), d->retryPolicy);
+}
+
+FileListReply *Client::listFiles(const ListParams &params, const QString &purpose)
+{
+    Q_D(Client);
+    QUrlQuery query = params.toQuery();
+    if (!purpose.isEmpty())
+        query.addQueryItem(QStringLiteral("purpose"), purpose);
+    QNetworkRequest req = apiRequest(d, QStringLiteral("/files"));
+    applyQuery(req, query);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new FileListReply(std::move(factory), d->retryPolicy);
+}
+
+FileReply *Client::getFile(const QString &fileId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/files/") + fileId;
+    auto factory = getFactory(manager, apiRequest(d, path));
+    return new FileReply(std::move(factory), d->retryPolicy);
+}
+
+FileReply *Client::deleteFile(const QString &fileId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/files/") + fileId;
+    auto factory = deleteFactory(manager, apiRequest(d, path));
+    return new FileReply(std::move(factory), d->retryPolicy);
+}
+
+BinaryReply *Client::downloadFileContent(const QString &fileId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/files/") + fileId + QStringLiteral("/content");
+    auto factory = getFactory(manager, apiRequest(d, path));
+    return new BinaryReply(std::move(factory), d->retryPolicy);
+}
+
 ModelListReply *Client::listModels()
 {
     Q_D(Client);

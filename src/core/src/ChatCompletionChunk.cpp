@@ -298,7 +298,7 @@ ChatCompletionChunk ChatCompletionChunk::fromJson(const QJsonObject &json)
     chunk.d->id = detail::stringOr(json, QStringLiteral("id"));
     chunk.d->object = detail::stringOr(json, QStringLiteral("object"),
                                        QStringLiteral("chat.completion.chunk"));
-    chunk.d->created = static_cast<qint64>(json.value(QStringLiteral("created")).toDouble());
+    chunk.d->created = detail::int64Or(json, QStringLiteral("created"));
     chunk.d->model = detail::stringOr(json, QStringLiteral("model"));
     chunk.d->systemFingerprint = detail::stringOr(json, QStringLiteral("system_fingerprint"));
 

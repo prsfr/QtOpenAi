@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Client/BinaryReply.h>
 #include <QtOpenAi/Client/ChatCompletionListReply.h>
 #include <QtOpenAi/Client/ChatCompletionMessageListReply.h>
 #include <QtOpenAi/Client/ChatCompletionReply.h>
@@ -10,6 +11,8 @@
 #include <QtOpenAi/Client/ConversationItemsReply.h>
 #include <QtOpenAi/Client/ConversationReply.h>
 #include <QtOpenAi/Client/EmbeddingReply.h>
+#include <QtOpenAi/Client/FileListReply.h>
+#include <QtOpenAi/Client/FileReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
 #include <QtOpenAi/Client/ImageReply.h>
 #include <QtOpenAi/Client/ListParams.h>
@@ -29,6 +32,7 @@
 #include <QtOpenAi/Core/CompletionRequest.h>
 #include <QtOpenAi/Core/CreateVideoRequest.h>
 #include <QtOpenAi/Core/EmbeddingRequest.h>
+#include <QtOpenAi/Core/FileUploadRequest.h>
 #include <QtOpenAi/Core/ImageEditRequest.h>
 #include <QtOpenAi/Core/ImageGenerationRequest.h>
 #include <QtOpenAi/Core/ImageVariationRequest.h>
@@ -272,6 +276,27 @@ public:
     // that emits progressed()/completed()/failed(); call start() to begin.
     // Ownership follows the poller's auto-delete policy (enabled by default).
     VideoPoller *pollVideo(const QString &videoId, int pollIntervalMs = 2000);
+
+    // --- Files (/files) ----------------------------------------------------
+    // Upload a file for use by fine-tuning, batch, assistants, vector stores or
+    // the Responses file inputs (POST /files). The bytes go out as
+    // multipart/form-data. Ownership follows the reply's auto-delete policy.
+    FileReply *uploadFile(const Core::FileUploadRequest &request);
+
+    // List the uploaded files (GET /files), optionally restricted to a single
+    // `purpose` (empty lists every purpose).
+    FileListReply *listFiles(const ListParams &params = {}, const QString &purpose = {});
+
+    // Retrieve a single file's metadata (GET /files/{id}).
+    FileReply *getFile(const QString &fileId);
+
+    // Delete a file (DELETE /files/{id}). On success the reply's file() carries
+    // the deletion acknowledgement (object "file.deleted").
+    FileReply *deleteFile(const QString &fileId);
+
+    // Download a file's contents (GET /files/{id}/content). The reply exposes
+    // the raw bytes and the response Content-Type.
+    BinaryReply *downloadFileContent(const QString &fileId);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.

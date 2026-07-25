@@ -20,11 +20,27 @@ inline void insertIfNotEmpty(QJsonObject &object, const QString &key, const QStr
         object.insert(key, value);
 }
 
+// Insert a 64-bit integer field only when it is non-zero (OpenAI omits absent
+// timestamps and byte counts rather than sending a 0).
+inline void insertIfNonZero(QJsonObject &object, const QString &key, qint64 value)
+{
+    if (value != 0)
+        object.insert(key, value);
+}
+
 // Read an optional string; returns an empty QString when absent.
 inline QString stringOr(const QJsonObject &object, const QString &key, const QString &fallback = {})
 {
     const QJsonValue value = object.value(key);
     return value.isString() ? value.toString() : fallback;
+}
+
+// Read an optional 64-bit integer (timestamp, byte count). Goes through QVariant
+// because QJsonValue::toDouble() loses precision beyond 2^53.
+inline qint64 int64Or(const QJsonObject &object, const QString &key, qint64 fallback = 0)
+{
+    const QJsonValue value = object.value(key);
+    return value.isDouble() ? value.toVariant().toLongLong() : fallback;
 }
 
 // Merge caller-supplied provider-specific fields into a request body, without

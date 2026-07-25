@@ -78,10 +78,8 @@ QJsonObject VideoJob::toJson() const
     detail::insertIfNotEmpty(json, QStringLiteral("model"), d->model);
     detail::insertIfNotEmpty(json, QStringLiteral("size"), d->size);
     detail::insertIfNotEmpty(json, QStringLiteral("seconds"), d->seconds);
-    if (d->createdAt != 0)
-        json.insert(QStringLiteral("created_at"), d->createdAt);
-    if (d->completedAt != 0)
-        json.insert(QStringLiteral("completed_at"), d->completedAt);
+    detail::insertIfNonZero(json, QStringLiteral("created_at"), d->createdAt);
+    detail::insertIfNonZero(json, QStringLiteral("completed_at"), d->completedAt);
     if (!d->errorCode.isEmpty() || !d->errorMessage.isEmpty()) {
         QJsonObject error;
         detail::insertIfNotEmpty(error, QStringLiteral("code"), d->errorCode);
@@ -100,8 +98,8 @@ VideoJob VideoJob::fromJson(const QJsonObject &json)
     job.d->model = detail::stringOr(json, QStringLiteral("model"));
     job.d->size = detail::stringOr(json, QStringLiteral("size"));
     job.d->seconds = detail::stringOr(json, QStringLiteral("seconds"));
-    job.d->createdAt = json.value(QStringLiteral("created_at")).toVariant().toLongLong();
-    job.d->completedAt = json.value(QStringLiteral("completed_at")).toVariant().toLongLong();
+    job.d->createdAt = detail::int64Or(json, QStringLiteral("created_at"));
+    job.d->completedAt = detail::int64Or(json, QStringLiteral("completed_at"));
     const QJsonValue error = json.value(QStringLiteral("error"));
     if (error.isObject()) {
         const QJsonObject errorObject = error.toObject();

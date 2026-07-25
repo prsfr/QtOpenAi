@@ -426,6 +426,55 @@ poller->start();
 `listVideos`, `remixVideo`, and `deleteVideo` round out the surface. Characters,
 edits, and extensions are not yet implemented (limited availability).
 
+## Files (`/files`)
+
+Files are the currency of every endpoint that consumes uploaded data:
+fine-tuning, batch, vector stores, and file inputs to a model. Uploads go out as
+`multipart/form-data`; everything else is a plain REST call:
+
+```cpp
+Core::FileUploadRequest request(bytes, "training.jsonl", "fine-tune");
+request.setExpiresAfter("created_at", 3600);   // optional retention window
+
+auto *upload = client.uploadFile(request);
+connect(upload, &Client::FileReply::finished, this,
+        [](const Core::FileObject &file) {
+            // file.id(), file.bytes(), file.purpose(), file.status()
+        });
+```
+
+`listFiles` pages through the stored files and takes an optional `purpose`
+filter on top of the shared `ListParams` cursor parameters:
+
+```cpp
+Client::ListParams params;
+params.limit = 20;
+auto *listing = client.listFiles(params, "assistants");
+connect(listing, &Client::FileListReply::finished, this,
+        [](const Core::FileList &list) {
+            for (const Core::FileObject &file : list.data)
+                qInfo() << file.id() << file.filename();
+            // list.hasMore / list.lastId drive the next page
+        });
+```
+
+The contents come back as raw bytes through the shared `BinaryReply` (the same
+type `createSpeech` and the video download build on), so binary payloads survive
+verbatim:
+
+```cpp
+auto *content = client.downloadFileContent(fileId);
+connect(content, &Client::BinaryReply::finished, this, [](const QByteArray &bytes) {
+    QFile out("downloaded.bin");
+    out.open(QIODevice::WriteOnly);
+    out.write(bytes);
+});
+```
+
+`getFile` retrieves a single file's metadata and `deleteFile` removes it; the
+deletion acknowledgement arrives as a `FileObject` whose `object()` is
+`"file.deleted"`.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -484,6 +533,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `transcribe`        | Speech-to-text (`/audio/transcriptions`)             |
 | `image`             | Image generation (`/images/generations`)             |
 | `video`             | Video / Sora: create → poll → download (`/videos`)   |
+| `files`             | Files: upload → list → download → delete (`/files`)  |
 
 ## Building
 
