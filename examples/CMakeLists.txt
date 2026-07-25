@@ -24,3 +24,4 @@ qtopenai_add_example(video video_generation.cpp)
 # --- Data & storage (v0.6) ---
 qtopenai_add_example(files files.cpp)
 qtopenai_add_example(chunked_upload chunked_upload.cpp)
+qtopenai_add_example(vector_search vector_search.cpp)

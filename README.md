@@ -517,6 +517,62 @@ auto *aborted  = client.cancelUpload(uploadId);                // POST .../cance
 `Upload::isTerminal()` reports whether an upload can still take parts —
 `completed`, `cancelled` and `expired` are final.
 
+## Vector stores (`/vector_stores`)
+
+A vector store is the server-side index behind file search — both for the
+Responses `file_search` tool and for Assistants. Files are added by id (upload
+them through the Files API first) and are chunked and embedded asynchronously,
+so a fresh store starts `in_progress` and becomes searchable as its
+`fileCounts()` fill up:
+
+```cpp
+Core::CreateVectorStoreRequest request("Support FAQ", {"file-1", "file-2"});
+request.setExpiresAfter("last_active_at", 7);          // optional retention
+
+auto *created = client.createVectorStore(request);
+connect(created, &Client::VectorStoreReply::finished, this,
+        [](const Core::VectorStore &store) {
+            // store.status(), store.fileCounts().completed / .total
+        });
+```
+
+Searching returns ranked chunks together with the file they came from; `text()`
+joins a hit's chunks, which is usually what you feed back to a model:
+
+```cpp
+Core::VectorStoreSearchRequest search("How do I reset my password?");
+search.setMaxNumResults(5);
+search.setFilters(QJsonObject {{"type", "eq"}, {"key", "region"}, {"value", "eu"}});
+
+auto *hits = client.searchVectorStore(storeId, search);
+connect(hits, &Client::VectorStoreSearchReply::finished, this,
+        [](const Core::VectorStoreSearchPage &page) {
+            for (const Core::VectorStoreSearchResult &hit : page.data)
+                qInfo() << hit.score() << hit.filename() << hit.text();
+            // page.hasMore / page.nextPage page through the rest
+        });
+```
+
+`filters` and `rankingOptions` — and a file's `chunkingStrategy` — stay raw
+`QJsonObject`s on purpose: the API keeps extending those grammars, so passing
+them through means a new option never needs a library release.
+
+The file sub-resource and batches round out the surface:
+
+```cpp
+client.createVectorStoreFile(storeId, fileId);            // attach one file
+client.listVectorStoreFiles(storeId, {}, "completed");    // filter by status
+client.updateVectorStoreFileAttributes(storeId, fileId, attributes);
+client.deleteVectorStoreFile(storeId, fileId);            // detach, file is kept
+client.getVectorStoreFileContent(storeId, fileId);        // the parsed chunks
+
+// Bulk ingest, so a large import needs one poll rather than one per file:
+client.createVectorStoreFileBatch(storeId, {"file-1", "file-2", "file-3"});
+client.getVectorStoreFileBatch(storeId, batchId);
+client.cancelVectorStoreFileBatch(storeId, batchId);
+client.listVectorStoreFileBatchFiles(storeId, batchId);
+```
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -577,6 +633,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `video`             | Video / Sora: create → poll → download (`/videos`)   |
 | `files`             | Files: upload → list → download → delete (`/files`)  |
 | `chunked_upload`    | Large-file multipart upload (`/uploads`)             |
+| `vector_search`     | Index a document and search it (`/vector_stores`)    |
 
 ## Building
 

@@ -27,6 +27,13 @@
 #include <QtOpenAi/Client/TranscriptionReply.h>
 #include <QtOpenAi/Client/UploadPartReply.h>
 #include <QtOpenAi/Client/UploadReply.h>
+#include <QtOpenAi/Client/VectorStoreFileBatchReply.h>
+#include <QtOpenAi/Client/VectorStoreFileContentReply.h>
+#include <QtOpenAi/Client/VectorStoreFileListReply.h>
+#include <QtOpenAi/Client/VectorStoreFileReply.h>
+#include <QtOpenAi/Client/VectorStoreListReply.h>
+#include <QtOpenAi/Client/VectorStoreReply.h>
+#include <QtOpenAi/Client/VectorStoreSearchReply.h>
 #include <QtOpenAi/Client/VideoContentReply.h>
 #include <QtOpenAi/Client/VideoListReply.h>
 #include <QtOpenAi/Client/VideoPoller.h>
@@ -34,6 +41,7 @@
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
 #include <QtOpenAi/Core/CreateUploadRequest.h>
+#include <QtOpenAi/Core/CreateVectorStoreRequest.h>
 #include <QtOpenAi/Core/CreateVideoRequest.h>
 #include <QtOpenAi/Core/EmbeddingRequest.h>
 #include <QtOpenAi/Core/FileUploadRequest.h>
@@ -46,6 +54,7 @@
 #include <QtOpenAi/Core/SpeechRequest.h>
 #include <QtOpenAi/Core/TranscriptionRequest.h>
 #include <QtOpenAi/Core/TranslationRequest.h>
+#include <QtOpenAi/Core/VectorStoreSearch.h>
 
 #include <QtCore/QByteArray>
 #include <QtCore/QHash>
@@ -338,6 +347,70 @@ public:
     ChunkedUploader *uploadInChunks(const Core::CreateUploadRequest &request,
                                     const QByteArray &data,
                                     qint64 chunkSize = ChunkedUploader::defaultChunkSize);
+
+    // --- Vector stores (/vector_stores) ------------------------------------
+    // Create a vector store, optionally seeded with already-uploaded file ids.
+    VectorStoreReply *createVectorStore(const Core::CreateVectorStoreRequest &request);
+
+    VectorStoreListReply *listVectorStores(const ListParams &params = {});
+
+    VectorStoreReply *getVectorStore(const QString &vectorStoreId);
+
+    // Modify a store; the request carries only the fields to change.
+    VectorStoreReply *updateVectorStore(const QString &vectorStoreId,
+                                        const Core::CreateVectorStoreRequest &request);
+
+    // Delete a store. On success the reply's store() carries the deletion
+    // acknowledgement (object "vector_store.deleted").
+    VectorStoreReply *deleteVectorStore(const QString &vectorStoreId);
+
+    // Attach an uploaded file to a store; ingestion then runs asynchronously.
+    VectorStoreFileReply *createVectorStoreFile(const QString &vectorStoreId, const QString &fileId,
+                                                const QJsonObject &chunkingStrategy = {},
+                                                const QJsonObject &attributes = {});
+
+    // List a store's files, optionally restricted to one ingestion status
+    // ("in_progress", "completed", "cancelled" or "failed").
+    VectorStoreFileListReply *listVectorStoreFiles(const QString &vectorStoreId,
+                                                   const ListParams &params = {},
+                                                   const QString &filter = {});
+
+    VectorStoreFileReply *getVectorStoreFile(const QString &vectorStoreId, const QString &fileId);
+
+    // Replace a file's search attributes.
+    VectorStoreFileReply *updateVectorStoreFileAttributes(const QString &vectorStoreId,
+                                                          const QString &fileId,
+                                                          const QJsonObject &attributes);
+
+    // Detach a file from the store (the underlying file itself is kept).
+    VectorStoreFileReply *deleteVectorStoreFile(const QString &vectorStoreId,
+                                                const QString &fileId);
+
+    // Fetch the parsed text chunks a file contributed to the index.
+    VectorStoreFileContentReply *getVectorStoreFileContent(const QString &vectorStoreId,
+                                                           const QString &fileId);
+
+    // Attach many files in one call, so a bulk ingest needs a single poll.
+    VectorStoreFileBatchReply *createVectorStoreFileBatch(const QString &vectorStoreId,
+                                                          const QStringList &fileIds,
+                                                          const QJsonObject &chunkingStrategy = {},
+                                                          const QJsonObject &attributes = {});
+
+    VectorStoreFileBatchReply *getVectorStoreFileBatch(const QString &vectorStoreId,
+                                                       const QString &batchId);
+
+    VectorStoreFileBatchReply *cancelVectorStoreFileBatch(const QString &vectorStoreId,
+                                                          const QString &batchId);
+
+    // List the files of one batch, with the same status filter as listVectorStoreFiles().
+    VectorStoreFileListReply *listVectorStoreFileBatchFiles(const QString &vectorStoreId,
+                                                            const QString &batchId,
+                                                            const ListParams &params = {},
+                                                            const QString &filter = {});
+
+    // Run a semantic search over a store and return a page of ranked hits.
+    VectorStoreSearchReply *searchVectorStore(const QString &vectorStoreId,
+                                              const Core::VectorStoreSearchRequest &request);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.

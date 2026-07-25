@@ -37,6 +37,13 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/UploadReply.h
     include/QtOpenAi/Client/UploadPartReply.h
     include/QtOpenAi/Client/ChunkedUploader.h
+    include/QtOpenAi/Client/VectorStoreReply.h
+    include/QtOpenAi/Client/VectorStoreListReply.h
+    include/QtOpenAi/Client/VectorStoreFileReply.h
+    include/QtOpenAi/Client/VectorStoreFileListReply.h
+    include/QtOpenAi/Client/VectorStoreFileBatchReply.h
+    include/QtOpenAi/Client/VectorStoreFileContentReply.h
+    include/QtOpenAi/Client/VectorStoreSearchReply.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -80,6 +87,13 @@ add_library(QtOpenAiClient
     src/UploadReply.cpp
     src/UploadPartReply.cpp
     src/ChunkedUploader.cpp
+    src/VectorStoreReply.cpp
+    src/VectorStoreListReply.cpp
+    src/VectorStoreFileReply.cpp
+    src/VectorStoreFileListReply.cpp
+    src/VectorStoreFileBatchReply.cpp
+    src/VectorStoreFileContentReply.cpp
+    src/VectorStoreSearchReply.cpp
     src/Client.cpp
 )
 

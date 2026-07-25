@@ -55,6 +55,25 @@ enum class UploadStatus {
 };
 Q_ENUM_NS(UploadStatus)
 
+// The lifecycle state of a vector store (Vector Stores API). Mirrors the OpenAI
+// `status` field: a store is ready for search once it is Completed.
+enum class VectorStoreStatus {
+    InProgress,
+    Completed,
+    Expired,
+};
+Q_ENUM_NS(VectorStoreStatus)
+
+// The ingestion state of a single file in a vector store — and of a whole file
+// batch, which the API reports with the same set of values.
+enum class VectorStoreFileStatus {
+    InProgress,
+    Completed,
+    Cancelled,
+    Failed,
+};
+Q_ENUM_NS(VectorStoreFileStatus)
+
 // Convert a Role to/from its OpenAI wire representation.
 QTOPENAI_CORE_EXPORT QString roleToString(Role role);
 QTOPENAI_CORE_EXPORT Role roleFromString(const QString &value);
@@ -73,6 +92,16 @@ QTOPENAI_CORE_EXPORT VideoStatus videoStatusFromString(const QString &value);
 // unrecognised value decodes to Pending (the initial, non-terminal state).
 QTOPENAI_CORE_EXPORT QString uploadStatusToString(UploadStatus status);
 QTOPENAI_CORE_EXPORT UploadStatus uploadStatusFromString(const QString &value);
+
+// Convert a VectorStoreStatus to/from its OpenAI wire representation. An
+// unrecognised value decodes to InProgress (the initial state).
+QTOPENAI_CORE_EXPORT QString vectorStoreStatusToString(VectorStoreStatus status);
+QTOPENAI_CORE_EXPORT VectorStoreStatus vectorStoreStatusFromString(const QString &value);
+
+// Convert a VectorStoreFileStatus to/from its OpenAI wire representation. An
+// unrecognised value decodes to InProgress (the initial state).
+QTOPENAI_CORE_EXPORT QString vectorStoreFileStatusToString(VectorStoreFileStatus status);
+QTOPENAI_CORE_EXPORT VectorStoreFileStatus vectorStoreFileStatusFromString(const QString &value);
 
 } // namespace Core
 } // namespace QtOpenAi
