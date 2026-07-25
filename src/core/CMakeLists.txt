@@ -43,6 +43,8 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/ImageResponse.h
     include/QtOpenAi/Core/SpeechRequest.h
     include/QtOpenAi/Core/VideoJob.h
+    include/QtOpenAi/Core/Upload.h
+    include/QtOpenAi/Core/CreateUploadRequest.h
     include/QtOpenAi/Core/CreateVideoRequest.h
 )
 
@@ -86,6 +88,8 @@ add_library(QtOpenAiCore
     src/ImageResponse.cpp
     src/SpeechRequest.cpp
     src/VideoJob.cpp
+    src/Upload.cpp
+    src/CreateUploadRequest.cpp
     src/CreateVideoRequest.cpp
 )
 

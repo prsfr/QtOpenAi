@@ -34,6 +34,9 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/VideoListReply.h
     include/QtOpenAi/Client/VideoContentReply.h
     include/QtOpenAi/Client/VideoPoller.h
+    include/QtOpenAi/Client/UploadReply.h
+    include/QtOpenAi/Client/UploadPartReply.h
+    include/QtOpenAi/Client/ChunkedUploader.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -74,6 +77,9 @@ add_library(QtOpenAiClient
     src/VideoListReply.cpp
     src/VideoContentReply.cpp
     src/VideoPoller.cpp
+    src/UploadReply.cpp
+    src/UploadPartReply.cpp
+    src/ChunkedUploader.cpp
     src/Client.cpp
 )
 

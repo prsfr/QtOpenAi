@@ -6,6 +6,7 @@
 #include <QtOpenAi/Client/ChatCompletionMessageListReply.h>
 #include <QtOpenAi/Client/ChatCompletionReply.h>
 #include <QtOpenAi/Client/ChatCompletionStreamReply.h>
+#include <QtOpenAi/Client/ChunkedUploader.h>
 #include <QtOpenAi/Client/CompletionReply.h>
 #include <QtOpenAi/Client/CompletionStreamReply.h>
 #include <QtOpenAi/Client/ConversationItemsReply.h>
@@ -24,12 +25,15 @@
 #include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Client/SpeechReply.h>
 #include <QtOpenAi/Client/TranscriptionReply.h>
+#include <QtOpenAi/Client/UploadPartReply.h>
+#include <QtOpenAi/Client/UploadReply.h>
 #include <QtOpenAi/Client/VideoContentReply.h>
 #include <QtOpenAi/Client/VideoListReply.h>
 #include <QtOpenAi/Client/VideoPoller.h>
 #include <QtOpenAi/Client/VideoReply.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
+#include <QtOpenAi/Core/CreateUploadRequest.h>
 #include <QtOpenAi/Core/CreateVideoRequest.h>
 #include <QtOpenAi/Core/EmbeddingRequest.h>
 #include <QtOpenAi/Core/FileUploadRequest.h>
@@ -49,8 +53,10 @@
 #include <QtCore/QList>
 #include <QtCore/QObject>
 #include <QtCore/QString>
+#include <QtCore/QStringList>
 #include <QtCore/QUrl>
 
+class QIODevice;
 class QNetworkAccessManager;
 
 namespace QtOpenAi {
@@ -297,6 +303,41 @@ public:
     // Download a file's contents (GET /files/{id}/content). The reply exposes
     // the raw bytes and the response Content-Type.
     BinaryReply *downloadFileContent(const QString &fileId);
+
+    // --- Uploads (/uploads) ------------------------------------------------
+    // Open a multipart upload for a file larger than the POST /files limit. The
+    // total size is declared up front; parts follow, then completeUpload().
+    UploadReply *createUpload(const Core::CreateUploadRequest &request);
+
+    // Add one chunk to an open upload (POST /uploads/{id}/parts), sent as
+    // multipart/form-data. The reply carries the part id to replay to
+    // completeUpload().
+    UploadPartReply *addUploadPart(const QString &uploadId, const QByteArray &data);
+
+    // Assemble an upload from its parts, in the given order
+    // (POST /uploads/{id}/complete). Pass the payload's `md5` to have the server
+    // verify the result; empty omits the check. On success the reply's upload()
+    // carries the finished file in file().
+    UploadReply *completeUpload(const QString &uploadId, const QStringList &partIds,
+                                const QString &md5 = {});
+
+    // Abort an open upload; its parts are discarded
+    // (POST /uploads/{id}/cancel).
+    UploadReply *cancelUpload(const QString &uploadId);
+
+    // Run the whole start -> parts -> complete flow over `source`, reading one
+    // chunk at a time. Returns a ChunkedUploader emitting
+    // progressed()/completed()/failed(); call start() to begin. The device is
+    // not adopted and must outlive the run. Ownership of the uploader follows
+    // its auto-delete policy (enabled by default).
+    ChunkedUploader *uploadInChunks(const Core::CreateUploadRequest &request, QIODevice *source,
+                                    qint64 chunkSize = ChunkedUploader::defaultChunkSize);
+
+    // The same flow over an in-memory payload; the request's bytes() may be left
+    // at 0 and is then derived from the data.
+    ChunkedUploader *uploadInChunks(const Core::CreateUploadRequest &request,
+                                    const QByteArray &data,
+                                    qint64 chunkSize = ChunkedUploader::defaultChunkSize);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.
