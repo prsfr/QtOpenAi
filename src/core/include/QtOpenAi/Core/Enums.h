@@ -44,6 +44,17 @@ enum class VideoStatus {
 };
 Q_ENUM_NS(VideoStatus)
 
+// The lifecycle state of a multipart upload (Uploads API). Mirrors the OpenAI
+// `status` field. An upload is terminal once it reaches Completed, Cancelled or
+// Expired; only a Pending upload accepts further parts.
+enum class UploadStatus {
+    Pending,
+    Completed,
+    Cancelled,
+    Expired,
+};
+Q_ENUM_NS(UploadStatus)
+
 // Convert a Role to/from its OpenAI wire representation.
 QTOPENAI_CORE_EXPORT QString roleToString(Role role);
 QTOPENAI_CORE_EXPORT Role roleFromString(const QString &value);
@@ -57,6 +68,11 @@ QTOPENAI_CORE_EXPORT FinishReason finishReasonFromString(const QString &value);
 // value decodes to Queued (the initial, non-terminal state).
 QTOPENAI_CORE_EXPORT QString videoStatusToString(VideoStatus status);
 QTOPENAI_CORE_EXPORT VideoStatus videoStatusFromString(const QString &value);
+
+// Convert an UploadStatus to/from its OpenAI wire representation. An
+// unrecognised value decodes to Pending (the initial, non-terminal state).
+QTOPENAI_CORE_EXPORT QString uploadStatusToString(UploadStatus status);
+QTOPENAI_CORE_EXPORT UploadStatus uploadStatusFromString(const QString &value);
 
 } // namespace Core
 } // namespace QtOpenAi

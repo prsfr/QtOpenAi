@@ -3,6 +3,7 @@
 
 #include "Multipart_p.h"
 
+#include <QtCore/QBuffer>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QUrlQuery>
@@ -782,6 +783,69 @@ BinaryReply *Client::downloadFileContent(const QString &fileId)
     const QString path = QStringLiteral("/files/") + fileId + QStringLiteral("/content");
     auto factory = getFactory(manager, apiRequest(d, path));
     return new BinaryReply(std::move(factory), d->retryPolicy);
+}
+
+UploadReply *Client::createUpload(const Core::CreateUploadRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = compactJson(request.toJson());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/uploads")), body);
+    return new UploadReply(std::move(factory), d->retryPolicy);
+}
+
+UploadPartReply *Client::addUploadPart(const QString &uploadId, const QByteArray &data)
+{
+    Q_D(Client);
+    // The chunk is the multipart `data` part; the filename is cosmetic here.
+    detail::FormFilePart part {"data", QStringLiteral("part"), data};
+    const QString path = QStringLiteral("/uploads/") + uploadId + QStringLiteral("/parts");
+    auto factory = multipartPostFactory(networkAccessManager(), apiRequest(d, path), {},
+                                        {std::move(part)});
+    return new UploadPartReply(std::move(factory), d->retryPolicy);
+}
+
+UploadReply *Client::completeUpload(const QString &uploadId, const QStringList &partIds,
+                                    const QString &md5)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    QJsonArray ids;
+    for (const QString &partId : partIds)
+        ids.append(partId);
+    bodyObject.insert(QStringLiteral("part_ids"), ids);
+    if (!md5.isEmpty())
+        bodyObject.insert(QStringLiteral("md5"), md5);
+    const QByteArray body = compactJson(bodyObject);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/uploads/") + uploadId + QStringLiteral("/complete");
+    auto factory = postFactory(manager, apiRequest(d, path), body);
+    return new UploadReply(std::move(factory), d->retryPolicy);
+}
+
+UploadReply *Client::cancelUpload(const QString &uploadId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/uploads/") + uploadId + QStringLiteral("/cancel");
+    auto factory = postFactory(manager, apiRequest(d, path));
+    return new UploadReply(std::move(factory), d->retryPolicy);
+}
+
+ChunkedUploader *Client::uploadInChunks(const Core::CreateUploadRequest &request, QIODevice *source,
+                                        qint64 chunkSize)
+{
+    return new ChunkedUploader(this, request, source, /*ownsSource=*/false, chunkSize);
+}
+
+ChunkedUploader *Client::uploadInChunks(const Core::CreateUploadRequest &request,
+                                        const QByteArray &data, qint64 chunkSize)
+{
+    // Wrap the payload so both overloads share one device-based implementation;
+    // the buffer is adopted by the uploader and freed with it.
+    auto *buffer = new QBuffer;
+    buffer->setData(data);
+    return new ChunkedUploader(this, request, buffer, /*ownsSource=*/true, chunkSize);
 }
 
 ModelListReply *Client::listModels()

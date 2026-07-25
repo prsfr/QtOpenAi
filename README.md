@@ -475,6 +475,48 @@ connect(content, &Client::BinaryReply::finished, this, [](const QByteArray &byte
 deletion acknowledgement arrives as a `FileObject` whose `object()` is
 `"file.deleted"`.
 
+## Uploads (`/uploads`)
+
+Files beyond the single-request limit of `POST /files` go up as a sequence of
+parts: create the upload, post each chunk, then complete it — the server
+assembles the parts into one regular `FileObject`. `uploadInChunks` runs that
+whole flow and streams straight from a `QIODevice`, so only one chunk is in
+memory at a time:
+
+```cpp
+QFile source("training.jsonl");
+source.open(QIODevice::ReadOnly);
+
+Core::CreateUploadRequest request("training.jsonl", "fine-tune", source.size(), "text/jsonl");
+
+// The device is not adopted and must outlive the run.
+auto *uploader = client.uploadInChunks(request, &source);   // 64 MB parts by default
+connect(uploader, &Client::ChunkedUploader::progressed, this,
+        [](qint64 sent, qint64 total) { qInfo() << sent << "/" << total; });
+connect(uploader, &Client::ChunkedUploader::completed, this,
+        [](const Core::Upload &upload) {
+            // upload.file()->id() is the assembled file
+        });
+uploader->start();
+```
+
+An in-memory overload takes a `QByteArray` instead and fills in the total size
+itself when the request leaves `bytes()` at 0.
+
+The individual steps are available too, for callers that need to drive the flow
+themselves (resuming an interrupted upload, computing part ids elsewhere):
+
+```cpp
+auto *created  = client.createUpload(request);                 // POST /uploads
+auto *part     = client.addUploadPart(uploadId, chunk);        // POST .../parts
+auto *finished = client.completeUpload(uploadId, partIds,      // POST .../complete
+                                       /*md5=*/QString());
+auto *aborted  = client.cancelUpload(uploadId);                // POST .../cancel
+```
+
+`Upload::isTerminal()` reports whether an upload can still take parts —
+`completed`, `cancelled` and `expired` are final.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -534,6 +576,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `image`             | Image generation (`/images/generations`)             |
 | `video`             | Video / Sora: create → poll → download (`/videos`)   |
 | `files`             | Files: upload → list → download → delete (`/files`)  |
+| `chunked_upload`    | Large-file multipart upload (`/uploads`)             |
 
 ## Building
 

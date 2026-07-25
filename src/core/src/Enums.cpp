@@ -94,5 +94,31 @@ VideoStatus videoStatusFromString(const QString &value)
     return VideoStatus::Queued;
 }
 
+QString uploadStatusToString(UploadStatus status)
+{
+    switch (status) {
+    case UploadStatus::Pending:
+        return QStringLiteral("pending");
+    case UploadStatus::Completed:
+        return QStringLiteral("completed");
+    case UploadStatus::Cancelled:
+        return QStringLiteral("cancelled");
+    case UploadStatus::Expired:
+        return QStringLiteral("expired");
+    }
+    return QStringLiteral("pending");
+}
+
+UploadStatus uploadStatusFromString(const QString &value)
+{
+    if (value == QLatin1String("completed"))
+        return UploadStatus::Completed;
+    if (value == QLatin1String("cancelled"))
+        return UploadStatus::Cancelled;
+    if (value == QLatin1String("expired"))
+        return UploadStatus::Expired;
+    return UploadStatus::Pending;
+}
+
 } // namespace Core
 } // namespace QtOpenAi
