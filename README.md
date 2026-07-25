@@ -573,6 +573,42 @@ client.cancelVectorStoreFileBatch(storeId, batchId);
 client.listVectorStoreFileBatchFiles(storeId, batchId);
 ```
 
+## Containers (`/containers`)
+
+A container is the sandbox behind the code-interpreter tool: a short-lived
+execution environment with its own filesystem under `/mnt/data`. Files get in
+either by uploading bytes directly or by referencing a file that is already in
+the Files API:
+
+```cpp
+Core::CreateContainerRequest request("analysis");
+request.setExpiresAfter("last_active_at", 20);   // reclaimed when idle
+
+auto *created = client.createContainer(request);
+connect(created, &Client::ContainerReply::finished, this,
+        [&client](const Core::Container &container) {
+            // Bytes straight into the sandbox (multipart)...
+            client.uploadContainerFile(container.id(), "cities.csv", csvBytes);
+            // ...or reuse something already uploaded through /files:
+            client.attachContainerFile(container.id(), "file-abc");
+        });
+```
+
+Reading a file back out uses the same shared `BinaryReply` as the other download
+endpoints, so binary artefacts (a generated plot, say) survive verbatim:
+
+```cpp
+auto *content = client.downloadContainerFileContent(containerId, fileId);
+connect(content, &Client::BinaryReply::finished, this, [](const QByteArray &bytes) {
+    QFile out("chart.png");
+    out.open(QIODevice::WriteOnly);
+    out.write(bytes);
+});
+```
+
+`listContainers`, `getContainer`, `deleteContainer`, `listContainerFiles`,
+`getContainerFile` and `deleteContainerFile` complete the surface.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -634,6 +670,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `files`             | Files: upload → list → download → delete (`/files`)  |
 | `chunked_upload`    | Large-file multipart upload (`/uploads`)             |
 | `vector_search`     | Index a document and search it (`/vector_stores`)    |
+| `containers`        | Code-interpreter sandbox + files (`/containers`)     |
 
 ## Building
 

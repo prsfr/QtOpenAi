@@ -44,6 +44,10 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/VectorStoreFileBatchReply.h
     include/QtOpenAi/Client/VectorStoreFileContentReply.h
     include/QtOpenAi/Client/VectorStoreSearchReply.h
+    include/QtOpenAi/Client/ContainerReply.h
+    include/QtOpenAi/Client/ContainerListReply.h
+    include/QtOpenAi/Client/ContainerFileReply.h
+    include/QtOpenAi/Client/ContainerFileListReply.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -94,6 +98,10 @@ add_library(QtOpenAiClient
     src/VectorStoreFileBatchReply.cpp
     src/VectorStoreFileContentReply.cpp
     src/VectorStoreSearchReply.cpp
+    src/ContainerReply.cpp
+    src/ContainerListReply.cpp
+    src/ContainerFileReply.cpp
+    src/ContainerFileListReply.cpp
     src/Client.cpp
 )
 
