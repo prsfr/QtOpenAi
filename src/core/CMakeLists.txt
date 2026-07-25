@@ -52,6 +52,8 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/Container.h
     include/QtOpenAi/Core/CreateContainerRequest.h
     include/QtOpenAi/Core/CreateVideoRequest.h
+    include/QtOpenAi/Core/Batch.h
+    include/QtOpenAi/Core/CreateBatchRequest.h
 )
 
 add_library(QtOpenAiCore
@@ -103,6 +105,8 @@ add_library(QtOpenAiCore
     src/Container.cpp
     src/CreateContainerRequest.cpp
     src/CreateVideoRequest.cpp
+    src/Batch.cpp
+    src/CreateBatchRequest.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

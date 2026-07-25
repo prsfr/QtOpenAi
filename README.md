@@ -609,6 +609,46 @@ connect(content, &Client::BinaryReply::finished, this, [](const QByteArray &byte
 `listContainers`, `getContainer`, `deleteContainer`, `listContainerFiles`,
 `getContainerFile` and `deleteContainerFile` complete the surface.
 
+## Batch (`/batches`)
+
+Batches trade latency for cost: a whole JSONL file of requests is processed
+asynchronously within a completion window, at a discount. The input file goes
+through the Files API with purpose `batch`, and the results come back the same
+way:
+
+```cpp
+Core::CreateBatchRequest request(inputFileId, "/v1/chat/completions");
+request.setMetadata(QJsonObject {{"job", "nightly"}});
+
+auto *created = client.createBatch(request);
+connect(created, &Client::BatchReply::finished, this,
+        [&client](const Core::Batch &batch) {
+            // batch.status() == Core::BatchStatus::Validating
+        });
+```
+
+`BatchPoller` drives the wait, reporting the request counts as they fill up and
+stopping on the first terminal state (`completed`, `failed`, `expired` or
+`cancelled` — note that `cancelling` is *not* terminal):
+
+```cpp
+auto *poller = client.pollBatch(batchId, 10000);   // every 10 s
+connect(poller, &Client::BatchPoller::progressed, this, [](const Core::Batch &b) {
+    const auto counts = b.requestCounts();
+    qDebug() << counts.completed << "of" << counts.total << "done";
+});
+connect(poller, &Client::BatchPoller::completed, this, [&client](const Core::Batch &b) {
+    client.downloadFileContent(b.outputFileId());  // JSONL, one line per request
+    // b.errorFileId() holds the requests that failed, b.errors() the input
+    // problems that stopped the batch from being accepted at all.
+});
+poller->start();
+```
+
+`listBatches`, `getBatch` and `cancelBatch` complete the surface. `BatchPoller`
+and `VideoPoller` share their timer, lifecycle and auto-delete behaviour through
+`JobPoller`, so both behave identically apart from the job type they carry.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -671,6 +711,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `chunked_upload`    | Large-file multipart upload (`/uploads`)             |
 | `vector_search`     | Index a document and search it (`/vector_stores`)    |
 | `containers`        | Code-interpreter sandbox + files (`/containers`)     |
+| `batch`             | Batch: upload → create → poll → results (`/batches`) |
 
 ## Building
 
