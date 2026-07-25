@@ -120,5 +120,53 @@ UploadStatus uploadStatusFromString(const QString &value)
     return UploadStatus::Pending;
 }
 
+QString vectorStoreStatusToString(VectorStoreStatus status)
+{
+    switch (status) {
+    case VectorStoreStatus::InProgress:
+        return QStringLiteral("in_progress");
+    case VectorStoreStatus::Completed:
+        return QStringLiteral("completed");
+    case VectorStoreStatus::Expired:
+        return QStringLiteral("expired");
+    }
+    return QStringLiteral("in_progress");
+}
+
+VectorStoreStatus vectorStoreStatusFromString(const QString &value)
+{
+    if (value == QLatin1String("completed"))
+        return VectorStoreStatus::Completed;
+    if (value == QLatin1String("expired"))
+        return VectorStoreStatus::Expired;
+    return VectorStoreStatus::InProgress;
+}
+
+QString vectorStoreFileStatusToString(VectorStoreFileStatus status)
+{
+    switch (status) {
+    case VectorStoreFileStatus::InProgress:
+        return QStringLiteral("in_progress");
+    case VectorStoreFileStatus::Completed:
+        return QStringLiteral("completed");
+    case VectorStoreFileStatus::Cancelled:
+        return QStringLiteral("cancelled");
+    case VectorStoreFileStatus::Failed:
+        return QStringLiteral("failed");
+    }
+    return QStringLiteral("in_progress");
+}
+
+VectorStoreFileStatus vectorStoreFileStatusFromString(const QString &value)
+{
+    if (value == QLatin1String("completed"))
+        return VectorStoreFileStatus::Completed;
+    if (value == QLatin1String("cancelled"))
+        return VectorStoreFileStatus::Cancelled;
+    if (value == QLatin1String("failed"))
+        return VectorStoreFileStatus::Failed;
+    return VectorStoreFileStatus::InProgress;
+}
+
 } // namespace Core
 } // namespace QtOpenAi

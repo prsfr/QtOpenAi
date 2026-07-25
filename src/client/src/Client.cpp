@@ -298,6 +298,26 @@ std::function<QNetworkReply *()> multipartPostFactory(QNetworkAccessManager *man
     };
 }
 
+// Build a /vector_stores path, optionally below a store's files or file batches.
+// The routes nest three levels deep, so composing them in one place keeps the
+// endpoint methods free of string arithmetic.
+QString vectorStorePath(const QString &vectorStoreId, const QString &suffix = {})
+{
+    QString path = QStringLiteral("/vector_stores");
+    if (!vectorStoreId.isEmpty())
+        path += QLatin1Char('/') + vectorStoreId;
+    return path + suffix;
+}
+
+// Serialise a list of ids to a JSON array.
+QJsonArray idsToArray(const QStringList &ids)
+{
+    QJsonArray array;
+    for (const QString &id : ids)
+        array.append(id);
+    return array;
+}
+
 // Serialise a request body object into a compact JSON payload.
 QByteArray compactJson(const QJsonObject &json)
 {
@@ -846,6 +866,199 @@ ChunkedUploader *Client::uploadInChunks(const Core::CreateUploadRequest &request
     auto *buffer = new QBuffer;
     buffer->setData(data);
     return new ChunkedUploader(this, request, buffer, /*ownsSource=*/true, chunkSize);
+}
+
+VectorStoreReply *Client::createVectorStore(const Core::CreateVectorStoreRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = compactJson(request.toJson());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(manager, apiRequest(d, vectorStorePath({})), body);
+    return new VectorStoreReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreListReply *Client::listVectorStores(const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, vectorStorePath({}));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new VectorStoreListReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreReply *Client::getVectorStore(const QString &vectorStoreId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, apiRequest(d, vectorStorePath(vectorStoreId)));
+    return new VectorStoreReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreReply *Client::updateVectorStore(const QString &vectorStoreId,
+                                            const Core::CreateVectorStoreRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = compactJson(request.toJson());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(manager, apiRequest(d, vectorStorePath(vectorStoreId)), body);
+    return new VectorStoreReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreReply *Client::deleteVectorStore(const QString &vectorStoreId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = deleteFactory(manager, apiRequest(d, vectorStorePath(vectorStoreId)));
+    return new VectorStoreReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreFileReply *Client::createVectorStoreFile(const QString &vectorStoreId,
+                                                    const QString &fileId,
+                                                    const QJsonObject &chunkingStrategy,
+                                                    const QJsonObject &attributes)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("file_id"), fileId);
+    if (!chunkingStrategy.isEmpty())
+        bodyObject.insert(QStringLiteral("chunking_strategy"), chunkingStrategy);
+    if (!attributes.isEmpty())
+        bodyObject.insert(QStringLiteral("attributes"), attributes);
+    const QByteArray body = compactJson(bodyObject);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files"));
+    auto factory = postFactory(manager, apiRequest(d, path), body);
+    return new VectorStoreFileReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreFileListReply *Client::listVectorStoreFiles(const QString &vectorStoreId,
+                                                       const ListParams &params,
+                                                       const QString &filter)
+{
+    Q_D(Client);
+    QUrlQuery query = params.toQuery();
+    if (!filter.isEmpty())
+        query.addQueryItem(QStringLiteral("filter"), filter);
+    QNetworkRequest req = apiRequest(d, vectorStorePath(vectorStoreId, QStringLiteral("/files")));
+    applyQuery(req, query);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new VectorStoreFileListReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreFileReply *Client::getVectorStoreFile(const QString &vectorStoreId,
+                                                 const QString &fileId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files/") + fileId);
+    auto factory = getFactory(manager, apiRequest(d, path));
+    return new VectorStoreFileReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreFileReply *Client::updateVectorStoreFileAttributes(const QString &vectorStoreId,
+                                                              const QString &fileId,
+                                                              const QJsonObject &attributes)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("attributes"), attributes);
+    const QByteArray body = compactJson(bodyObject);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files/") + fileId);
+    auto factory = postFactory(manager, apiRequest(d, path), body);
+    return new VectorStoreFileReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreFileReply *Client::deleteVectorStoreFile(const QString &vectorStoreId,
+                                                    const QString &fileId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files/") + fileId);
+    auto factory = deleteFactory(manager, apiRequest(d, path));
+    return new VectorStoreFileReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreFileContentReply *Client::getVectorStoreFileContent(const QString &vectorStoreId,
+                                                               const QString &fileId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files/") + fileId
+                                                                + QStringLiteral("/content"));
+    auto factory = getFactory(manager, apiRequest(d, path));
+    return new VectorStoreFileContentReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreFileBatchReply *Client::createVectorStoreFileBatch(const QString &vectorStoreId,
+                                                              const QStringList &fileIds,
+                                                              const QJsonObject &chunkingStrategy,
+                                                              const QJsonObject &attributes)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("file_ids"), idsToArray(fileIds));
+    if (!chunkingStrategy.isEmpty())
+        bodyObject.insert(QStringLiteral("chunking_strategy"), chunkingStrategy);
+    if (!attributes.isEmpty())
+        bodyObject.insert(QStringLiteral("attributes"), attributes);
+    const QByteArray body = compactJson(bodyObject);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/file_batches"));
+    auto factory = postFactory(manager, apiRequest(d, path), body);
+    return new VectorStoreFileBatchReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreFileBatchReply *Client::getVectorStoreFileBatch(const QString &vectorStoreId,
+                                                           const QString &batchId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/file_batches/") + batchId);
+    auto factory = getFactory(manager, apiRequest(d, path));
+    return new VectorStoreFileBatchReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreFileBatchReply *Client::cancelVectorStoreFileBatch(const QString &vectorStoreId,
+                                                              const QString &batchId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/file_batches/") + batchId
+                                                                + QStringLiteral("/cancel"));
+    auto factory = postFactory(manager, apiRequest(d, path));
+    return new VectorStoreFileBatchReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreFileListReply *Client::listVectorStoreFileBatchFiles(const QString &vectorStoreId,
+                                                                const QString &batchId,
+                                                                const ListParams &params,
+                                                                const QString &filter)
+{
+    Q_D(Client);
+    QUrlQuery query = params.toQuery();
+    if (!filter.isEmpty())
+        query.addQueryItem(QStringLiteral("filter"), filter);
+    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/file_batches/") + batchId
+                                                                + QStringLiteral("/files"));
+    QNetworkRequest req = apiRequest(d, path);
+    applyQuery(req, query);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new VectorStoreFileListReply(std::move(factory), d->retryPolicy);
+}
+
+VectorStoreSearchReply *Client::searchVectorStore(const QString &vectorStoreId,
+                                                  const Core::VectorStoreSearchRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = compactJson(request.toJson());
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/search"));
+    auto factory = postFactory(manager, apiRequest(d, path), body);
+    return new VectorStoreSearchReply(std::move(factory), d->retryPolicy);
 }
 
 ModelListReply *Client::listModels()

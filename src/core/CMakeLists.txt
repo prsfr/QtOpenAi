@@ -45,6 +45,10 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/VideoJob.h
     include/QtOpenAi/Core/Upload.h
     include/QtOpenAi/Core/CreateUploadRequest.h
+    include/QtOpenAi/Core/VectorStore.h
+    include/QtOpenAi/Core/VectorStoreFile.h
+    include/QtOpenAi/Core/VectorStoreSearch.h
+    include/QtOpenAi/Core/CreateVectorStoreRequest.h
     include/QtOpenAi/Core/CreateVideoRequest.h
 )
 
@@ -90,6 +94,10 @@ add_library(QtOpenAiCore
     src/VideoJob.cpp
     src/Upload.cpp
     src/CreateUploadRequest.cpp
+    src/VectorStore.cpp
+    src/VectorStoreFile.cpp
+    src/VectorStoreSearch.cpp
+    src/CreateVectorStoreRequest.cpp
     src/CreateVideoRequest.cpp
 )
 
