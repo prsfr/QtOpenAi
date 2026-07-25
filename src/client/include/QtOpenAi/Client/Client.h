@@ -9,6 +9,10 @@
 #include <QtOpenAi/Client/ChunkedUploader.h>
 #include <QtOpenAi/Client/CompletionReply.h>
 #include <QtOpenAi/Client/CompletionStreamReply.h>
+#include <QtOpenAi/Client/ContainerFileListReply.h>
+#include <QtOpenAi/Client/ContainerFileReply.h>
+#include <QtOpenAi/Client/ContainerListReply.h>
+#include <QtOpenAi/Client/ContainerReply.h>
 #include <QtOpenAi/Client/ConversationItemsReply.h>
 #include <QtOpenAi/Client/ConversationReply.h>
 #include <QtOpenAi/Client/EmbeddingReply.h>
@@ -40,6 +44,7 @@
 #include <QtOpenAi/Client/VideoReply.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
+#include <QtOpenAi/Core/CreateContainerRequest.h>
 #include <QtOpenAi/Core/CreateUploadRequest.h>
 #include <QtOpenAi/Core/CreateVectorStoreRequest.h>
 #include <QtOpenAi/Core/CreateVideoRequest.h>
@@ -411,6 +416,39 @@ public:
     // Run a semantic search over a store and return a page of ranked hits.
     VectorStoreSearchReply *searchVectorStore(const QString &vectorStoreId,
                                               const Core::VectorStoreSearchRequest &request);
+
+    // --- Containers (/containers) ------------------------------------------
+    // Create a sandboxed container, optionally pre-loaded with uploaded files.
+    ContainerReply *createContainer(const Core::CreateContainerRequest &request);
+
+    ContainerListReply *listContainers(const ListParams &params = {});
+
+    ContainerReply *getContainer(const QString &containerId);
+
+    // Delete a container. On success the reply's container() carries the
+    // deletion acknowledgement (object "container.deleted").
+    ContainerReply *deleteContainer(const QString &containerId);
+
+    // Upload bytes straight into a container's filesystem
+    // (POST /containers/{id}/files as multipart/form-data).
+    ContainerFileReply *uploadContainerFile(const QString &containerId, const QString &fileName,
+                                            const QByteArray &data);
+
+    // Copy an existing Files-API file into a container instead of uploading it
+    // again (the JSON `file_id` form of the same endpoint).
+    ContainerFileReply *attachContainerFile(const QString &containerId, const QString &fileId);
+
+    ContainerFileListReply *listContainerFiles(const QString &containerId,
+                                               const ListParams &params = {});
+
+    ContainerFileReply *getContainerFile(const QString &containerId, const QString &fileId);
+
+    ContainerFileReply *deleteContainerFile(const QString &containerId, const QString &fileId);
+
+    // Download a container file's contents
+    // (GET /containers/{id}/files/{file_id}/content). The reply exposes the raw
+    // bytes and the response Content-Type.
+    BinaryReply *downloadContainerFileContent(const QString &containerId, const QString &fileId);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.

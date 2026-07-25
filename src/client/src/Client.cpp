@@ -309,6 +309,17 @@ QString vectorStorePath(const QString &vectorStoreId, const QString &suffix = {}
     return path + suffix;
 }
 
+// Build a /containers path, optionally below a container's files. Mirrors
+// vectorStorePath(): the routes nest, so composing them once keeps the endpoint
+// methods free of string arithmetic.
+QString containerPath(const QString &containerId, const QString &suffix = {})
+{
+    QString path = QStringLiteral("/containers");
+    if (!containerId.isEmpty())
+        path += QLatin1Char('/') + containerId;
+    return path + suffix;
+}
+
 // Serialise a list of ids to a JSON array.
 QJsonArray idsToArray(const QStringList &ids)
 {
@@ -1059,6 +1070,103 @@ VectorStoreSearchReply *Client::searchVectorStore(const QString &vectorStoreId,
     const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/search"));
     auto factory = postFactory(manager, apiRequest(d, path), body);
     return new VectorStoreSearchReply(std::move(factory), d->retryPolicy);
+}
+
+ContainerReply *Client::createContainer(const Core::CreateContainerRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = compactJson(request.toJson());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(manager, apiRequest(d, containerPath({})), body);
+    return new ContainerReply(std::move(factory), d->retryPolicy);
+}
+
+ContainerListReply *Client::listContainers(const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, containerPath({}));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new ContainerListReply(std::move(factory), d->retryPolicy);
+}
+
+ContainerReply *Client::getContainer(const QString &containerId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, apiRequest(d, containerPath(containerId)));
+    return new ContainerReply(std::move(factory), d->retryPolicy);
+}
+
+ContainerReply *Client::deleteContainer(const QString &containerId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = deleteFactory(manager, apiRequest(d, containerPath(containerId)));
+    return new ContainerReply(std::move(factory), d->retryPolicy);
+}
+
+ContainerFileReply *Client::uploadContainerFile(const QString &containerId, const QString &fileName,
+                                                const QByteArray &data)
+{
+    Q_D(Client);
+    detail::FormFilePart file {"file", fileName, data};
+    const QString path = containerPath(containerId, QStringLiteral("/files"));
+    auto factory = multipartPostFactory(networkAccessManager(), apiRequest(d, path), {},
+                                        {std::move(file)});
+    return new ContainerFileReply(std::move(factory), d->retryPolicy);
+}
+
+ContainerFileReply *Client::attachContainerFile(const QString &containerId, const QString &fileId)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("file_id"), fileId);
+    const QByteArray body = compactJson(bodyObject);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = containerPath(containerId, QStringLiteral("/files"));
+    auto factory = postFactory(manager, apiRequest(d, path), body);
+    return new ContainerFileReply(std::move(factory), d->retryPolicy);
+}
+
+ContainerFileListReply *Client::listContainerFiles(const QString &containerId,
+                                                   const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, containerPath(containerId, QStringLiteral("/files")));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new ContainerFileListReply(std::move(factory), d->retryPolicy);
+}
+
+ContainerFileReply *Client::getContainerFile(const QString &containerId, const QString &fileId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = containerPath(containerId, QStringLiteral("/files/") + fileId);
+    auto factory = getFactory(manager, apiRequest(d, path));
+    return new ContainerFileReply(std::move(factory), d->retryPolicy);
+}
+
+ContainerFileReply *Client::deleteContainerFile(const QString &containerId, const QString &fileId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = containerPath(containerId, QStringLiteral("/files/") + fileId);
+    auto factory = deleteFactory(manager, apiRequest(d, path));
+    return new ContainerFileReply(std::move(factory), d->retryPolicy);
+}
+
+BinaryReply *Client::downloadContainerFileContent(const QString &containerId, const QString &fileId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = containerPath(containerId, QStringLiteral("/files/") + fileId
+                                                            + QStringLiteral("/content"));
+    auto factory = getFactory(manager, apiRequest(d, path));
+    return new BinaryReply(std::move(factory), d->retryPolicy);
 }
 
 ModelListReply *Client::listModels()

@@ -93,6 +93,10 @@ qtopenai_add_test(tst_core_vectorstores
     SOURCES core/tst_vectorstores.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_containers
+    SOURCES core/tst_containers.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp
@@ -164,4 +168,8 @@ qtopenai_add_test(tst_client_uploads
 
 qtopenai_add_test(tst_client_vectorstores
     SOURCES client/tst_vectorstores.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_containers
+    SOURCES client/tst_containers.cpp
     LIBS QtOpenAi::Client)

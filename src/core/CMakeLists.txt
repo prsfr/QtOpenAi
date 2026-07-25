@@ -49,6 +49,8 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/VectorStoreFile.h
     include/QtOpenAi/Core/VectorStoreSearch.h
     include/QtOpenAi/Core/CreateVectorStoreRequest.h
+    include/QtOpenAi/Core/Container.h
+    include/QtOpenAi/Core/CreateContainerRequest.h
     include/QtOpenAi/Core/CreateVideoRequest.h
 )
 
@@ -98,6 +100,8 @@ add_library(QtOpenAiCore
     src/VectorStoreFile.cpp
     src/VectorStoreSearch.cpp
     src/CreateVectorStoreRequest.cpp
+    src/Container.cpp
+    src/CreateContainerRequest.cpp
     src/CreateVideoRequest.cpp
 )
 
