@@ -79,7 +79,7 @@ CompletionResponse CompletionResponse::fromJson(const QJsonObject &json)
     response.d->id = detail::stringOr(json, QStringLiteral("id"));
     response.d->object
             = detail::stringOr(json, QStringLiteral("object"), QStringLiteral("text_completion"));
-    response.d->created = static_cast<qint64>(json.value(QStringLiteral("created")).toDouble());
+    response.d->created = detail::int64Or(json, QStringLiteral("created"));
     response.d->model = detail::stringOr(json, QStringLiteral("model"));
 
     const QJsonArray choices = json.value(QStringLiteral("choices")).toArray();

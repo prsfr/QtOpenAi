@@ -54,7 +54,7 @@ Model Model::fromJson(const QJsonObject &json)
     Model model;
     model.d->id = detail::stringOr(json, QStringLiteral("id"));
     model.d->object = detail::stringOr(json, QStringLiteral("object"), QStringLiteral("model"));
-    model.d->created = static_cast<qint64>(json.value(QStringLiteral("created")).toDouble());
+    model.d->created = detail::int64Or(json, QStringLiteral("created"));
     model.d->ownedBy = detail::stringOr(json, QStringLiteral("owned_by"));
     return model;
 }

@@ -121,8 +121,7 @@ Response Response::fromJson(const QJsonObject &json)
     response.d->id = detail::stringOr(json, QStringLiteral("id"));
     response.d->object
             = detail::stringOr(json, QStringLiteral("object"), QStringLiteral("response"));
-    response.d->createdAt
-            = static_cast<qint64>(json.value(QStringLiteral("created_at")).toDouble());
+    response.d->createdAt = detail::int64Or(json, QStringLiteral("created_at"));
     response.d->model = detail::stringOr(json, QStringLiteral("model"));
     response.d->status = detail::stringOr(json, QStringLiteral("status"));
 

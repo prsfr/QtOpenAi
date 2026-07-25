@@ -96,8 +96,7 @@ Image ImageResponse::firstImage() const { return d->data.isEmpty() ? Image() : d
 QJsonObject ImageResponse::toJson() const
 {
     QJsonObject json;
-    if (d->created != 0)
-        json.insert(QStringLiteral("created"), d->created);
+    detail::insertIfNonZero(json, QStringLiteral("created"), d->created);
     QJsonArray data;
     for (const Image &image : d->data)
         data.append(image.toJson());
@@ -110,7 +109,7 @@ QJsonObject ImageResponse::toJson() const
 ImageResponse ImageResponse::fromJson(const QJsonObject &json)
 {
     ImageResponse response;
-    response.d->created = static_cast<qint64>(json.value(QStringLiteral("created")).toDouble());
+    response.d->created = detail::int64Or(json, QStringLiteral("created"));
     const QJsonArray data = json.value(QStringLiteral("data")).toArray();
     for (const QJsonValue &value : data)
         response.d->data.append(Image::fromJson(value.toObject()));

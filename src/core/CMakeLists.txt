@@ -31,6 +31,8 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/ChatCompletionList.h
     include/QtOpenAi/Core/EmbeddingRequest.h
     include/QtOpenAi/Core/EmbeddingResponse.h
+    include/QtOpenAi/Core/FileObject.h
+    include/QtOpenAi/Core/FileUploadRequest.h
     include/QtOpenAi/Core/Model.h
     include/QtOpenAi/Core/TranscriptionRequest.h
     include/QtOpenAi/Core/TranscriptionResponse.h
@@ -72,6 +74,8 @@ add_library(QtOpenAiCore
     src/CompletionRequest.cpp
     src/EmbeddingRequest.cpp
     src/EmbeddingResponse.cpp
+    src/FileObject.cpp
+    src/FileUploadRequest.cpp
     src/Model.cpp
     src/TranscriptionRequest.cpp
     src/TranscriptionResponse.cpp
