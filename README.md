@@ -230,6 +230,22 @@ connect(stream, &Client::ResponseStreamReply::finished, this,
 > separately and land in a follow-up; the request/response types, the
 > create/get/cancel/delete endpoints, and streaming are covered here.
 
+Two further calls round out the surface. `listResponseInputItems` returns the
+items a stored response was built from — the same list shape the Conversations
+API returns, so it shares `ConversationItemsReply`:
+
+```cpp
+auto *items = client.listResponseInputItems(responseId, params);
+```
+
+`compactResponse` compacts a stored response's history and
+`countResponseInputTokens` prices a request's input without running it. Both
+endpoints are newer than the OpenAPI revision this library was written against,
+so only their paths are confirmed: `compactResponse` sends
+`{"response_id": ...}` and takes an `extra` object merged in verbatim, and
+`InputTokensReply` exposes both the parsed count and the raw payload — so an
+unexpected response shape stays reachable rather than being dropped.
+
 ## Conversations API (`/conversations`)
 
 Stateful conversations persist item history server-side for use with the

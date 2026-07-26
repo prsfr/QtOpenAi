@@ -9,7 +9,10 @@ namespace Client {
 
 class ConversationItemsReplyPrivate;
 
-// The items of a conversation (/conversations/{id}/items).
+// A cursor-paginated page of Responses-model items. Two endpoints answer with
+// this shape and therefore share this reply: the items of a conversation
+// (/conversations/{id}/items) and the input items a stored response was built
+// from (/responses/{id}/input_items).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
 class QTOPENAI_CLIENT_EXPORT ConversationItemsReply : public RestReplyBase
 {
