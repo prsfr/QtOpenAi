@@ -104,6 +104,19 @@ enum class FineTuningJobStatus {
 };
 Q_ENUM_NS(FineTuningJobStatus)
 
+// The lifecycle state of an eval run (Evals API). Mirrors the OpenAI `status`
+// field. A run is terminal once it reaches Completed, Failed or Canceled;
+// Queued and InProgress are transient. Note the single-l "canceled" spelling
+// this endpoint family uses.
+enum class EvalRunStatus {
+    Queued,
+    InProgress,
+    Completed,
+    Failed,
+    Canceled,
+};
+Q_ENUM_NS(EvalRunStatus)
+
 // Convert a Role to/from its OpenAI wire representation.
 QTOPENAI_CORE_EXPORT QString roleToString(Role role);
 QTOPENAI_CORE_EXPORT Role roleFromString(const QString &value);
@@ -144,6 +157,12 @@ QTOPENAI_CORE_EXPORT BatchStatus batchStatusFromString(const QString &value);
 // an unfamiliar status keeps waiting instead of stopping early.
 QTOPENAI_CORE_EXPORT QString fineTuningJobStatusToString(FineTuningJobStatus status);
 QTOPENAI_CORE_EXPORT FineTuningJobStatus fineTuningJobStatusFromString(const QString &value);
+
+// Convert an EvalRunStatus to/from its OpenAI wire representation. An
+// unrecognised value decodes to Queued (the initial, non-terminal state), so a
+// client polling an unfamiliar status keeps waiting instead of stopping early.
+QTOPENAI_CORE_EXPORT QString evalRunStatusToString(EvalRunStatus status);
+QTOPENAI_CORE_EXPORT EvalRunStatus evalRunStatusFromString(const QString &value);
 
 } // namespace Core
 } // namespace QtOpenAi

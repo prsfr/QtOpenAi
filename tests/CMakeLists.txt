@@ -109,6 +109,10 @@ qtopenai_add_test(tst_core_finetuning
     SOURCES core/tst_finetuning.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_evals
+    SOURCES core/tst_evals.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp
@@ -200,4 +204,8 @@ qtopenai_add_test(tst_client_pagination
 
 qtopenai_add_test(tst_client_voices
     SOURCES client/tst_voices.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_evals
+    SOURCES client/tst_evals.cpp
     LIBS QtOpenAi::Client)

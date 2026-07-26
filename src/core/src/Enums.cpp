@@ -248,5 +248,35 @@ FineTuningJobStatus fineTuningJobStatusFromString(const QString &value)
     return FineTuningJobStatus::Queued;
 }
 
+QString evalRunStatusToString(EvalRunStatus status)
+{
+    switch (status) {
+    case EvalRunStatus::Queued:
+        return QStringLiteral("queued");
+    case EvalRunStatus::InProgress:
+        return QStringLiteral("in_progress");
+    case EvalRunStatus::Completed:
+        return QStringLiteral("completed");
+    case EvalRunStatus::Failed:
+        return QStringLiteral("failed");
+    case EvalRunStatus::Canceled:
+        return QStringLiteral("canceled");
+    }
+    return QStringLiteral("queued");
+}
+
+EvalRunStatus evalRunStatusFromString(const QString &value)
+{
+    if (value == QLatin1String("in_progress"))
+        return EvalRunStatus::InProgress;
+    if (value == QLatin1String("completed"))
+        return EvalRunStatus::Completed;
+    if (value == QLatin1String("failed"))
+        return EvalRunStatus::Failed;
+    if (value == QLatin1String("canceled"))
+        return EvalRunStatus::Canceled;
+    return EvalRunStatus::Queued;
+}
+
 } // namespace Core
 } // namespace QtOpenAi

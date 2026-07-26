@@ -19,6 +19,13 @@
 #include <QtOpenAi/Client/ConversationItemsReply.h>
 #include <QtOpenAi/Client/ConversationReply.h>
 #include <QtOpenAi/Client/EmbeddingReply.h>
+#include <QtOpenAi/Client/EvalListReply.h>
+#include <QtOpenAi/Client/EvalReply.h>
+#include <QtOpenAi/Client/EvalRunListReply.h>
+#include <QtOpenAi/Client/EvalRunOutputItemListReply.h>
+#include <QtOpenAi/Client/EvalRunOutputItemReply.h>
+#include <QtOpenAi/Client/EvalRunPoller.h>
+#include <QtOpenAi/Client/EvalRunReply.h>
 #include <QtOpenAi/Client/FileListReply.h>
 #include <QtOpenAi/Client/FileReply.h>
 #include <QtOpenAi/Client/FineTuningCheckpointListReply.h>
@@ -60,6 +67,7 @@
 #include <QtOpenAi/Core/CompletionRequest.h>
 #include <QtOpenAi/Core/CreateBatchRequest.h>
 #include <QtOpenAi/Core/CreateContainerRequest.h>
+#include <QtOpenAi/Core/CreateEvalRequest.h>
 #include <QtOpenAi/Core/CreateFineTuningJobRequest.h>
 #include <QtOpenAi/Core/CreateUploadRequest.h>
 #include <QtOpenAi/Core/CreateVectorStoreRequest.h>
@@ -585,6 +593,51 @@ public:
 
     FineTuningPermissionReply *deleteFineTuningCheckpointPermission(const QString &checkpointId,
                                                                     const QString &permissionId);
+
+    // --- Evals (/evals) ----------------------------------------------------
+    // Define an eval: how its items are shaped plus the graders scoring them.
+    EvalReply *createEval(const Core::CreateEvalRequest &request);
+
+    EvalListReply *listEvals(const ListParams &params = {});
+
+    EvalReply *getEval(const QString &evalId);
+
+    // Rename an eval and/or replace its metadata (POST /evals/{id}); empty
+    // arguments are left out of the body.
+    EvalReply *updateEval(const QString &evalId, const QString &name,
+                          const QJsonObject &metadata = {});
+
+    // Delete an eval. On success the reply's eval() carries the deletion
+    // acknowledgement (object "eval.deleted").
+    EvalReply *deleteEval(const QString &evalId);
+
+    // Execute an eval against a data source. The run starts `queued`; poll
+    // getEvalRun() (or use pollEvalRun()) until isTerminal(), then read the
+    // result counts and the per-item output.
+    EvalRunReply *createEvalRun(const QString &evalId, const Core::CreateEvalRunRequest &request);
+
+    EvalRunListReply *listEvalRuns(const QString &evalId, const ListParams &params = {});
+
+    EvalRunReply *getEvalRun(const QString &evalId, const QString &runId);
+
+    // Cancel a run. The API models this as a bare POST to the run itself rather
+    // than a /cancel sub-path.
+    EvalRunReply *cancelEvalRun(const QString &evalId, const QString &runId);
+
+    EvalRunReply *deleteEvalRun(const QString &evalId, const QString &runId);
+
+    // Per-item results of a finished run.
+    EvalRunOutputItemListReply *listEvalRunOutputItems(const QString &evalId, const QString &runId,
+                                                       const ListParams &params = {});
+
+    EvalRunOutputItemReply *getEvalRunOutputItem(const QString &evalId, const QString &runId,
+                                                 const QString &outputItemId);
+
+    // Poll a run until it reaches a terminal state. Returns an EvalRunPoller
+    // that emits progressed()/completed()/failed(); call start() on it. It
+    // deletes itself once it stops unless setAutoDelete(false) is used.
+    EvalRunPoller *pollEvalRun(const QString &evalId, const QString &runId,
+                               int pollIntervalMs = 2000);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.

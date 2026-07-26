@@ -64,6 +64,13 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/FineTuningPermissionListReply.h
     include/QtOpenAi/Client/FineTuningPermissionReply.h
     include/QtOpenAi/Client/FineTuningJobPoller.h
+    include/QtOpenAi/Client/EvalReply.h
+    include/QtOpenAi/Client/EvalListReply.h
+    include/QtOpenAi/Client/EvalRunReply.h
+    include/QtOpenAi/Client/EvalRunListReply.h
+    include/QtOpenAi/Client/EvalRunOutputItemReply.h
+    include/QtOpenAi/Client/EvalRunOutputItemListReply.h
+    include/QtOpenAi/Client/EvalRunPoller.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -135,6 +142,13 @@ add_library(QtOpenAiClient
     src/FineTuningPermissionListReply.cpp
     src/FineTuningPermissionReply.cpp
     src/FineTuningJobPoller.cpp
+    src/EvalReply.cpp
+    src/EvalListReply.cpp
+    src/EvalRunReply.cpp
+    src/EvalRunListReply.cpp
+    src/EvalRunOutputItemReply.cpp
+    src/EvalRunOutputItemListReply.cpp
+    src/EvalRunPoller.cpp
     src/Client.cpp
 )
 
