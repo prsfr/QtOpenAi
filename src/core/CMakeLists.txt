@@ -54,6 +54,9 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/CreateVideoRequest.h
     include/QtOpenAi/Core/Batch.h
     include/QtOpenAi/Core/CreateBatchRequest.h
+    include/QtOpenAi/Core/FineTuningJob.h
+    include/QtOpenAi/Core/FineTuningCheckpoint.h
+    include/QtOpenAi/Core/CreateFineTuningJobRequest.h
 )
 
 add_library(QtOpenAiCore
@@ -107,6 +110,9 @@ add_library(QtOpenAiCore
     src/CreateVideoRequest.cpp
     src/Batch.cpp
     src/CreateBatchRequest.cpp
+    src/FineTuningJob.cpp
+    src/FineTuningCheckpoint.cpp
+    src/CreateFineTuningJobRequest.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

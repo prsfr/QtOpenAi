@@ -649,6 +649,47 @@ poller->start();
 and `VideoPoller` share their timer, lifecycle and auto-delete behaviour through
 `JobPoller`, so both behave identically apart from the job type they carry.
 
+## Fine-tuning (`/fine_tuning`)
+
+Training a model on your own data is a long-running job: upload a JSONL
+training file with purpose `fine-tune`, start the job, and wait.
+
+```cpp
+Core::CreateFineTuningJobRequest request("gpt-4o-mini-2024-07-18", trainingFileId);
+request.setSuffix("my-run");
+// Optional — leaving the hyperparameters unset lets the service pick them:
+Core::FineTuningHyperparameters hyper;
+hyper.nEpochs = 3;
+request.setMethodType("supervised");
+request.setHyperparameters(hyper);
+
+auto *created = client.createFineTuningJob(request);
+```
+
+The wire format spells an auto-chosen hyperparameter as the string `"auto"`;
+those decode to an unset `std::optional` rather than an invented number, and
+unset values are left out of a request body.
+
+Waiting reuses the same `JobPoller` engine as batches and videos — a paused job
+is *not* terminal, so a poller keeps waiting across a `pause`/`resume`:
+
+```cpp
+auto *poller = client.pollFineTuningJob(jobId, 30000);
+connect(poller, &Client::FineTuningJobPoller::completed, this,
+        [](const Core::FineTuningJob &job) {
+            if (job.status() == Core::FineTuningJobStatus::Succeeded)
+                qDebug() << "new model:" << job.fineTunedModel();
+        });
+poller->start();
+```
+
+`listFineTuningEvents` returns the progress log (status messages and periodic
+metrics samples), `listFineTuningCheckpoints` the mid-training snapshots — each
+a usable model of its own — and the
+`{list,create,delete}FineTuningCheckpointPermission(s)` trio controls which
+projects may use a checkpoint. `cancelFineTuningJob`, `pauseFineTuningJob` and
+`resumeFineTuningJob` complete the lifecycle.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -712,6 +753,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `vector_search`     | Index a document and search it (`/vector_stores`)    |
 | `containers`        | Code-interpreter sandbox + files (`/containers`)     |
 | `batch`             | Batch: upload → create → poll → results (`/batches`) |
+| `fine_tuning`       | Fine-tuning: train → poll → events (`/fine_tuning`)  |
 
 ## Building
 

@@ -52,6 +52,13 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/BatchReply.h
     include/QtOpenAi/Client/BatchListReply.h
     include/QtOpenAi/Client/BatchPoller.h
+    include/QtOpenAi/Client/FineTuningJobReply.h
+    include/QtOpenAi/Client/FineTuningJobListReply.h
+    include/QtOpenAi/Client/FineTuningEventListReply.h
+    include/QtOpenAi/Client/FineTuningCheckpointListReply.h
+    include/QtOpenAi/Client/FineTuningPermissionListReply.h
+    include/QtOpenAi/Client/FineTuningPermissionReply.h
+    include/QtOpenAi/Client/FineTuningJobPoller.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -111,6 +118,13 @@ add_library(QtOpenAiClient
     src/BatchReply.cpp
     src/BatchListReply.cpp
     src/BatchPoller.cpp
+    src/FineTuningJobReply.cpp
+    src/FineTuningJobListReply.cpp
+    src/FineTuningEventListReply.cpp
+    src/FineTuningCheckpointListReply.cpp
+    src/FineTuningPermissionListReply.cpp
+    src/FineTuningPermissionReply.cpp
+    src/FineTuningJobPoller.cpp
     src/Client.cpp
 )
 
