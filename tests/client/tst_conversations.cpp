@@ -8,6 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestConversationsClient : public QObject
@@ -27,16 +28,14 @@ void TestConversationsClient::createConversationPostsAndParses()
         "metadata":{"topic":"weather"}})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ConversationReply *reply = client.createConversation(
-            QJsonObject {{QStringLiteral("topic"), QStringLiteral("weather")}});
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createConversation(
+            QJsonObject {{QStringLiteral("topic"), QStringLiteral("weather")}}));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/conversations "));
     QCOMPARE(reply->conversation().id(), QStringLiteral("conv_1"));
     QVERIFY(server.requestBody().contains("\"metadata\""));
-    delete reply;
 }
 
 void TestConversationsClient::listItemsUsesGetAndParsesPage()
@@ -47,15 +46,13 @@ void TestConversationsClient::listItemsUsesGetAndParsesPage()
         "first_id":"msg_1","last_id":"msg_1","has_more":false})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ConversationItemsReply *reply = client.listConversationItems(QStringLiteral("conv_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listConversationItems(QStringLiteral("conv_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/conversations/conv_1/items "));
     QCOMPARE(reply->items().size(), 1);
     QCOMPARE(reply->firstItem().text(), QStringLiteral("Hello"));
-    delete reply;
 }
 
 void TestConversationsClient::createItemsPostsBody()
@@ -66,16 +63,14 @@ void TestConversationsClient::createItemsPostsBody()
         "first_id":"msg_1","last_id":"msg_1","has_more":false})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ConversationItemsReply *reply = client.createConversationItems(
+    const auto reply = awaited(client.createConversationItems(
             QStringLiteral("conv_1"),
-            {ResponseOutputItem::message(QStringLiteral("Hi"), QStringLiteral("user"))});
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+            {ResponseOutputItem::message(QStringLiteral("Hi"), QStringLiteral("user"))}));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/conversations/conv_1/items "));
     QVERIFY(server.requestBody().contains("\"items\""));
-    delete reply;
 }
 
 void TestConversationsClient::getItemWrapsSingleItem()
@@ -84,16 +79,14 @@ void TestConversationsClient::getItemWrapsSingleItem()
         "content":[{"type":"output_text","text":"Answer","annotations":[]}]})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ConversationItemsReply *reply
-            = client.getConversationItem(QStringLiteral("conv_1"), QStringLiteral("msg_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(
+            client.getConversationItem(QStringLiteral("conv_1"), QStringLiteral("msg_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/conversations/conv_1/items/msg_1 "));
     QCOMPARE(reply->items().size(), 1);
     QCOMPARE(reply->firstItem().text(), QStringLiteral("Answer"));
-    delete reply;
 }
 
 void TestConversationsClient::deleteConversationUsesDelete()
@@ -101,14 +94,12 @@ void TestConversationsClient::deleteConversationUsesDelete()
     StubServer server(R"({"id":"conv_1","object":"conversation.deleted","deleted":true})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ConversationReply *reply = client.deleteConversation(QStringLiteral("conv_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.deleteConversation(QStringLiteral("conv_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("DELETE /v1/conversations/conv_1 "));
     QCOMPARE(reply->conversation().object(), QStringLiteral("conversation.deleted"));
-    delete reply;
 }
 
 QTEST_MAIN(TestConversationsClient)

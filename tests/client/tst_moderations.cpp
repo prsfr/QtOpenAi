@@ -8,6 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestModerationsClient : public QObject
@@ -24,16 +25,15 @@ void TestModerationsClient::createPostsAndParsesFlagged()
          "category_scores":{"violence":0.91}}]})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ModerationReply *reply = client.createModeration(ModerationRequest(QStringLiteral("bad text")));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply
+            = awaited(client.createModeration(ModerationRequest(QStringLiteral("bad text"))));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/moderations "));
     const ModerationResult result = reply->response().firstResult();
     QVERIFY(result.flagged());
     QCOMPARE(result.score(QStringLiteral("violence")), 0.91);
-    delete reply;
 }
 
 QTEST_MAIN(TestModerationsClient)

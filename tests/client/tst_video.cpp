@@ -8,6 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestVideoClient : public QObject
@@ -33,9 +34,8 @@ void TestVideoClient::createPostsJsonAndParsesQueuedJob()
     CreateVideoRequest request(QStringLiteral("a cat surfing"), QStringLiteral("sora-2"));
     request.setSeconds(QStringLiteral("8"));
 
-    VideoReply *reply = client.createVideo(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createVideo(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLines().first().startsWith("POST /v1/videos "));
@@ -44,7 +44,6 @@ void TestVideoClient::createPostsJsonAndParsesQueuedJob()
     QCOMPARE(reply->job().id(), QStringLiteral("video_1"));
     QCOMPARE(reply->job().status(), VideoStatus::Queued);
     QVERIFY(!reply->job().isTerminal());
-    delete reply;
 }
 
 void TestVideoClient::createWithReferenceUploadsMultipart()
@@ -55,9 +54,8 @@ void TestVideoClient::createWithReferenceUploadsMultipart()
     CreateVideoRequest request(QStringLiteral("extend this"), QStringLiteral("sora-2"));
     request.setInputReference(QStringLiteral("ref.png"), QByteArray("PNGrefbytes"));
 
-    VideoReply *reply = client.createVideo(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createVideo(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLines().first().startsWith("POST /v1/videos "));
@@ -66,7 +64,6 @@ void TestVideoClient::createWithReferenceUploadsMultipart()
     QVERIFY(body.contains("name=\"prompt\""));
     QVERIFY(body.contains("name=\"input_reference\"; filename=\"ref.png\""));
     QVERIFY(body.contains("PNGrefbytes"));
-    delete reply;
 }
 
 void TestVideoClient::listParsesPage()
@@ -79,9 +76,8 @@ void TestVideoClient::listParsesPage()
 
     ListParams params;
     params.limit = 2;
-    VideoListReply *reply = client.listVideos(params);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listVideos(params));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLines().first().startsWith("GET /v1/videos?"));
@@ -89,7 +85,6 @@ void TestVideoClient::listParsesPage()
     QCOMPARE(reply->list().size(), 2);
     QCOMPARE(reply->list().data.at(0).id(), QStringLiteral("video_1"));
     QCOMPARE(reply->list().data.at(0).status(), VideoStatus::Completed);
-    delete reply;
 }
 
 void TestVideoClient::remixPostsPrompt()
@@ -97,16 +92,14 @@ void TestVideoClient::remixPostsPrompt()
     StubServer server(QByteArray(R"({"id":"video_remix","status":"queued","progress":0})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    VideoReply *reply
-            = client.remixVideo(QStringLiteral("video_1"), QStringLiteral("make it rain"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply
+            = awaited(client.remixVideo(QStringLiteral("video_1"), QStringLiteral("make it rain")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLines().first().startsWith("POST /v1/videos/video_1/remix "));
     QVERIFY(server.requestBodies().first().contains("\"prompt\":\"make it rain\""));
     QCOMPARE(reply->job().id(), QStringLiteral("video_remix"));
-    delete reply;
 }
 
 void TestVideoClient::deleteIssuesDeleteVerb()
@@ -114,14 +107,12 @@ void TestVideoClient::deleteIssuesDeleteVerb()
     StubServer server(QByteArray(R"({"id":"video_1","object":"video.deleted","deleted":true})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    VideoReply *reply = client.deleteVideo(QStringLiteral("video_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.deleteVideo(QStringLiteral("video_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLines().first().startsWith("DELETE /v1/videos/video_1 "));
     QCOMPARE(reply->job().id(), QStringLiteral("video_1"));
-    delete reply;
 }
 
 void TestVideoClient::downloadsBinaryContentVerbatim()
@@ -134,15 +125,13 @@ void TestVideoClient::downloadsBinaryContentVerbatim()
     StubServer server(video, QByteArray("video/mp4"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    VideoContentReply *reply = client.downloadVideoContent(QStringLiteral("video_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.downloadVideoContent(QStringLiteral("video_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLines().first().startsWith("GET /v1/videos/video_1/content "));
     QCOMPARE(reply->videoData(), video);
     QCOMPARE(reply->contentType(), QByteArray("video/mp4"));
-    delete reply;
 }
 
 void TestVideoClient::pollUntilCompleteEmitsProgress()

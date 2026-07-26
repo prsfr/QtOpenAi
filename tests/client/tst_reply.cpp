@@ -9,6 +9,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestReply : public QObject
@@ -81,15 +82,13 @@ void TestReply::requestBodyContainsModelAndMessages()
     StubServer server(200, body);
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ChatCompletionReply *reply = client.createChatCompletion(ChatCompletionRequest(
-            QStringLiteral("gpt-4o-mini"), {Message::user(QStringLiteral("ping"))}));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletion(ChatCompletionRequest(
+            QStringLiteral("gpt-4o-mini"), {Message::user(QStringLiteral("ping"))})));
+    QVERIFY(reply);
 
     const QJsonObject sent = QJsonDocument::fromJson(server.requestBody()).object();
     QCOMPARE(sent.value(QStringLiteral("model")).toString(), QStringLiteral("gpt-4o-mini"));
     QCOMPARE(sent.value(QStringLiteral("messages")).toArray().size(), 1);
-    delete reply;
 }
 
 QTEST_MAIN(TestReply)

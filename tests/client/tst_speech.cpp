@@ -8,6 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestSpeechClient : public QObject
@@ -24,10 +25,9 @@ void TestSpeechClient::surfacesAudioBytesVerbatim()
     StubServer server(audio, "audio/mpeg");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    SpeechReply *reply = client.createSpeech(SpeechRequest(
-            QStringLiteral("gpt-4o-mini-tts"), QStringLiteral("Hello"), QStringLiteral("alloy")));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createSpeech(SpeechRequest(
+            QStringLiteral("gpt-4o-mini-tts"), QStringLiteral("Hello"), QStringLiteral("alloy"))));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/audio/speech "));
@@ -35,7 +35,6 @@ void TestSpeechClient::surfacesAudioBytesVerbatim()
     // The client must surface the bytes verbatim, NUL byte and all.
     QCOMPARE(reply->audioData(), audio);
     QCOMPARE(reply->contentType(), QByteArray("audio/mpeg"));
-    delete reply;
 }
 
 QTEST_MAIN(TestSpeechClient)

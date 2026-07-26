@@ -8,6 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestTranscriptionsClient : public QObject
@@ -28,9 +29,8 @@ void TestTranscriptionsClient::uploadsMultipartAndParsesVerboseJson()
                                  QStringLiteral("whisper-1"));
     request.setResponseFormat(QStringLiteral("verbose_json"));
 
-    TranscriptionReply *reply = client.createTranscription(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createTranscription(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/audio/transcriptions "));
@@ -47,7 +47,6 @@ void TestTranscriptionsClient::uploadsMultipartAndParsesVerboseJson()
     QCOMPARE(response.text(), QStringLiteral("Hello world"));
     QCOMPARE(response.segments().size(), 1);
     QCOMPARE(response.segments().first().end(), 1.5);
-    delete reply;
 }
 
 QTEST_MAIN(TestTranscriptionsClient)

@@ -6,6 +6,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 // Offline stub-server coverage for the Evals endpoints (#22): eval CRUD, the
@@ -41,16 +42,14 @@ void TestEvalsClient::createPostsJsonBody()
     CreateEvalRequest request(config, criteria);
     request.setName(QStringLiteral("Accuracy"));
 
-    EvalReply *reply = client.createEval(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createEval(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/evals "));
     QVERIFY(server.requestBody().contains("\"name\":\"Accuracy\""));
     QVERIFY(server.requestBody().contains("\"data_source_config\":{\"type\":\"custom\"}"));
     QCOMPARE(reply->eval().id(), QStringLiteral("eval_1"));
-    delete reply;
 }
 
 void TestEvalsClient::listSendsPaginationQuery()
@@ -61,15 +60,13 @@ void TestEvalsClient::listSendsPaginationQuery()
 
     ListParams params;
     params.limit = 5;
-    EvalListReply *reply = client.listEvals(params);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listEvals(params));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/evals?"));
     QVERIFY(server.requestLine().contains("limit=5"));
     QCOMPARE(reply->list().size(), 2);
-    delete reply;
 }
 
 void TestEvalsClient::getParsesEval()
@@ -78,15 +75,13 @@ void TestEvalsClient::getParsesEval()
                                  R"("testing_criteria":[{"type":"string_check"}]})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    EvalReply *reply = client.getEval(QStringLiteral("eval_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.getEval(QStringLiteral("eval_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/evals/eval_1 "));
     QCOMPARE(reply->eval().createdAt(), Q_INT64_C(1716028800));
     QCOMPARE(reply->eval().testingCriteria().size(), 1);
-    delete reply;
 }
 
 void TestEvalsClient::updatePostsChangedFields()
@@ -94,18 +89,16 @@ void TestEvalsClient::updatePostsChangedFields()
     StubServer server(QByteArray(R"({"id":"eval_1","name":"Renamed"})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    EvalReply *reply
-            = client.updateEval(QStringLiteral("eval_1"), QStringLiteral("Renamed"),
-                                QJsonObject {{QStringLiteral("team"), QStringLiteral("qa")}});
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(
+            client.updateEval(QStringLiteral("eval_1"), QStringLiteral("Renamed"),
+                              QJsonObject {{QStringLiteral("team"), QStringLiteral("qa")}}));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/evals/eval_1 "));
     QVERIFY(server.requestBody().contains("\"name\":\"Renamed\""));
     QVERIFY(server.requestBody().contains("\"team\":\"qa\""));
     QCOMPARE(reply->eval().name(), QStringLiteral("Renamed"));
-    delete reply;
 }
 
 void TestEvalsClient::deleteIssuesDeleteVerb()
@@ -114,15 +107,13 @@ void TestEvalsClient::deleteIssuesDeleteVerb()
                                  R"("eval_id":"eval_1"})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    EvalReply *reply = client.deleteEval(QStringLiteral("eval_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.deleteEval(QStringLiteral("eval_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("DELETE /v1/evals/eval_1 "));
     QCOMPARE(reply->eval().object(), QStringLiteral("eval.deleted"));
     QCOMPARE(reply->eval().id(), QStringLiteral("eval_1"));
-    delete reply;
 }
 
 void TestEvalsClient::createsRunBelowEval()
@@ -135,15 +126,13 @@ void TestEvalsClient::createsRunBelowEval()
             QJsonObject {{QStringLiteral("type"), QStringLiteral("completions")}});
     request.setName(QStringLiteral("nightly"));
 
-    EvalRunReply *reply = client.createEvalRun(QStringLiteral("eval_1"), request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createEvalRun(QStringLiteral("eval_1"), request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/evals/eval_1/runs "));
     QVERIFY(server.requestBody().contains("\"name\":\"nightly\""));
     QCOMPARE(reply->run().status(), EvalRunStatus::Queued);
-    delete reply;
 }
 
 void TestEvalsClient::listsRuns()
@@ -154,15 +143,13 @@ void TestEvalsClient::listsRuns()
 
     ListParams params;
     params.limit = 3;
-    EvalRunListReply *reply = client.listEvalRuns(QStringLiteral("eval_1"), params);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listEvalRuns(QStringLiteral("eval_1"), params));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/evals/eval_1/runs?"));
     QVERIFY(server.requestLine().contains("limit=3"));
     QCOMPARE(reply->list().size(), 1);
-    delete reply;
 }
 
 void TestEvalsClient::getParsesRun()
@@ -172,15 +159,14 @@ void TestEvalsClient::getParsesRun()
                                  R"("failed":1,"passed":3}})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    EvalRunReply *reply = client.getEvalRun(QStringLiteral("eval_1"), QStringLiteral("evalrun_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply
+            = awaited(client.getEvalRun(QStringLiteral("eval_1"), QStringLiteral("evalrun_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/evals/eval_1/runs/evalrun_1 "));
     QCOMPARE(reply->run().resultCounts().passed, 3);
     QVERIFY(reply->run().isTerminal());
-    delete reply;
 }
 
 void TestEvalsClient::cancelPostsToRunPath()
@@ -189,15 +175,13 @@ void TestEvalsClient::cancelPostsToRunPath()
     StubServer server(QByteArray(R"({"id":"evalrun_1","status":"canceled"})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    EvalRunReply *reply
-            = client.cancelEvalRun(QStringLiteral("eval_1"), QStringLiteral("evalrun_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply
+            = awaited(client.cancelEvalRun(QStringLiteral("eval_1"), QStringLiteral("evalrun_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/evals/eval_1/runs/evalrun_1 "));
     QCOMPARE(reply->run().status(), EvalRunStatus::Canceled);
-    delete reply;
 }
 
 void TestEvalsClient::deleteRunIssuesDeleteVerb()
@@ -206,15 +190,13 @@ void TestEvalsClient::deleteRunIssuesDeleteVerb()
                                  R"("run_id":"evalrun_1"})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    EvalRunReply *reply
-            = client.deleteEvalRun(QStringLiteral("eval_1"), QStringLiteral("evalrun_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply
+            = awaited(client.deleteEvalRun(QStringLiteral("eval_1"), QStringLiteral("evalrun_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("DELETE /v1/evals/eval_1/runs/evalrun_1 "));
     QCOMPARE(reply->run().id(), QStringLiteral("evalrun_1"));
-    delete reply;
 }
 
 void TestEvalsClient::listsOutputItems()
@@ -224,16 +206,14 @@ void TestEvalsClient::listsOutputItems()
                                  R"({"id":"outputitem_2","status":"fail"}],"has_more":false})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    EvalRunOutputItemListReply *reply
-            = client.listEvalRunOutputItems(QStringLiteral("eval_1"), QStringLiteral("evalrun_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(
+            client.listEvalRunOutputItems(QStringLiteral("eval_1"), QStringLiteral("evalrun_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/evals/eval_1/runs/evalrun_1/output_items"));
     QCOMPARE(reply->list().size(), 2);
     QCOMPARE(reply->list().data.last().status(), QStringLiteral("fail"));
-    delete reply;
 }
 
 void TestEvalsClient::getsOutputItem()
@@ -242,16 +222,14 @@ void TestEvalsClient::getsOutputItem()
                                  R"("results":[{"passed":true}]})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    EvalRunOutputItemReply *reply = client.getEvalRunOutputItem(
-            QStringLiteral("eval_1"), QStringLiteral("evalrun_1"), QStringLiteral("outputitem_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.getEvalRunOutputItem(
+            QStringLiteral("eval_1"), QStringLiteral("evalrun_1"), QStringLiteral("outputitem_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith(
             "GET /v1/evals/eval_1/runs/evalrun_1/output_items/outputitem_1 "));
     QCOMPARE(reply->item().results().size(), 1);
-    delete reply;
 }
 
 void TestEvalsClient::pollsRunUntilCompleted()

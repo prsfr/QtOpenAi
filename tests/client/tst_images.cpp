@@ -8,6 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestImagesClient : public QObject
@@ -26,15 +27,13 @@ void TestImagesClient::generationPostsJsonAndParsesB64()
     ImageGenerationRequest request(QStringLiteral("a red cube"), QStringLiteral("gpt-image-1"));
     request.setSize(QStringLiteral("1024x1024"));
 
-    ImageReply *reply = client.createImage(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createImage(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/images/generations "));
     QVERIFY(server.requestBody().contains("\"prompt\":\"a red cube\""));
     QCOMPARE(reply->response().firstImage().b64Json(), QStringLiteral("aGVsbG8="));
-    delete reply;
 }
 
 void TestImagesClient::editUploadsMultipartWithMask()
@@ -46,9 +45,8 @@ void TestImagesClient::editUploadsMultipartWithMask()
                              QStringLiteral("add a hat"), QStringLiteral("gpt-image-1"));
     request.setMask(QStringLiteral("mask.png"), QByteArray("PNGmaskbytes"));
 
-    ImageReply *reply = client.createImageEdit(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createImageEdit(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/images/edits "));
@@ -60,7 +58,6 @@ void TestImagesClient::editUploadsMultipartWithMask()
     QVERIFY(body.contains("PNGmaskbytes"));
     QVERIFY(body.contains("name=\"prompt\""));
     QCOMPARE(reply->response().firstImage().url(), QStringLiteral("https://x/y.png"));
-    delete reply;
 }
 
 QTEST_MAIN(TestImagesClient)

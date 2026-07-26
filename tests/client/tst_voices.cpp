@@ -6,6 +6,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 // Offline stub-server coverage for the custom-voice endpoints (#12): the two
@@ -31,9 +32,8 @@ void TestVoicesClient::createVoicePostsMultipart()
     CreateVoiceRequest request(QStringLiteral("Narrator"), QStringLiteral("consent_1"),
                                QByteArray("RIFFfake"), QStringLiteral("sample.wav"));
 
-    VoiceReply *reply = client.createVoice(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createVoice(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/audio/voices "));
@@ -42,7 +42,6 @@ void TestVoicesClient::createVoicePostsMultipart()
     QVERIFY(server.requestBody().contains("name=\"consent\""));
     QVERIFY(server.requestBody().contains("consent_1"));
     QCOMPARE(reply->voice().voiceStatus(), QStringLiteral("processing"));
-    delete reply;
 }
 
 void TestVoicesClient::createConsentPostsMultipart()
@@ -55,16 +54,14 @@ void TestVoicesClient::createConsentPostsMultipart()
     CreateVoiceConsentRequest request(QStringLiteral("Jane Doe"), QStringLiteral("en"),
                                       QByteArray("RIFFfake"), QStringLiteral("consent.wav"));
 
-    VoiceConsentReply *reply = client.createVoiceConsent(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createVoiceConsent(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/audio/voice_consents "));
     QVERIFY(server.requestBody().contains("name=\"recording\"; filename=\"consent.wav\""));
     QVERIFY(server.requestBody().contains("name=\"language\""));
     QCOMPARE(reply->consent().consentStatus(), QStringLiteral("pending"));
-    delete reply;
 }
 
 void TestVoicesClient::listsConsentsWithPagination()
@@ -75,15 +72,13 @@ void TestVoicesClient::listsConsentsWithPagination()
 
     ListParams params;
     params.limit = 5;
-    VoiceConsentListReply *reply = client.listVoiceConsents(params);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listVoiceConsents(params));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/audio/voice_consents?"));
     QVERIFY(server.requestLine().contains("limit=5"));
     QCOMPARE(reply->list().size(), 2);
-    delete reply;
 }
 
 void TestVoicesClient::getParsesConsent()
@@ -92,15 +87,13 @@ void TestVoicesClient::getParsesConsent()
                                  R"("created_at":1716028800,"consent_status":"verified"})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    VoiceConsentReply *reply = client.getVoiceConsent(QStringLiteral("consent_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.getVoiceConsent(QStringLiteral("consent_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/audio/voice_consents/consent_1 "));
     QCOMPARE(reply->consent().language(), QStringLiteral("de"));
     QCOMPARE(reply->consent().createdAt(), Q_INT64_C(1716028800));
-    delete reply;
 }
 
 void TestVoicesClient::updatePostsName()
@@ -108,16 +101,14 @@ void TestVoicesClient::updatePostsName()
     StubServer server(QByteArray(R"({"id":"consent_1","name":"Renamed"})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    VoiceConsentReply *reply
-            = client.updateVoiceConsent(QStringLiteral("consent_1"), QStringLiteral("Renamed"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(
+            client.updateVoiceConsent(QStringLiteral("consent_1"), QStringLiteral("Renamed")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/audio/voice_consents/consent_1 "));
     QVERIFY(server.requestBody().contains("\"name\":\"Renamed\""));
     QCOMPARE(reply->consent().name(), QStringLiteral("Renamed"));
-    delete reply;
 }
 
 void TestVoicesClient::deleteIssuesDeleteVerb()
@@ -126,14 +117,12 @@ void TestVoicesClient::deleteIssuesDeleteVerb()
                                  R"("object":"audio.voice_consent.deleted","deleted":true})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    VoiceConsentReply *reply = client.deleteVoiceConsent(QStringLiteral("consent_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.deleteVoiceConsent(QStringLiteral("consent_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("DELETE /v1/audio/voice_consents/consent_1 "));
     QCOMPARE(reply->consent().object(), QStringLiteral("audio.voice_consent.deleted"));
-    delete reply;
 }
 
 QTEST_MAIN(TestVoicesClient)

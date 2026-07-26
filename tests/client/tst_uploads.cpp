@@ -7,6 +7,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 // Offline stub-server coverage for the Uploads endpoints (#17): the four REST
@@ -34,9 +35,8 @@ void TestUploadsClient::createPostsJsonBody()
     CreateUploadRequest request(QStringLiteral("big.jsonl"), QStringLiteral("fine-tune"), 100,
                                 QStringLiteral("text/jsonl"));
 
-    UploadReply *reply = client.createUpload(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createUpload(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/uploads "));
@@ -45,7 +45,6 @@ void TestUploadsClient::createPostsJsonBody()
     QCOMPARE(reply->upload().id(), QStringLiteral("upload_1"));
     QCOMPARE(reply->upload().status(), UploadStatus::Pending);
     QVERIFY(!reply->upload().isTerminal());
-    delete reply;
 }
 
 void TestUploadsClient::addPartUploadsMultipart()
@@ -54,10 +53,9 @@ void TestUploadsClient::addPartUploadsMultipart()
                                  R"("upload_id":"upload_1","created_at":1700000000})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    UploadPartReply *reply
-            = client.addUploadPart(QStringLiteral("upload_1"), QByteArray("chunk-bytes"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply
+            = awaited(client.addUploadPart(QStringLiteral("upload_1"), QByteArray("chunk-bytes")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/uploads/upload_1/parts "));
@@ -66,7 +64,6 @@ void TestUploadsClient::addPartUploadsMultipart()
     QVERIFY(server.requestBody().contains("chunk-bytes"));
     QCOMPARE(reply->part().id(), QStringLiteral("part_1"));
     QCOMPARE(reply->part().uploadId(), QStringLiteral("upload_1"));
-    delete reply;
 }
 
 void TestUploadsClient::completePostsPartIds()
@@ -75,10 +72,9 @@ void TestUploadsClient::completePostsPartIds()
                                  R"("file":{"id":"file-1","purpose":"fine-tune"}})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    UploadReply *reply = client.completeUpload(
-            QStringLiteral("upload_1"), {QStringLiteral("part_1"), QStringLiteral("part_2")});
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.completeUpload(
+            QStringLiteral("upload_1"), {QStringLiteral("part_1"), QStringLiteral("part_2")}));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/uploads/upload_1/complete "));
@@ -87,7 +83,6 @@ void TestUploadsClient::completePostsPartIds()
     QCOMPARE(reply->upload().status(), UploadStatus::Completed);
     QVERIFY(reply->upload().file().has_value());
     QCOMPARE(reply->upload().file()->id(), QStringLiteral("file-1"));
-    delete reply;
 }
 
 void TestUploadsClient::completeSendsOptionalMd5()
@@ -95,14 +90,12 @@ void TestUploadsClient::completeSendsOptionalMd5()
     StubServer server(QByteArray(R"({"id":"upload_1","status":"completed"})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    UploadReply *reply = client.completeUpload(
-            QStringLiteral("upload_1"), {QStringLiteral("part_1")}, QStringLiteral("d41d8cd9"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.completeUpload(
+            QStringLiteral("upload_1"), {QStringLiteral("part_1")}, QStringLiteral("d41d8cd9")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestBody().contains("\"md5\":\"d41d8cd9\""));
-    delete reply;
 }
 
 void TestUploadsClient::cancelPostsToCancelPath()
@@ -110,15 +103,13 @@ void TestUploadsClient::cancelPostsToCancelPath()
     StubServer server(QByteArray(R"({"id":"upload_1","status":"cancelled"})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    UploadReply *reply = client.cancelUpload(QStringLiteral("upload_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.cancelUpload(QStringLiteral("upload_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/uploads/upload_1/cancel "));
     QCOMPARE(reply->upload().status(), UploadStatus::Cancelled);
     QVERIFY(reply->upload().isTerminal());
-    delete reply;
 }
 
 void TestUploadsClient::chunkedUploaderSplitsPayloadAndCompletes()

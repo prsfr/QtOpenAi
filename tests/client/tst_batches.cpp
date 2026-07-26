@@ -6,6 +6,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 // Offline stub-server coverage for the Batch endpoints (#20): the four REST
@@ -33,9 +34,8 @@ void TestBatchesClient::createPostsJsonBody()
     CreateBatchRequest request(QStringLiteral("file-in"), QStringLiteral("/v1/chat/completions"));
     request.setMetadata(QJsonObject {{QStringLiteral("job"), QStringLiteral("nightly")}});
 
-    BatchReply *reply = client.createBatch(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createBatch(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/batches "));
@@ -44,7 +44,6 @@ void TestBatchesClient::createPostsJsonBody()
     QVERIFY(server.requestBody().contains("\"job\":\"nightly\""));
     QCOMPARE(reply->batch().id(), QStringLiteral("batch_1"));
     QCOMPARE(reply->batch().status(), BatchStatus::Validating);
-    delete reply;
 }
 
 void TestBatchesClient::listSendsPaginationQuery()
@@ -56,16 +55,14 @@ void TestBatchesClient::listSendsPaginationQuery()
     ListParams params;
     params.limit = 5;
     params.after = QStringLiteral("batch_0");
-    BatchListReply *reply = client.listBatches(params);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listBatches(params));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/batches?"));
     QVERIFY(server.requestLine().contains("limit=5"));
     QVERIFY(server.requestLine().contains("after=batch_0"));
     QCOMPARE(reply->list().size(), 2);
-    delete reply;
 }
 
 void TestBatchesClient::getParsesBatch()
@@ -75,9 +72,8 @@ void TestBatchesClient::getParsesBatch()
                                  R"("request_counts":{"total":3,"completed":3,"failed":0}})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    BatchReply *reply = client.getBatch(QStringLiteral("batch_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.getBatch(QStringLiteral("batch_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/batches/batch_1 "));
@@ -85,7 +81,6 @@ void TestBatchesClient::getParsesBatch()
     QCOMPARE(reply->batch().createdAt(), Q_INT64_C(1711471533));
     QCOMPARE(reply->batch().requestCounts().completed, 3);
     QVERIFY(reply->batch().isTerminal());
-    delete reply;
 }
 
 void TestBatchesClient::cancelPostsToCancelPath()
@@ -93,16 +88,14 @@ void TestBatchesClient::cancelPostsToCancelPath()
     StubServer server(QByteArray(R"({"id":"batch_1","status":"cancelling"})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    BatchReply *reply = client.cancelBatch(QStringLiteral("batch_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.cancelBatch(QStringLiteral("batch_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/batches/batch_1/cancel "));
     QCOMPARE(reply->batch().status(), BatchStatus::Cancelling);
     // Cancelling is not terminal — the batch settles on `cancelled` later.
     QVERIFY(!reply->batch().isTerminal());
-    delete reply;
 }
 
 void TestBatchesClient::pollsUntilCompleted()
