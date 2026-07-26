@@ -134,9 +134,9 @@ void TestResponsesClient::listsInputItemsWithPagination()
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/responses/resp_1/input_items?"));
     QVERIFY(server.requestLine().contains("limit=2"));
-    QCOMPARE(reply->items().items().size(), 2);
-    QCOMPARE(reply->items().lastId(), QStringLiteral("msg_2"));
-    QVERIFY(!reply->items().hasMore());
+    QCOMPARE(reply->items().size(), 2);
+    QCOMPARE(reply->items().lastId, QStringLiteral("msg_2"));
+    QVERIFY(!reply->items().hasMore);
     delete reply;
 }
 

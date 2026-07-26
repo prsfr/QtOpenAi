@@ -32,6 +32,12 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
 * **Hidden implementation** — QObject-derived types (`Client`,
   `ChatCompletionReply`, `ToolRegistry`) use the classic `Q_DECLARE_PRIVATE`
   `d`-pointer so the ABI stays stable and headers stay clean.
+* **No boilerplate replies** — most endpoints decode into exactly one value
+  type, so they derive from `TypedReply<T>`, which owns the parsed value and the
+  decode step. A concrete reply is left with only what is genuinely its own: a
+  typed `finished(...)` signal, a getter named the way that endpoint names its
+  payload, and the one line that fires the signal. The streaming replies, which
+  carry real state, still derive from `RestReplyBase` directly.
 * **Qt coding style** — getters are `content()` not `getContent()`; setters are
   `setContent()`; enums are exposed via `Q_ENUM`/`Q_NAMESPACE`.
 
@@ -259,7 +265,7 @@ connect(created, &Client::ConversationReply::finished, this,
             auto *items = client.listConversationItems(conv.id());
             connect(items, &Client::ConversationItemsReply::finished, this,
                     [](const Core::ConversationItemList &page) {
-                        for (const auto &item : page.items())
+                        for (const auto &item : page.data)
                             qInfo().noquote() << item.role() << item.text();
                     });
         });
@@ -809,7 +815,8 @@ walker->start();   // deletes itself when it stops, unless setAutoDelete(false)
 ```
 
 Only the two template arguments and the fetch lambda change per endpoint; a
-handler that has seen enough can call `stop()` mid-walk.
+handler that has seen enough can call `stop()` mid-walk. Every list endpoint
+returns a `ListPage`, so every one of them can be walked this way.
 
 **Azure OpenAI** (and other `api-key`-style providers):
 

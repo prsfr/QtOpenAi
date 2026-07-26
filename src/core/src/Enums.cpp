@@ -4,278 +4,192 @@
 namespace QtOpenAi {
 namespace Core {
 
-QString roleToString(Role role)
+namespace {
+
+// The wire spelling of one enum value. Each enum below is described by a single
+// table, so the mapping and its inverse can never drift apart -- which they
+// could when both directions were hand-written as a switch and an if-chain.
+template <typename Enum>
+struct WireName
 {
-    switch (role) {
-    case Role::System:
-        return QStringLiteral("system");
-    case Role::User:
-        return QStringLiteral("user");
-    case Role::Assistant:
-        return QStringLiteral("assistant");
-    case Role::Tool:
-        return QStringLiteral("tool");
-    case Role::Developer:
-        return QStringLiteral("developer");
+    Enum value;
+    const char *name;
+};
+
+// An enum value the table does not cover encodes as `fallback`'s spelling, and
+// an unrecognised wire string decodes to `fallback`. Every table is proven
+// complete by tst_core_enums, which round-trips every value the meta-object
+// system reports -- a stronger check than a switch's exhaustiveness warning,
+// because it also catches a value that has a row but the wrong spelling.
+template <typename Enum, size_t N>
+QString toWire(Enum value, const WireName<Enum> (&table)[N], Enum fallback)
+{
+    for (const auto &row : table) {
+        if (row.value == value)
+            return QString::fromLatin1(row.name);
     }
-    return QStringLiteral("user");
+    return toWire(fallback, table, fallback);
 }
 
-Role roleFromString(const QString &value)
+template <typename Enum, size_t N>
+Enum fromWire(const QString &value, const WireName<Enum> (&table)[N], Enum fallback)
 {
-    if (value == QLatin1String("system"))
-        return Role::System;
-    if (value == QLatin1String("assistant"))
-        return Role::Assistant;
-    if (value == QLatin1String("tool"))
-        return Role::Tool;
-    if (value == QLatin1String("developer"))
-        return Role::Developer;
-    return Role::User;
+    for (const auto &row : table) {
+        if (value == QLatin1String(row.name))
+            return row.value;
+    }
+    return fallback;
 }
+
+constexpr WireName<Role> kRoles[] = {
+        {Role::System, "system"}, {Role::User, "user"},           {Role::Assistant, "assistant"},
+        {Role::Tool, "tool"},     {Role::Developer, "developer"},
+};
+
+// FinishReason::None is the absent field, so its spelling is the empty string.
+constexpr WireName<FinishReason> kFinishReasons[] = {
+        {FinishReason::None, ""},
+        {FinishReason::Stop, "stop"},
+        {FinishReason::Length, "length"},
+        {FinishReason::ToolCalls, "tool_calls"},
+        {FinishReason::ContentFilter, "content_filter"},
+        {FinishReason::FunctionCall, "function_call"},
+};
+
+constexpr WireName<VideoStatus> kVideoStatuses[] = {
+        {VideoStatus::Queued, "queued"},
+        {VideoStatus::InProgress, "in_progress"},
+        {VideoStatus::Completed, "completed"},
+        {VideoStatus::Failed, "failed"},
+};
+
+constexpr WireName<UploadStatus> kUploadStatuses[] = {
+        {UploadStatus::Pending, "pending"},
+        {UploadStatus::Completed, "completed"},
+        {UploadStatus::Cancelled, "cancelled"},
+        {UploadStatus::Expired, "expired"},
+};
+
+constexpr WireName<VectorStoreStatus> kVectorStoreStatuses[] = {
+        {VectorStoreStatus::InProgress, "in_progress"},
+        {VectorStoreStatus::Completed, "completed"},
+        {VectorStoreStatus::Expired, "expired"},
+};
+
+constexpr WireName<VectorStoreFileStatus> kVectorStoreFileStatuses[] = {
+        {VectorStoreFileStatus::InProgress, "in_progress"},
+        {VectorStoreFileStatus::Completed, "completed"},
+        {VectorStoreFileStatus::Cancelled, "cancelled"},
+        {VectorStoreFileStatus::Failed, "failed"},
+};
+
+constexpr WireName<BatchStatus> kBatchStatuses[] = {
+        {BatchStatus::Validating, "validating"}, {BatchStatus::InProgress, "in_progress"},
+        {BatchStatus::Finalizing, "finalizing"}, {BatchStatus::Completed, "completed"},
+        {BatchStatus::Failed, "failed"},         {BatchStatus::Expired, "expired"},
+        {BatchStatus::Cancelling, "cancelling"}, {BatchStatus::Cancelled, "cancelled"},
+};
+
+constexpr WireName<FineTuningJobStatus> kFineTuningJobStatuses[] = {
+        {FineTuningJobStatus::ValidatingFiles, "validating_files"},
+        {FineTuningJobStatus::Queued, "queued"},
+        {FineTuningJobStatus::Running, "running"},
+        {FineTuningJobStatus::Succeeded, "succeeded"},
+        {FineTuningJobStatus::Failed, "failed"},
+        {FineTuningJobStatus::Cancelled, "cancelled"},
+        {FineTuningJobStatus::Paused, "paused"},
+};
+
+// Note the single-l "canceled" this endpoint family uses, unlike every other.
+constexpr WireName<EvalRunStatus> kEvalRunStatuses[] = {
+        {EvalRunStatus::Queued, "queued"},       {EvalRunStatus::InProgress, "in_progress"},
+        {EvalRunStatus::Completed, "completed"}, {EvalRunStatus::Failed, "failed"},
+        {EvalRunStatus::Canceled, "canceled"},
+};
+
+} // namespace
+
+QString roleToString(Role role) { return toWire(role, kRoles, Role::User); }
+Role roleFromString(const QString &value) { return fromWire(value, kRoles, Role::User); }
 
 QString finishReasonToString(FinishReason reason)
 {
-    switch (reason) {
-    case FinishReason::None:
-        return QString();
-    case FinishReason::Stop:
-        return QStringLiteral("stop");
-    case FinishReason::Length:
-        return QStringLiteral("length");
-    case FinishReason::ToolCalls:
-        return QStringLiteral("tool_calls");
-    case FinishReason::ContentFilter:
-        return QStringLiteral("content_filter");
-    case FinishReason::FunctionCall:
-        return QStringLiteral("function_call");
-    }
-    return QString();
+    return toWire(reason, kFinishReasons, FinishReason::None);
 }
 
 FinishReason finishReasonFromString(const QString &value)
 {
-    if (value == QLatin1String("stop"))
-        return FinishReason::Stop;
-    if (value == QLatin1String("length"))
-        return FinishReason::Length;
-    if (value == QLatin1String("tool_calls"))
-        return FinishReason::ToolCalls;
-    if (value == QLatin1String("content_filter"))
-        return FinishReason::ContentFilter;
-    if (value == QLatin1String("function_call"))
-        return FinishReason::FunctionCall;
-    return FinishReason::None;
+    return fromWire(value, kFinishReasons, FinishReason::None);
 }
 
 QString videoStatusToString(VideoStatus status)
 {
-    switch (status) {
-    case VideoStatus::Queued:
-        return QStringLiteral("queued");
-    case VideoStatus::InProgress:
-        return QStringLiteral("in_progress");
-    case VideoStatus::Completed:
-        return QStringLiteral("completed");
-    case VideoStatus::Failed:
-        return QStringLiteral("failed");
-    }
-    return QStringLiteral("queued");
+    return toWire(status, kVideoStatuses, VideoStatus::Queued);
 }
 
 VideoStatus videoStatusFromString(const QString &value)
 {
-    if (value == QLatin1String("in_progress"))
-        return VideoStatus::InProgress;
-    if (value == QLatin1String("completed"))
-        return VideoStatus::Completed;
-    if (value == QLatin1String("failed"))
-        return VideoStatus::Failed;
-    return VideoStatus::Queued;
+    return fromWire(value, kVideoStatuses, VideoStatus::Queued);
 }
 
 QString uploadStatusToString(UploadStatus status)
 {
-    switch (status) {
-    case UploadStatus::Pending:
-        return QStringLiteral("pending");
-    case UploadStatus::Completed:
-        return QStringLiteral("completed");
-    case UploadStatus::Cancelled:
-        return QStringLiteral("cancelled");
-    case UploadStatus::Expired:
-        return QStringLiteral("expired");
-    }
-    return QStringLiteral("pending");
+    return toWire(status, kUploadStatuses, UploadStatus::Pending);
 }
 
 UploadStatus uploadStatusFromString(const QString &value)
 {
-    if (value == QLatin1String("completed"))
-        return UploadStatus::Completed;
-    if (value == QLatin1String("cancelled"))
-        return UploadStatus::Cancelled;
-    if (value == QLatin1String("expired"))
-        return UploadStatus::Expired;
-    return UploadStatus::Pending;
+    return fromWire(value, kUploadStatuses, UploadStatus::Pending);
 }
 
 QString vectorStoreStatusToString(VectorStoreStatus status)
 {
-    switch (status) {
-    case VectorStoreStatus::InProgress:
-        return QStringLiteral("in_progress");
-    case VectorStoreStatus::Completed:
-        return QStringLiteral("completed");
-    case VectorStoreStatus::Expired:
-        return QStringLiteral("expired");
-    }
-    return QStringLiteral("in_progress");
+    return toWire(status, kVectorStoreStatuses, VectorStoreStatus::InProgress);
 }
 
 VectorStoreStatus vectorStoreStatusFromString(const QString &value)
 {
-    if (value == QLatin1String("completed"))
-        return VectorStoreStatus::Completed;
-    if (value == QLatin1String("expired"))
-        return VectorStoreStatus::Expired;
-    return VectorStoreStatus::InProgress;
+    return fromWire(value, kVectorStoreStatuses, VectorStoreStatus::InProgress);
 }
 
 QString vectorStoreFileStatusToString(VectorStoreFileStatus status)
 {
-    switch (status) {
-    case VectorStoreFileStatus::InProgress:
-        return QStringLiteral("in_progress");
-    case VectorStoreFileStatus::Completed:
-        return QStringLiteral("completed");
-    case VectorStoreFileStatus::Cancelled:
-        return QStringLiteral("cancelled");
-    case VectorStoreFileStatus::Failed:
-        return QStringLiteral("failed");
-    }
-    return QStringLiteral("in_progress");
+    return toWire(status, kVectorStoreFileStatuses, VectorStoreFileStatus::InProgress);
 }
 
 VectorStoreFileStatus vectorStoreFileStatusFromString(const QString &value)
 {
-    if (value == QLatin1String("completed"))
-        return VectorStoreFileStatus::Completed;
-    if (value == QLatin1String("cancelled"))
-        return VectorStoreFileStatus::Cancelled;
-    if (value == QLatin1String("failed"))
-        return VectorStoreFileStatus::Failed;
-    return VectorStoreFileStatus::InProgress;
+    return fromWire(value, kVectorStoreFileStatuses, VectorStoreFileStatus::InProgress);
 }
 
 QString batchStatusToString(BatchStatus status)
 {
-    switch (status) {
-    case BatchStatus::Validating:
-        return QStringLiteral("validating");
-    case BatchStatus::InProgress:
-        return QStringLiteral("in_progress");
-    case BatchStatus::Finalizing:
-        return QStringLiteral("finalizing");
-    case BatchStatus::Completed:
-        return QStringLiteral("completed");
-    case BatchStatus::Failed:
-        return QStringLiteral("failed");
-    case BatchStatus::Expired:
-        return QStringLiteral("expired");
-    case BatchStatus::Cancelling:
-        return QStringLiteral("cancelling");
-    case BatchStatus::Cancelled:
-        return QStringLiteral("cancelled");
-    }
-    return QStringLiteral("validating");
+    return toWire(status, kBatchStatuses, BatchStatus::Validating);
 }
 
 BatchStatus batchStatusFromString(const QString &value)
 {
-    if (value == QLatin1String("in_progress"))
-        return BatchStatus::InProgress;
-    if (value == QLatin1String("finalizing"))
-        return BatchStatus::Finalizing;
-    if (value == QLatin1String("completed"))
-        return BatchStatus::Completed;
-    if (value == QLatin1String("failed"))
-        return BatchStatus::Failed;
-    if (value == QLatin1String("expired"))
-        return BatchStatus::Expired;
-    if (value == QLatin1String("cancelling"))
-        return BatchStatus::Cancelling;
-    if (value == QLatin1String("cancelled"))
-        return BatchStatus::Cancelled;
-    return BatchStatus::Validating;
+    return fromWire(value, kBatchStatuses, BatchStatus::Validating);
 }
 
 QString fineTuningJobStatusToString(FineTuningJobStatus status)
 {
-    switch (status) {
-    case FineTuningJobStatus::ValidatingFiles:
-        return QStringLiteral("validating_files");
-    case FineTuningJobStatus::Queued:
-        return QStringLiteral("queued");
-    case FineTuningJobStatus::Running:
-        return QStringLiteral("running");
-    case FineTuningJobStatus::Succeeded:
-        return QStringLiteral("succeeded");
-    case FineTuningJobStatus::Failed:
-        return QStringLiteral("failed");
-    case FineTuningJobStatus::Cancelled:
-        return QStringLiteral("cancelled");
-    case FineTuningJobStatus::Paused:
-        return QStringLiteral("paused");
-    }
-    return QStringLiteral("queued");
+    return toWire(status, kFineTuningJobStatuses, FineTuningJobStatus::Queued);
 }
 
 FineTuningJobStatus fineTuningJobStatusFromString(const QString &value)
 {
-    if (value == QLatin1String("validating_files"))
-        return FineTuningJobStatus::ValidatingFiles;
-    if (value == QLatin1String("running"))
-        return FineTuningJobStatus::Running;
-    if (value == QLatin1String("succeeded"))
-        return FineTuningJobStatus::Succeeded;
-    if (value == QLatin1String("failed"))
-        return FineTuningJobStatus::Failed;
-    if (value == QLatin1String("cancelled"))
-        return FineTuningJobStatus::Cancelled;
-    if (value == QLatin1String("paused"))
-        return FineTuningJobStatus::Paused;
-    return FineTuningJobStatus::Queued;
+    return fromWire(value, kFineTuningJobStatuses, FineTuningJobStatus::Queued);
 }
 
 QString evalRunStatusToString(EvalRunStatus status)
 {
-    switch (status) {
-    case EvalRunStatus::Queued:
-        return QStringLiteral("queued");
-    case EvalRunStatus::InProgress:
-        return QStringLiteral("in_progress");
-    case EvalRunStatus::Completed:
-        return QStringLiteral("completed");
-    case EvalRunStatus::Failed:
-        return QStringLiteral("failed");
-    case EvalRunStatus::Canceled:
-        return QStringLiteral("canceled");
-    }
-    return QStringLiteral("queued");
+    return toWire(status, kEvalRunStatuses, EvalRunStatus::Queued);
 }
 
 EvalRunStatus evalRunStatusFromString(const QString &value)
 {
-    if (value == QLatin1String("in_progress"))
-        return EvalRunStatus::InProgress;
-    if (value == QLatin1String("completed"))
-        return EvalRunStatus::Completed;
-    if (value == QLatin1String("failed"))
-        return EvalRunStatus::Failed;
-    if (value == QLatin1String("canceled"))
-        return EvalRunStatus::Canceled;
-    return EvalRunStatus::Queued;
+    return fromWire(value, kEvalRunStatuses, EvalRunStatus::Queued);
 }
 
 } // namespace Core

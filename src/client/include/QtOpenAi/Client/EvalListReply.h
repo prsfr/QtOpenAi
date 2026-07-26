@@ -1,33 +1,28 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/TypedReply.h>
 #include <QtOpenAi/Core/Eval.h>
 
 namespace QtOpenAi {
 namespace Client {
 
-class EvalListReplyPrivate;
-
 // An asynchronous handle for GET /evals, returning a cursor-paginated page of
 // eval definitions. See RestReplyBase for the shared lifecycle.
-class QTOPENAI_CLIENT_EXPORT EvalListReply : public RestReplyBase
+class QTOPENAI_CLIENT_EXPORT EvalListReply : public TypedReply<Core::EvalList>
 {
     Q_OBJECT
 public:
-    Core::EvalList list() const;
+    Core::EvalList list() const { return value(); }
 
 Q_SIGNALS:
     void finished(const QtOpenAi::Core::EvalList &list);
 
 private:
     friend class Client;
-    EvalListReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
-                  QObject *parent = nullptr);
+    using TypedReply::TypedReply;
 
-    bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
-
-    Q_DECLARE_PRIVATE(EvalListReply)
+    void emitFinished(const Core::EvalList &list) override { Q_EMIT finished(list); }
 };
 
 } // namespace Client

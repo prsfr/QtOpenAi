@@ -13,6 +13,10 @@ function(qtopenai_add_test name)
 endfunction()
 
 # --- Core module tests ---
+qtopenai_add_test(tst_core_enums
+    SOURCES core/tst_enums.cpp
+    LIBS QtOpenAi::Core)
+
 qtopenai_add_test(tst_core_serialization
     SOURCES core/tst_serialization.cpp
     LIBS QtOpenAi::Core)

@@ -47,6 +47,11 @@ RestReplyBase::RestReplyBase(RestReplyBasePrivate &dd,
     });
 }
 
+RestReplyBase::RestReplyBase(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
+                             QObject *parent)
+    : RestReplyBase(*new RestReplyBasePrivate, std::move(requestFactory), std::move(policy), parent)
+{ }
+
 RestReplyBase::~RestReplyBase() = default;
 
 bool RestReplyBase::isFinished() const

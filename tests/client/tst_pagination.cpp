@@ -21,6 +21,7 @@ private slots:
     void stopsOnSinglePage();
     void surfacesRequestFailure();
     void stopsWhenAsked();
+    void walksConversationItemsNowThatTheyArePages();
 };
 
 void TestPagination::walksTwoPagesAndFinishes()
@@ -149,6 +150,38 @@ void TestPagination::stopsWhenAsked()
 
     QCOMPARE(server.requestCount(), 1);
     QCOMPARE(finishedSpy.count(), 0);
+    delete walker;
+}
+
+void TestPagination::walksConversationItemsNowThatTheyArePages()
+{
+    // ConversationItemList used to be a hand-written type with accessors, which
+    // made it the one list PageWalker could not drive. It is a ListPage now, so
+    // /conversations/{id}/items paginates like everything else.
+    StubServer server(QList<StubServer::Response> {
+            {R"({"object":"list","data":[{"id":"msg_1","type":"message","role":"user"}],)"
+             R"("first_id":"msg_1","last_id":"msg_1","has_more":true})"},
+            {R"({"object":"list","data":[{"id":"msg_2","type":"message","role":"user"}],)"
+             R"("first_id":"msg_2","last_id":"msg_2","has_more":false})"},
+    });
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    auto *walker = new PageWalker<ConversationItemsReply, ConversationItemList>(
+            [&client](const ListParams &params) {
+                return client.listResponseInputItems(QStringLiteral("resp_1"), params);
+            });
+    walker->setAutoDelete(false);
+
+    int seen = 0;
+    walker->setPageHandler([&seen](const ConversationItemList &page) { seen += page.size(); });
+    QSignalSpy finishedSpy(walker, &PageWalkerBase::finished);
+
+    walker->start();
+    QVERIFY(finishedSpy.wait(5000));
+
+    QCOMPARE(walker->pageCount(), 2);
+    QCOMPARE(seen, 2);
+    QVERIFY(server.requestLines().at(1).contains("after=msg_1"));
     delete walker;
 }
 

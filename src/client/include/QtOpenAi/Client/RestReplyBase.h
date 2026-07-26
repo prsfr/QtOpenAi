@@ -52,10 +52,15 @@ Q_SIGNALS:
     void retrying(int attempt, int delayMs);
 
 protected:
-    // Constructed by subclasses with their own RestReplyBasePrivate subclass, so
-    // each reply's parsed value lives in the .cpp rather than this header.
+    // Constructed by subclasses that need private state of their own, passing a
+    // RestReplyBasePrivate subclass (the streaming replies do this).
     RestReplyBase(RestReplyBasePrivate &dd, std::function<QNetworkReply *()> requestFactory,
                   RetryPolicy policy, QObject *parent = nullptr);
+
+    // Constructed by subclasses that add no private state, letting the base own
+    // its data outright — the case for every TypedReply.
+    RestReplyBase(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
+                  QObject *parent = nullptr);
 
     // Decode a 2xx response body and emit the subclass's typed finished(...)
     // signal. Return true on success; on a decode failure call setError() and

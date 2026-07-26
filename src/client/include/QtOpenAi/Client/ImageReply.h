@@ -1,33 +1,28 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/TypedReply.h>
 #include <QtOpenAi/Core/ImageResponse.h>
 
 namespace QtOpenAi {
 namespace Client {
 
-class ImageReplyPrivate;
-
 // An images request (POST /images/generations, /edits or /variations).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
-class QTOPENAI_CLIENT_EXPORT ImageReply : public RestReplyBase
+class QTOPENAI_CLIENT_EXPORT ImageReply : public TypedReply<Core::ImageResponse>
 {
     Q_OBJECT
 public:
-    Core::ImageResponse response() const;
+    Core::ImageResponse response() const { return value(); }
 
 Q_SIGNALS:
     void finished(const QtOpenAi::Core::ImageResponse &response);
 
 private:
     friend class Client;
-    ImageReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
-               QObject *parent = nullptr);
+    using TypedReply::TypedReply;
 
-    bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
-
-    Q_DECLARE_PRIVATE(ImageReply)
+    void emitFinished(const Core::ImageResponse &response) override { Q_EMIT finished(response); }
 };
 
 } // namespace Client

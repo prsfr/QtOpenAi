@@ -1,34 +1,29 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/TypedReply.h>
 #include <QtOpenAi/Core/VectorStoreSearch.h>
 
 namespace QtOpenAi {
 namespace Client {
 
-class VectorStoreSearchReplyPrivate;
-
 // A vector-store search request (POST /vector_stores/{id}/search), carrying a
 // page of ranked hits.
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
-class QTOPENAI_CLIENT_EXPORT VectorStoreSearchReply : public RestReplyBase
+class QTOPENAI_CLIENT_EXPORT VectorStoreSearchReply : public TypedReply<Core::VectorStoreSearchPage>
 {
     Q_OBJECT
 public:
-    Core::VectorStoreSearchPage page() const;
+    Core::VectorStoreSearchPage page() const { return value(); }
 
 Q_SIGNALS:
     void finished(const QtOpenAi::Core::VectorStoreSearchPage &page);
 
 private:
     friend class Client;
-    VectorStoreSearchReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
-                           QObject *parent = nullptr);
+    using TypedReply::TypedReply;
 
-    bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
-
-    Q_DECLARE_PRIVATE(VectorStoreSearchReply)
+    void emitFinished(const Core::VectorStoreSearchPage &page) override { Q_EMIT finished(page); }
 };
 
 } // namespace Client

@@ -1,34 +1,32 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/TypedReply.h>
 #include <QtOpenAi/Core/ChatCompletionResponse.h>
 
 namespace QtOpenAi {
 namespace Client {
 
-class ChatCompletionReplyPrivate;
-
 // A chat completion (POST /chat/completions) or a stored completion
 // retrieved/updated via /chat/completions/{id}.
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
-class QTOPENAI_CLIENT_EXPORT ChatCompletionReply : public RestReplyBase
+class QTOPENAI_CLIENT_EXPORT ChatCompletionReply : public TypedReply<Core::ChatCompletionResponse>
 {
     Q_OBJECT
 public:
-    Core::ChatCompletionResponse response() const;
+    Core::ChatCompletionResponse response() const { return value(); }
 
 Q_SIGNALS:
     void finished(const QtOpenAi::Core::ChatCompletionResponse &response);
 
 private:
     friend class Client;
-    ChatCompletionReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
-                        QObject *parent = nullptr);
+    using TypedReply::TypedReply;
 
-    bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
-
-    Q_DECLARE_PRIVATE(ChatCompletionReply)
+    void emitFinished(const Core::ChatCompletionResponse &response) override
+    {
+        Q_EMIT finished(response);
+    }
 };
 
 } // namespace Client

@@ -27,7 +27,7 @@ Core::ConversationItemList ConversationItemsReply::items() const
 Core::ResponseOutputItem ConversationItemsReply::firstItem() const
 {
     Q_D(const ConversationItemsReply);
-    const auto list = d->items.items();
+    const auto list = d->items.data;
     return list.isEmpty() ? Core::ResponseOutputItem() : list.first();
 }
 
@@ -41,7 +41,7 @@ bool ConversationItemsReply::dispatchSuccess(const QByteArray &body, int httpSta
         d->items = Core::ConversationItemList::fromJson(object);
     } else {
         // A single item object (get item): surface it as a one-item list.
-        d->items.setItems({Core::ResponseOutputItem::fromJson(object)});
+        d->items.data = {Core::ResponseOutputItem::fromJson(object)};
     }
     Q_EMIT finished(d->items);
     return true;

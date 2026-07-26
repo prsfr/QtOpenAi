@@ -1,33 +1,28 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/TypedReply.h>
 #include <QtOpenAi/Core/Model.h>
 
 namespace QtOpenAi {
 namespace Client {
 
-class ModelReplyPrivate;
-
 // A single model (GET /models/{id}).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
-class QTOPENAI_CLIENT_EXPORT ModelReply : public RestReplyBase
+class QTOPENAI_CLIENT_EXPORT ModelReply : public TypedReply<Core::Model>
 {
     Q_OBJECT
 public:
-    Core::Model model() const;
+    Core::Model model() const { return value(); }
 
 Q_SIGNALS:
     void finished(const QtOpenAi::Core::Model &model);
 
 private:
     friend class Client;
-    ModelReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
-               QObject *parent = nullptr);
+    using TypedReply::TypedReply;
 
-    bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
-
-    Q_DECLARE_PRIVATE(ModelReply)
+    void emitFinished(const Core::Model &model) override { Q_EMIT finished(model); }
 };
 
 } // namespace Client
