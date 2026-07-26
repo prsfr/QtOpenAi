@@ -364,6 +364,17 @@ QString fineTuningCheckpointPath(const QString &checkpointId, const QString &suf
     return resourcePath(QLatin1String("/fine_tuning/checkpoints"), checkpointId, suffix);
 }
 
+QString evalPath(const QString &evalId, const QString &suffix = {})
+{
+    return resourcePath(QLatin1String("/evals"), evalId, suffix);
+}
+
+// Runs nest below an eval, so their paths compose two levels of resourcePath().
+QString evalRunPath(const QString &evalId, const QString &runId, const QString &suffix = {})
+{
+    return evalPath(evalId, resourcePath(QLatin1String("/runs"), runId, suffix));
+}
+
 // Serialise a list of ids to a JSON array.
 QJsonArray idsToArray(const QStringList &ids)
 {
@@ -1467,6 +1478,131 @@ FineTuningPermissionReply *Client::deleteFineTuningCheckpointPermission(const QS
                                                   QStringLiteral("/permissions/") + permissionId);
     auto factory = deleteFactory(manager, apiRequest(d, path));
     return new FineTuningPermissionReply(std::move(factory), d->retryPolicy);
+}
+
+EvalReply *Client::createEval(const Core::CreateEvalRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = compactJson(request.toJson());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(d, manager, apiRequest(d, evalPath({})), body);
+    return new EvalReply(std::move(factory), d->retryPolicy);
+}
+
+EvalListReply *Client::listEvals(const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, evalPath({}));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new EvalListReply(std::move(factory), d->retryPolicy);
+}
+
+EvalReply *Client::getEval(const QString &evalId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, apiRequest(d, evalPath(evalId)));
+    return new EvalReply(std::move(factory), d->retryPolicy);
+}
+
+EvalReply *Client::updateEval(const QString &evalId, const QString &name,
+                              const QJsonObject &metadata)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    if (!name.isEmpty())
+        bodyObject.insert(QStringLiteral("name"), name);
+    if (!metadata.isEmpty())
+        bodyObject.insert(QStringLiteral("metadata"), metadata);
+    const QByteArray body = compactJson(bodyObject);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(d, manager, apiRequest(d, evalPath(evalId)), body);
+    return new EvalReply(std::move(factory), d->retryPolicy);
+}
+
+EvalReply *Client::deleteEval(const QString &evalId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = deleteFactory(manager, apiRequest(d, evalPath(evalId)));
+    return new EvalReply(std::move(factory), d->retryPolicy);
+}
+
+EvalRunReply *Client::createEvalRun(const QString &evalId,
+                                    const Core::CreateEvalRunRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = compactJson(request.toJson());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(d, manager, apiRequest(d, evalPath(evalId, QStringLiteral("/runs"))),
+                               body);
+    return new EvalRunReply(std::move(factory), d->retryPolicy);
+}
+
+EvalRunListReply *Client::listEvalRuns(const QString &evalId, const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, evalPath(evalId, QStringLiteral("/runs")));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new EvalRunListReply(std::move(factory), d->retryPolicy);
+}
+
+EvalRunReply *Client::getEvalRun(const QString &evalId, const QString &runId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, apiRequest(d, evalRunPath(evalId, runId)));
+    return new EvalRunReply(std::move(factory), d->retryPolicy);
+}
+
+EvalRunReply *Client::cancelEvalRun(const QString &evalId, const QString &runId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    // Cancelling is a bare POST to the run itself, not to a /cancel sub-path.
+    auto factory = postFactory(d, manager, apiRequest(d, evalRunPath(evalId, runId)));
+    return new EvalRunReply(std::move(factory), d->retryPolicy);
+}
+
+EvalRunReply *Client::deleteEvalRun(const QString &evalId, const QString &runId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = deleteFactory(manager, apiRequest(d, evalRunPath(evalId, runId)));
+    return new EvalRunReply(std::move(factory), d->retryPolicy);
+}
+
+EvalRunOutputItemListReply *Client::listEvalRunOutputItems(const QString &evalId,
+                                                           const QString &runId,
+                                                           const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req
+            = apiRequest(d, evalRunPath(evalId, runId, QStringLiteral("/output_items")));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new EvalRunOutputItemListReply(std::move(factory), d->retryPolicy);
+}
+
+EvalRunOutputItemReply *Client::getEvalRunOutputItem(const QString &evalId, const QString &runId,
+                                                     const QString &outputItemId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path
+            = evalRunPath(evalId, runId, QStringLiteral("/output_items/") + outputItemId);
+    auto factory = getFactory(manager, apiRequest(d, path));
+    return new EvalRunOutputItemReply(std::move(factory), d->retryPolicy);
+}
+
+EvalRunPoller *Client::pollEvalRun(const QString &evalId, const QString &runId, int pollIntervalMs)
+{
+    return new EvalRunPoller(this, evalId, runId, pollIntervalMs);
 }
 
 ModelListReply *Client::listModels()

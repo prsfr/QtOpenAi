@@ -59,6 +59,9 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/FineTuningJob.h
     include/QtOpenAi/Core/FineTuningCheckpoint.h
     include/QtOpenAi/Core/CreateFineTuningJobRequest.h
+    include/QtOpenAi/Core/Eval.h
+    include/QtOpenAi/Core/EvalRun.h
+    include/QtOpenAi/Core/CreateEvalRequest.h
 )
 
 add_library(QtOpenAiCore
@@ -117,6 +120,9 @@ add_library(QtOpenAiCore
     src/FineTuningJob.cpp
     src/FineTuningCheckpoint.cpp
     src/CreateFineTuningJobRequest.cpp
+    src/Eval.cpp
+    src/EvalRun.cpp
+    src/CreateEvalRequest.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

@@ -726,6 +726,42 @@ a usable model of its own — and the
 projects may use a checkpoint. `cancelFineTuningJob`, `pauseFineTuningJob` and
 `resumeFineTuningJob` complete the lifecycle.
 
+## Evals (`/evals`)
+
+An eval is a reusable definition — the shape of the test items plus the graders
+scoring them — and a *run* executes it against a data source. The config and the
+grader list are large open unions in the API, so they are carried as raw JSON
+rather than half-modelled; everything a client acts on (ids, name, status,
+counts) is typed:
+
+```cpp
+Core::CreateEvalRequest request(dataSourceConfig, testingCriteria);
+request.setName("Capital cities");
+auto *created = client.createEval(request);
+
+// ... then, per run:
+Core::CreateEvalRunRequest runRequest(dataSource);
+auto *started = client.createEvalRun(evalId, runRequest);
+```
+
+`EvalRunPoller` waits for the graders. It is the only poller that carries two
+ids — the run id as `JobPoller::jobId()`, plus the owning `evalId()`:
+
+```cpp
+auto *poller = client.pollEvalRun(evalId, runId, 5000);
+connect(poller, &Client::EvalRunPoller::progressed, this, [](const Core::EvalRun &r) {
+    const auto counts = r.resultCounts();
+    qDebug() << counts.passed << "passed," << counts.failed << "failed";
+});
+poller->start();
+```
+
+`listEvalRunOutputItems` and `getEvalRunOutputItem` return the per-item verdicts.
+Two API quirks are handled for you: cancelling a run is a bare `POST` to the run
+itself (not a `/cancel` sub-path), and the delete acknowledgements name their id
+`eval_id`/`run_id`, which the value types accept as alternative spellings of
+`id`.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -818,6 +854,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `containers`        | Code-interpreter sandbox + files (`/containers`)     |
 | `batch`             | Batch: upload → create → poll → results (`/batches`) |
 | `fine_tuning`       | Fine-tuning: train → poll → events (`/fine_tuning`)  |
+| `evals`             | Evals: define → run → poll → items (`/evals`)        |
 
 ## Building
 
