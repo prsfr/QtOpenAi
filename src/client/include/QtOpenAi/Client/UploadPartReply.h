@@ -1,33 +1,28 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/TypedReply.h>
 #include <QtOpenAi/Core/Upload.h>
 
 namespace QtOpenAi {
 namespace Client {
 
-class UploadPartReplyPrivate;
-
 // An upload-part request (POST /uploads/{id}/parts).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
-class QTOPENAI_CLIENT_EXPORT UploadPartReply : public RestReplyBase
+class QTOPENAI_CLIENT_EXPORT UploadPartReply : public TypedReply<Core::UploadPart>
 {
     Q_OBJECT
 public:
-    Core::UploadPart part() const;
+    Core::UploadPart part() const { return value(); }
 
 Q_SIGNALS:
     void finished(const QtOpenAi::Core::UploadPart &part);
 
 private:
     friend class Client;
-    UploadPartReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
-                    QObject *parent = nullptr);
+    using TypedReply::TypedReply;
 
-    bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
-
-    Q_DECLARE_PRIVATE(UploadPartReply)
+    void emitFinished(const Core::UploadPart &part) override { Q_EMIT finished(part); }
 };
 
 } // namespace Client

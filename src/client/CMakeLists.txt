@@ -8,6 +8,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ToolRegistry.h
     include/QtOpenAi/Client/RetryPolicy.h
     include/QtOpenAi/Client/RestReplyBase.h
+    include/QtOpenAi/Client/TypedReply.h
     include/QtOpenAi/Client/BinaryReply.h
     include/QtOpenAi/Client/ChatCompletionReply.h
     include/QtOpenAi/Client/ChatCompletionAccumulator.h
@@ -89,65 +90,19 @@ add_library(QtOpenAiClient
     src/RestReplyBase.cpp
     src/PageWalker.cpp
     src/BinaryReply.cpp
-    src/ChatCompletionReply.cpp
     src/ChatCompletionAccumulator.cpp
     src/ChatCompletionStreamReply.cpp
-    src/ResponseReply.cpp
-    src/ConversationReply.cpp
     src/ConversationItemsReply.cpp
-    src/ModerationReply.cpp
-    src/CompletionReply.cpp
-    src/ChatCompletionListReply.cpp
-    src/ChatCompletionMessageListReply.cpp
-    src/EmbeddingReply.cpp
-    src/FileReply.cpp
-    src/FileListReply.cpp
-    src/ModelReply.cpp
-    src/ModelListReply.cpp
     src/CompletionStreamReply.cpp
     src/ResponseStreamReply.cpp
-    src/TranscriptionReply.cpp
-    src/ImageReply.cpp
     src/InputTokensReply.cpp
     src/SpeechReply.cpp
-    src/VoiceReply.cpp
-    src/VoiceConsentReply.cpp
-    src/VoiceConsentListReply.cpp
-    src/VideoReply.cpp
-    src/VideoListReply.cpp
     src/VideoContentReply.cpp
     src/JobPoller.cpp
     src/VideoPoller.cpp
-    src/UploadReply.cpp
-    src/UploadPartReply.cpp
     src/ChunkedUploader.cpp
-    src/VectorStoreReply.cpp
-    src/VectorStoreListReply.cpp
-    src/VectorStoreFileReply.cpp
-    src/VectorStoreFileListReply.cpp
-    src/VectorStoreFileBatchReply.cpp
-    src/VectorStoreFileContentReply.cpp
-    src/VectorStoreSearchReply.cpp
-    src/ContainerReply.cpp
-    src/ContainerListReply.cpp
-    src/ContainerFileReply.cpp
-    src/ContainerFileListReply.cpp
-    src/BatchReply.cpp
-    src/BatchListReply.cpp
     src/BatchPoller.cpp
-    src/FineTuningJobReply.cpp
-    src/FineTuningJobListReply.cpp
-    src/FineTuningEventListReply.cpp
-    src/FineTuningCheckpointListReply.cpp
-    src/FineTuningPermissionListReply.cpp
-    src/FineTuningPermissionReply.cpp
     src/FineTuningJobPoller.cpp
-    src/EvalReply.cpp
-    src/EvalListReply.cpp
-    src/EvalRunReply.cpp
-    src/EvalRunListReply.cpp
-    src/EvalRunOutputItemReply.cpp
-    src/EvalRunOutputItemListReply.cpp
     src/EvalRunPoller.cpp
     src/Client.cpp
 )

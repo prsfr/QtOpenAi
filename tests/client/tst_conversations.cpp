@@ -53,7 +53,7 @@ void TestConversationsClient::listItemsUsesGetAndParsesPage()
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/conversations/conv_1/items "));
-    QCOMPARE(reply->items().items().size(), 1);
+    QCOMPARE(reply->items().size(), 1);
     QCOMPARE(reply->firstItem().text(), QStringLiteral("Hello"));
     delete reply;
 }
@@ -91,7 +91,7 @@ void TestConversationsClient::getItemWrapsSingleItem()
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/conversations/conv_1/items/msg_1 "));
-    QCOMPARE(reply->items().items().size(), 1);
+    QCOMPARE(reply->items().size(), 1);
     QCOMPARE(reply->firstItem().text(), QStringLiteral("Answer"));
     delete reply;
 }

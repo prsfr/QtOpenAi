@@ -1,33 +1,28 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/TypedReply.h>
 #include <QtOpenAi/Core/EvalRun.h>
 
 namespace QtOpenAi {
 namespace Client {
 
-class EvalRunListReplyPrivate;
-
 // An asynchronous handle for GET /evals/{eval_id}/runs, returning a page of an
 // eval's runs. See RestReplyBase for the shared lifecycle.
-class QTOPENAI_CLIENT_EXPORT EvalRunListReply : public RestReplyBase
+class QTOPENAI_CLIENT_EXPORT EvalRunListReply : public TypedReply<Core::EvalRunList>
 {
     Q_OBJECT
 public:
-    Core::EvalRunList list() const;
+    Core::EvalRunList list() const { return value(); }
 
 Q_SIGNALS:
     void finished(const QtOpenAi::Core::EvalRunList &list);
 
 private:
     friend class Client;
-    EvalRunListReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
-                     QObject *parent = nullptr);
+    using TypedReply::TypedReply;
 
-    bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
-
-    Q_DECLARE_PRIVATE(EvalRunListReply)
+    void emitFinished(const Core::EvalRunList &list) override { Q_EMIT finished(list); }
 };
 
 } // namespace Client

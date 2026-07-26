@@ -84,7 +84,6 @@ add_library(QtOpenAiCore
     src/Response.cpp
     src/ResponseRequest.cpp
     src/Conversation.cpp
-    src/ConversationItemList.cpp
     src/ModerationRequest.cpp
     src/ModerationResponse.cpp
     src/CompletionChoice.cpp

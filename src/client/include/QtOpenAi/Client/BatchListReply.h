@@ -1,33 +1,28 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/TypedReply.h>
 #include <QtOpenAi/Core/Batch.h>
 
 namespace QtOpenAi {
 namespace Client {
 
-class BatchListReplyPrivate;
-
 // An asynchronous handle for GET /batches, returning a cursor-paginated page of
 // batch jobs. See RestReplyBase for the shared lifecycle.
-class QTOPENAI_CLIENT_EXPORT BatchListReply : public RestReplyBase
+class QTOPENAI_CLIENT_EXPORT BatchListReply : public TypedReply<Core::BatchList>
 {
     Q_OBJECT
 public:
-    Core::BatchList list() const;
+    Core::BatchList list() const { return value(); }
 
 Q_SIGNALS:
     void finished(const QtOpenAi::Core::BatchList &list);
 
 private:
     friend class Client;
-    BatchListReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
-                   QObject *parent = nullptr);
+    using TypedReply::TypedReply;
 
-    bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
-
-    Q_DECLARE_PRIVATE(BatchListReply)
+    void emitFinished(const Core::BatchList &list) override { Q_EMIT finished(list); }
 };
 
 } // namespace Client

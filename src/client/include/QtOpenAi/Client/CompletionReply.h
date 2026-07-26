@@ -1,33 +1,31 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/TypedReply.h>
 #include <QtOpenAi/Core/CompletionResponse.h>
 
 namespace QtOpenAi {
 namespace Client {
 
-class CompletionReplyPrivate;
-
 // A legacy text completion (POST /completions).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
-class QTOPENAI_CLIENT_EXPORT CompletionReply : public RestReplyBase
+class QTOPENAI_CLIENT_EXPORT CompletionReply : public TypedReply<Core::CompletionResponse>
 {
     Q_OBJECT
 public:
-    Core::CompletionResponse response() const;
+    Core::CompletionResponse response() const { return value(); }
 
 Q_SIGNALS:
     void finished(const QtOpenAi::Core::CompletionResponse &response);
 
 private:
     friend class Client;
-    CompletionReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
-                    QObject *parent = nullptr);
+    using TypedReply::TypedReply;
 
-    bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
-
-    Q_DECLARE_PRIVATE(CompletionReply)
+    void emitFinished(const Core::CompletionResponse &response) override
+    {
+        Q_EMIT finished(response);
+    }
 };
 
 } // namespace Client

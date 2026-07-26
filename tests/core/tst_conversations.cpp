@@ -34,17 +34,17 @@ void TestConversations::conversationRoundTrip()
 void TestConversations::itemListRoundTrip()
 {
     ConversationItemList list;
-    list.setItems({ResponseOutputItem::message(QStringLiteral("hi")),
-                   ResponseOutputItem::functionCall(QStringLiteral("f"), QStringLiteral("{}"),
-                                                    QStringLiteral("call_1"))});
-    list.setFirstId(QStringLiteral("msg_1"));
-    list.setLastId(QStringLiteral("fc_1"));
-    list.setHasMore(true);
+    list.data = {ResponseOutputItem::message(QStringLiteral("hi")),
+                 ResponseOutputItem::functionCall(QStringLiteral("f"), QStringLiteral("{}"),
+                                                  QStringLiteral("call_1"))};
+    list.firstId = QStringLiteral("msg_1");
+    list.lastId = QStringLiteral("fc_1");
+    list.hasMore = true;
 
     const ConversationItemList parsed = ConversationItemList::fromJson(list.toJson());
     QCOMPARE(parsed, list);
-    QCOMPARE(parsed.items().size(), 2);
-    QVERIFY(parsed.hasMore());
+    QCOMPARE(parsed.size(), 2);
+    QVERIFY(parsed.hasMore);
 }
 
 void TestConversations::parsesItemListPage()
@@ -62,11 +62,11 @@ void TestConversations::parsesItemListPage()
     const ConversationItemList list
             = ConversationItemList::fromJson(QJsonDocument::fromJson(body).object());
 
-    QCOMPARE(list.items().size(), 2);
-    QCOMPARE(list.items().at(0).text(), QStringLiteral("Hello"));
-    QCOMPARE(list.items().at(1).text(), QStringLiteral("Hi there"));
-    QCOMPARE(list.firstId(), QStringLiteral("msg_1"));
-    QVERIFY(!list.hasMore());
+    QCOMPARE(list.size(), 2);
+    QCOMPARE(list.data.at(0).text(), QStringLiteral("Hello"));
+    QCOMPARE(list.data.at(1).text(), QStringLiteral("Hi there"));
+    QCOMPARE(list.firstId, QStringLiteral("msg_1"));
+    QVERIFY(!list.hasMore);
 }
 
 void TestConversations::parsesInputTextMessage()

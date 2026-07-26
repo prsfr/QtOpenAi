@@ -1,33 +1,28 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/TypedReply.h>
 #include <QtOpenAi/Core/Container.h>
 
 namespace QtOpenAi {
 namespace Client {
 
-class ContainerFileListReplyPrivate;
-
 // A container-files list request (GET /containers/{id}/files).
 // See RestReplyBase for the shared lifecycle (finished/failed/done, auto-delete).
-class QTOPENAI_CLIENT_EXPORT ContainerFileListReply : public RestReplyBase
+class QTOPENAI_CLIENT_EXPORT ContainerFileListReply : public TypedReply<Core::ContainerFileList>
 {
     Q_OBJECT
 public:
-    Core::ContainerFileList list() const;
+    Core::ContainerFileList list() const { return value(); }
 
 Q_SIGNALS:
     void finished(const QtOpenAi::Core::ContainerFileList &list);
 
 private:
     friend class Client;
-    ContainerFileListReply(std::function<QNetworkReply *()> requestFactory, RetryPolicy policy,
-                           QObject *parent = nullptr);
+    using TypedReply::TypedReply;
 
-    bool dispatchSuccess(const QByteArray &body, int httpStatus) override;
-
-    Q_DECLARE_PRIVATE(ContainerFileListReply)
+    void emitFinished(const Core::ContainerFileList &list) override { Q_EMIT finished(list); }
 };
 
 } // namespace Client
