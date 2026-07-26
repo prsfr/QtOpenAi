@@ -32,6 +32,9 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ImageReply.h
     include/QtOpenAi/Client/InputTokensReply.h
     include/QtOpenAi/Client/SpeechReply.h
+    include/QtOpenAi/Client/VoiceReply.h
+    include/QtOpenAi/Client/VoiceConsentReply.h
+    include/QtOpenAi/Client/VoiceConsentListReply.h
     include/QtOpenAi/Client/VideoReply.h
     include/QtOpenAi/Client/VideoListReply.h
     include/QtOpenAi/Client/VideoContentReply.h
@@ -100,6 +103,9 @@ add_library(QtOpenAiClient
     src/ImageReply.cpp
     src/InputTokensReply.cpp
     src/SpeechReply.cpp
+    src/VoiceReply.cpp
+    src/VoiceConsentReply.cpp
+    src/VoiceConsentListReply.cpp
     src/VideoReply.cpp
     src/VideoListReply.cpp
     src/VideoContentReply.cpp

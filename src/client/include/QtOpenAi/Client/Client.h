@@ -53,6 +53,9 @@
 #include <QtOpenAi/Client/VideoListReply.h>
 #include <QtOpenAi/Client/VideoPoller.h>
 #include <QtOpenAi/Client/VideoReply.h>
+#include <QtOpenAi/Client/VoiceConsentListReply.h>
+#include <QtOpenAi/Client/VoiceConsentReply.h>
+#include <QtOpenAi/Client/VoiceReply.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
 #include <QtOpenAi/Core/CreateBatchRequest.h>
@@ -61,6 +64,7 @@
 #include <QtOpenAi/Core/CreateUploadRequest.h>
 #include <QtOpenAi/Core/CreateVectorStoreRequest.h>
 #include <QtOpenAi/Core/CreateVideoRequest.h>
+#include <QtOpenAi/Core/CreateVoiceRequest.h>
 #include <QtOpenAi/Core/EmbeddingRequest.h>
 #include <QtOpenAi/Core/FileUploadRequest.h>
 #include <QtOpenAi/Core/ImageEditRequest.h>
@@ -298,6 +302,29 @@ public:
     // the response Content-Type. Ownership follows the reply's auto-delete
     // policy (enabled by default).
     SpeechReply *createSpeech(const Core::SpeechRequest &request);
+
+    // --- Audio: custom voices (/audio/voices, /audio/voice_consents) -------
+    // Build a custom voice from an audio sample, authorised by an accepted
+    // consent. Multipart upload; the resulting voice becomes usable as the
+    // `voice` of a text-to-speech request once its voiceStatus() says so.
+    //
+    // The spec defines no list endpoint for voices, so there is no listVoices()
+    // here — only creation.
+    VoiceReply *createVoice(const Core::CreateVoiceRequest &request);
+
+    // Record the spoken consent that authorises cloning a voice (multipart).
+    VoiceConsentReply *createVoiceConsent(const Core::CreateVoiceConsentRequest &request);
+
+    VoiceConsentListReply *listVoiceConsents(const ListParams &params = {});
+
+    VoiceConsentReply *getVoiceConsent(const QString &consentId);
+
+    // Rename a consent (POST /audio/voice_consents/{id}).
+    VoiceConsentReply *updateVoiceConsent(const QString &consentId, const QString &name);
+
+    // Delete a consent. On success the reply's consent() carries the deletion
+    // acknowledgement.
+    VoiceConsentReply *deleteVoiceConsent(const QString &consentId);
 
     // --- Images (/images) --------------------------------------------------
     // Generate images from a text prompt (POST /images/generations).

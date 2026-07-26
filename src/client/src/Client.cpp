@@ -354,6 +354,11 @@ QString fineTuningJobPath(const QString &jobId, const QString &suffix = {})
     return resourcePath(QLatin1String("/fine_tuning/jobs"), jobId, suffix);
 }
 
+QString voiceConsentPath(const QString &consentId, const QString &suffix = {})
+{
+    return resourcePath(QLatin1String("/audio/voice_consents"), consentId, suffix);
+}
+
 QString fineTuningCheckpointPath(const QString &checkpointId, const QString &suffix = {})
 {
     return resourcePath(QLatin1String("/fine_tuning/checkpoints"), checkpointId, suffix);
@@ -726,6 +731,63 @@ TranscriptionReply *Client::createTranslation(const Core::TranslationRequest &re
                                         apiRequest(d, QStringLiteral("/audio/translations")),
                                         request.formFields(), {std::move(file)});
     return new TranscriptionReply(std::move(factory), d->retryPolicy);
+}
+
+VoiceReply *Client::createVoice(const Core::CreateVoiceRequest &request)
+{
+    Q_D(Client);
+    detail::FormFilePart file {"audio_sample", request.fileName(), request.audioSample()};
+    auto factory = multipartPostFactory(d, networkAccessManager(),
+                                        apiRequest(d, QStringLiteral("/audio/voices")),
+                                        request.formFields(), {std::move(file)});
+    return new VoiceReply(std::move(factory), d->retryPolicy);
+}
+
+VoiceConsentReply *Client::createVoiceConsent(const Core::CreateVoiceConsentRequest &request)
+{
+    Q_D(Client);
+    detail::FormFilePart file {"recording", request.fileName(), request.recording()};
+    auto factory
+            = multipartPostFactory(d, networkAccessManager(), apiRequest(d, voiceConsentPath({})),
+                                   request.formFields(), {std::move(file)});
+    return new VoiceConsentReply(std::move(factory), d->retryPolicy);
+}
+
+VoiceConsentListReply *Client::listVoiceConsents(const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, voiceConsentPath({}));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new VoiceConsentListReply(std::move(factory), d->retryPolicy);
+}
+
+VoiceConsentReply *Client::getVoiceConsent(const QString &consentId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, apiRequest(d, voiceConsentPath(consentId)));
+    return new VoiceConsentReply(std::move(factory), d->retryPolicy);
+}
+
+VoiceConsentReply *Client::updateVoiceConsent(const QString &consentId, const QString &name)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("name"), name);
+    const QByteArray body = compactJson(bodyObject);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(d, manager, apiRequest(d, voiceConsentPath(consentId)), body);
+    return new VoiceConsentReply(std::move(factory), d->retryPolicy);
+}
+
+VoiceConsentReply *Client::deleteVoiceConsent(const QString &consentId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = deleteFactory(manager, apiRequest(d, voiceConsentPath(consentId)));
+    return new VoiceConsentReply(std::move(factory), d->retryPolicy);
 }
 
 ImageReply *Client::createImage(const Core::ImageGenerationRequest &request)

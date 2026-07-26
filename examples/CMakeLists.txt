@@ -20,6 +20,7 @@ qtopenai_add_example(moderations moderations.cpp)
 
 # --- Multimodal generation (v0.5) ---
 qtopenai_add_example(tts text_to_speech.cpp)
+qtopenai_add_example(voice_cloning voice_cloning.cpp)
 qtopenai_add_example(transcribe transcription.cpp)
 qtopenai_add_example(image image_generation.cpp)
 qtopenai_add_example(video video_generation.cpp)
