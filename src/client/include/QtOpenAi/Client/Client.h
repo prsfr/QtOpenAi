@@ -30,6 +30,7 @@
 #include <QtOpenAi/Client/FineTuningPermissionReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
 #include <QtOpenAi/Client/ImageReply.h>
+#include <QtOpenAi/Client/InputTokensReply.h>
 #include <QtOpenAi/Client/ListParams.h>
 #include <QtOpenAi/Client/ModelListReply.h>
 #include <QtOpenAi/Client/ModelReply.h>
@@ -210,6 +211,29 @@ public:
     // Delete a stored response. On success the reply's response() carries the
     // deletion acknowledgement (object "response.deleted").
     ResponseReply *deleteResponse(const QString &responseId);
+
+    // The input items a stored response was produced from
+    // (GET /responses/{id}/input_items). The payload is a cursor-paginated list
+    // of the same item model the Conversations API returns, so it shares
+    // ConversationItemsReply rather than duplicating it.
+    ConversationItemsReply *listResponseInputItems(const QString &responseId,
+                                                   const ListParams &params = {});
+
+    // Compact a stored response's accumulated history server-side, returning
+    // the compacted response (POST /responses/compact).
+    //
+    // NOTE: this endpoint is newer than the OpenAPI revision this library was
+    // written against, so only its path is confirmed. The body is sent as
+    // {"response_id": ...}; `extra` is merged in verbatim for fields the
+    // provider expects that are not modelled here.
+    ResponseReply *compactResponse(const QString &responseId, const QJsonObject &extra = {});
+
+    // Price a request's input without running it (POST /responses/input_tokens).
+    //
+    // NOTE: same caveat as compactResponse() — the request is sent as a normal
+    // Responses body and the reply exposes both the parsed `input_tokens` count
+    // and the raw payload, so an unexpected shape stays reachable.
+    InputTokensReply *countResponseInputTokens(const Core::ResponseRequest &request);
 
     // --- Conversations API (/conversations) --------------------------------
     // Create a conversation, optionally seeded with items and metadata.

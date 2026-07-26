@@ -557,6 +557,47 @@ ConversationReply *Client::deleteConversation(const QString &conversationId)
     return new ConversationReply(std::move(factory), d->retryPolicy);
 }
 
+ResponseReply *Client::compactResponse(const QString &responseId, const QJsonObject &extra)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("response_id"), responseId);
+    // Caller-supplied fields fill in what this library does not model, without
+    // overriding what it does.
+    for (auto it = extra.constBegin(); it != extra.constEnd(); ++it) {
+        if (!bodyObject.contains(it.key()))
+            bodyObject.insert(it.key(), it.value());
+    }
+    const QByteArray body = compactJson(bodyObject);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory
+            = postFactory(d, manager, apiRequest(d, QStringLiteral("/responses/compact")), body);
+    return new ResponseReply(std::move(factory), d->retryPolicy);
+}
+
+InputTokensReply *Client::countResponseInputTokens(const Core::ResponseRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = compactJson(request.toJson());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/responses/input_tokens")),
+                               body);
+    return new InputTokensReply(std::move(factory), d->retryPolicy);
+}
+
+ConversationItemsReply *Client::listResponseInputItems(const QString &responseId,
+                                                       const ListParams &params)
+{
+    Q_D(Client);
+    const QString path
+            = QStringLiteral("/responses/") + responseId + QStringLiteral("/input_items");
+    QNetworkRequest req = apiRequest(d, path);
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new ConversationItemsReply(std::move(factory), d->retryPolicy);
+}
+
 ConversationItemsReply *Client::listConversationItems(const QString &conversationId)
 {
     Q_D(Client);
