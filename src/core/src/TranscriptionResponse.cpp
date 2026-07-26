@@ -70,7 +70,11 @@ public:
     double start = 0.0;
     double end = 0.0;
     QString text;
+    int seek = 0;
+    double temperature = 0.0;
     double avgLogprob = 0.0;
+    double compressionRatio = 0.0;
+    double noSpeechProb = 0.0;
 };
 
 TranscriptionSegment::TranscriptionSegment()
@@ -99,6 +103,21 @@ void TranscriptionSegment::setText(const QString &text) { d->text = text; }
 double TranscriptionSegment::avgLogprob() const { return d->avgLogprob; }
 void TranscriptionSegment::setAvgLogprob(double avgLogprob) { d->avgLogprob = avgLogprob; }
 
+int TranscriptionSegment::seek() const { return d->seek; }
+void TranscriptionSegment::setSeek(int seek) { d->seek = seek; }
+
+double TranscriptionSegment::temperature() const { return d->temperature; }
+void TranscriptionSegment::setTemperature(double temperature) { d->temperature = temperature; }
+
+double TranscriptionSegment::compressionRatio() const { return d->compressionRatio; }
+void TranscriptionSegment::setCompressionRatio(double compressionRatio)
+{
+    d->compressionRatio = compressionRatio;
+}
+
+double TranscriptionSegment::noSpeechProb() const { return d->noSpeechProb; }
+void TranscriptionSegment::setNoSpeechProb(double noSpeechProb) { d->noSpeechProb = noSpeechProb; }
+
 QJsonObject TranscriptionSegment::toJson() const
 {
     QJsonObject json;
@@ -106,7 +125,11 @@ QJsonObject TranscriptionSegment::toJson() const
     json.insert(QStringLiteral("start"), d->start);
     json.insert(QStringLiteral("end"), d->end);
     json.insert(QStringLiteral("text"), d->text);
+    json.insert(QStringLiteral("seek"), d->seek);
+    json.insert(QStringLiteral("temperature"), d->temperature);
     json.insert(QStringLiteral("avg_logprob"), d->avgLogprob);
+    json.insert(QStringLiteral("compression_ratio"), d->compressionRatio);
+    json.insert(QStringLiteral("no_speech_prob"), d->noSpeechProb);
     return json;
 }
 
@@ -117,14 +140,21 @@ TranscriptionSegment TranscriptionSegment::fromJson(const QJsonObject &json)
     segment.d->start = json.value(QStringLiteral("start")).toDouble();
     segment.d->end = json.value(QStringLiteral("end")).toDouble();
     segment.d->text = detail::stringOr(json, QStringLiteral("text"));
+    segment.d->seek = json.value(QStringLiteral("seek")).toInt();
+    segment.d->temperature = json.value(QStringLiteral("temperature")).toDouble();
     segment.d->avgLogprob = json.value(QStringLiteral("avg_logprob")).toDouble();
+    segment.d->compressionRatio = json.value(QStringLiteral("compression_ratio")).toDouble();
+    segment.d->noSpeechProb = json.value(QStringLiteral("no_speech_prob")).toDouble();
     return segment;
 }
 
 bool TranscriptionSegment::operator==(const TranscriptionSegment &other) const
 {
     return d->id == other.d->id && d->start == other.d->start && d->end == other.d->end
-           && d->text == other.d->text && d->avgLogprob == other.d->avgLogprob;
+           && d->text == other.d->text && d->seek == other.d->seek
+           && d->temperature == other.d->temperature && d->avgLogprob == other.d->avgLogprob
+           && d->compressionRatio == other.d->compressionRatio
+           && d->noSpeechProb == other.d->noSpeechProb;
 }
 
 // --- TranscriptionResponse -------------------------------------------------
@@ -133,6 +163,7 @@ class TranscriptionResponseData : public QSharedData
 {
 public:
     QString text;
+    QString task;
     QString language;
     double duration = 0.0;
     QList<TranscriptionSegment> segments;
@@ -154,6 +185,9 @@ TranscriptionResponse::~TranscriptionResponse() = default;
 QString TranscriptionResponse::text() const { return d->text; }
 void TranscriptionResponse::setText(const QString &text) { d->text = text; }
 
+QString TranscriptionResponse::task() const { return d->task; }
+void TranscriptionResponse::setTask(const QString &task) { d->task = task; }
+
 QString TranscriptionResponse::language() const { return d->language; }
 void TranscriptionResponse::setLanguage(const QString &language) { d->language = language; }
 
@@ -173,6 +207,7 @@ QJsonObject TranscriptionResponse::toJson() const
 {
     QJsonObject json;
     json.insert(QStringLiteral("text"), d->text);
+    detail::insertIfNotEmpty(json, QStringLiteral("task"), d->task);
     detail::insertIfNotEmpty(json, QStringLiteral("language"), d->language);
     if (d->duration != 0.0)
         json.insert(QStringLiteral("duration"), d->duration);
@@ -195,6 +230,7 @@ TranscriptionResponse TranscriptionResponse::fromJson(const QJsonObject &json)
 {
     TranscriptionResponse response;
     response.d->text = detail::stringOr(json, QStringLiteral("text"));
+    response.d->task = detail::stringOr(json, QStringLiteral("task"));
     response.d->language = detail::stringOr(json, QStringLiteral("language"));
     response.d->duration = json.value(QStringLiteral("duration")).toDouble();
     const QJsonArray segments = json.value(QStringLiteral("segments")).toArray();
@@ -215,7 +251,7 @@ TranscriptionResponse TranscriptionResponse::fromText(const QString &text)
 
 bool TranscriptionResponse::operator==(const TranscriptionResponse &other) const
 {
-    return d->text == other.d->text && d->language == other.d->language
+    return d->text == other.d->text && d->task == other.d->task && d->language == other.d->language
            && d->duration == other.d->duration && d->segments == other.d->segments
            && d->words == other.d->words;
 }

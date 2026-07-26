@@ -4,6 +4,7 @@
 #include <QtOpenAi/Core/TranslationRequest.h>
 
 #include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtTest/QtTest>
 
@@ -21,6 +22,7 @@ private slots:
     void parsesVerboseJsonWithSegments();
     void parsesPlainText();
     void responseRoundTrip();
+    void parsesVerboseSegmentDiagnostics();
 };
 
 static QString fieldValue(const QList<TranscriptionRequest::FormField> &fields, const QString &name)
@@ -136,6 +138,32 @@ void TestTranscriptions::responseRoundTrip()
 
     const TranscriptionResponse parsed = TranscriptionResponse::fromJson(response.toJson());
     QCOMPARE(parsed, response);
+}
+
+void TestTranscriptions::parsesVerboseSegmentDiagnostics()
+{
+    // compression_ratio and no_speech_prob are how callers spot a hallucinated
+    // or silent segment, so they have to survive the decode.
+    const QByteArray body = R"({
+        "task": "transcribe", "language": "english", "duration": 2.0,
+        "text": "hello",
+        "segments": [{
+            "id": 0, "seek": 1500, "start": 0.0, "end": 2.0, "text": "hello",
+            "temperature": 0.2, "avg_logprob": -0.3,
+            "compression_ratio": 2.7, "no_speech_prob": 0.04
+        }]
+    })";
+
+    const TranscriptionResponse response
+            = TranscriptionResponse::fromJson(QJsonDocument::fromJson(body).object());
+
+    QCOMPARE(response.task(), QStringLiteral("transcribe"));
+    QCOMPARE(response.segments().size(), 1);
+    const TranscriptionSegment segment = response.segments().first();
+    QCOMPARE(segment.seek(), 1500);
+    QCOMPARE(segment.temperature(), 0.2);
+    QCOMPARE(segment.compressionRatio(), 2.7);
+    QCOMPARE(segment.noSpeechProb(), 0.04);
 }
 
 QTEST_APPLESS_MAIN(TestTranscriptions)

@@ -17,6 +17,10 @@ qtopenai_add_test(tst_core_enums
     SOURCES core/tst_enums.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_roundtrip
+    SOURCES core/tst_roundtrip.cpp
+    LIBS QtOpenAi::Core)
+
 qtopenai_add_test(tst_core_serialization
     SOURCES core/tst_serialization.cpp
     LIBS QtOpenAi::Core)
