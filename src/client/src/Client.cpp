@@ -7,6 +7,7 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QUrlQuery>
+#include <QtCore/QUuid>
 #include <QtNetwork/QHttpMultiPart>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
@@ -28,6 +29,7 @@ public:
     Client::AuthScheme authScheme = Client::AuthScheme::BearerToken;
     QString apiVersion;
     RetryPolicy retryPolicy;
+    bool idempotencyKeys = true;
     int requestTimeoutMs = 0;
     QString userAgent;
     QHash<QByteArray, QByteArray> defaultHeaders;
@@ -162,6 +164,18 @@ int Client::requestTimeoutMs() const
     return d->requestTimeoutMs;
 }
 
+bool Client::idempotencyKeysEnabled() const
+{
+    Q_D(const Client);
+    return d->idempotencyKeys;
+}
+
+void Client::setIdempotencyKeysEnabled(bool enabled)
+{
+    Q_D(Client);
+    d->idempotencyKeys = enabled;
+}
+
 void Client::setRequestTimeoutMs(int timeoutMs)
 {
     Q_D(Client);
@@ -248,6 +262,19 @@ QNetworkRequest apiRequest(const ClientPrivate *d, const QString &path)
     return networkRequest;
 }
 
+// Stamp a per-call Idempotency-Key on a request that is about to be POSTed, so
+// the automatic retries cannot be charged twice. Generated once per request
+// factory rather than per attempt — that is the whole point: every attempt of
+// one logical call must carry the same key. GETs are idempotent by definition
+// and are left alone.
+void applyIdempotencyKey(const ClientPrivate *d, QNetworkRequest &request)
+{
+    if (!d->idempotencyKeys || request.hasRawHeader("Idempotency-Key"))
+        return;
+    request.setRawHeader("Idempotency-Key",
+                         QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8());
+}
+
 // The /chat/completions request, retaining the original spelling for callers.
 QNetworkRequest chatRequest(const ClientPrivate *d)
 {
@@ -282,11 +309,13 @@ void applyQuery(QNetworkRequest &request, const QUrlQuery &extra)
 // QHttpMultiPart is created per attempt (they are single-use) and parented to
 // the reply so it is freed with it. The Content-Type header is set from the
 // generated boundary, overriding the JSON default from apiRequest().
-std::function<QNetworkReply *()> multipartPostFactory(QNetworkAccessManager *manager,
+std::function<QNetworkReply *()> multipartPostFactory(const ClientPrivate *d,
+                                                      QNetworkAccessManager *manager,
                                                       QNetworkRequest request,
                                                       QList<QPair<QString, QString>> fields,
                                                       QList<detail::FormFilePart> files)
 {
+    applyIdempotencyKey(d, request);
     return [manager, request, fields = std::move(fields), files = std::move(files)]() mutable {
         QHttpMultiPart *multiPart = detail::buildMultipart(fields, files);
         QNetworkRequest req = request;
@@ -358,9 +387,10 @@ std::function<QNetworkReply *()> deleteFactory(QNetworkAccessManager *manager,
     return [manager, request = std::move(request)]() { return manager->deleteResource(request); };
 }
 
-std::function<QNetworkReply *()> postFactory(QNetworkAccessManager *manager,
+std::function<QNetworkReply *()> postFactory(const ClientPrivate *d, QNetworkAccessManager *manager,
                                              QNetworkRequest request, QByteArray body = {})
 {
+    applyIdempotencyKey(d, request);
     return [manager, request = std::move(request), body = std::move(body)]() {
         return manager->post(request, body);
     };
@@ -374,7 +404,7 @@ ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequ
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
     // Capture what a retry needs to re-issue the request.
-    auto factory = postFactory(manager, chatRequest(d), body);
+    auto factory = postFactory(d, manager, chatRequest(d), body);
     return new ChatCompletionReply(std::move(factory), d->retryPolicy);
 }
 
@@ -383,7 +413,7 @@ ModerationReply *Client::createModeration(const Core::ModerationRequest &request
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/moderations")), body);
+    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/moderations")), body);
     return new ModerationReply(std::move(factory), d->retryPolicy);
 }
 
@@ -392,7 +422,7 @@ CompletionReply *Client::createCompletion(const Core::CompletionRequest &request
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/completions")), body);
+    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/completions")), body);
     return new CompletionReply(std::move(factory), d->retryPolicy);
 }
 
@@ -434,7 +464,7 @@ ResponseReply *Client::createResponse(const Core::ResponseRequest &request)
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/responses")), body);
+    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/responses")), body);
     return new ResponseReply(std::move(factory), d->retryPolicy);
 }
 
@@ -468,7 +498,7 @@ ResponseReply *Client::cancelResponse(const QString &responseId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/responses/") + responseId + QStringLiteral("/cancel");
-    auto factory = postFactory(manager, apiRequest(d, path));
+    auto factory = postFactory(d, manager, apiRequest(d, path));
     return new ResponseReply(std::move(factory), d->retryPolicy);
 }
 
@@ -492,7 +522,7 @@ ConversationReply *Client::createConversation(const QJsonObject &metadata,
         bodyObject.insert(QStringLiteral("items"), itemsToArray(items));
     const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/conversations")), body);
+    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/conversations")), body);
     return new ConversationReply(std::move(factory), d->retryPolicy);
 }
 
@@ -514,7 +544,7 @@ ConversationReply *Client::updateConversation(const QString &conversationId,
     const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/conversations/") + conversationId;
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new ConversationReply(std::move(factory), d->retryPolicy);
 }
 
@@ -548,7 +578,7 @@ Client::createConversationItems(const QString &conversationId,
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path
             = QStringLiteral("/conversations/") + conversationId + QStringLiteral("/items");
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new ConversationItemsReply(std::move(factory), d->retryPolicy);
 }
 
@@ -602,7 +632,7 @@ ChatCompletionReply *Client::updateChatCompletion(const QString &completionId,
     const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/chat/completions/") + completionId;
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new ChatCompletionReply(std::move(factory), d->retryPolicy);
 }
 
@@ -633,7 +663,7 @@ EmbeddingReply *Client::createEmbeddings(const Core::EmbeddingRequest &request)
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/embeddings")), body);
+    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/embeddings")), body);
     return new EmbeddingReply(std::move(factory), d->retryPolicy);
 }
 
@@ -641,7 +671,7 @@ TranscriptionReply *Client::createTranscription(const Core::TranscriptionRequest
 {
     Q_D(Client);
     detail::FormFilePart file {"file", request.fileName(), request.fileData()};
-    auto factory = multipartPostFactory(networkAccessManager(),
+    auto factory = multipartPostFactory(d, networkAccessManager(),
                                         apiRequest(d, QStringLiteral("/audio/transcriptions")),
                                         request.formFields(), {std::move(file)});
     return new TranscriptionReply(std::move(factory), d->retryPolicy);
@@ -651,7 +681,7 @@ TranscriptionReply *Client::createTranslation(const Core::TranslationRequest &re
 {
     Q_D(Client);
     detail::FormFilePart file {"file", request.fileName(), request.fileData()};
-    auto factory = multipartPostFactory(networkAccessManager(),
+    auto factory = multipartPostFactory(d, networkAccessManager(),
                                         apiRequest(d, QStringLiteral("/audio/translations")),
                                         request.formFields(), {std::move(file)});
     return new TranscriptionReply(std::move(factory), d->retryPolicy);
@@ -662,7 +692,8 @@ ImageReply *Client::createImage(const Core::ImageGenerationRequest &request)
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/images/generations")), body);
+    auto factory
+            = postFactory(d, manager, apiRequest(d, QStringLiteral("/images/generations")), body);
     return new ImageReply(std::move(factory), d->retryPolicy);
 }
 
@@ -678,7 +709,7 @@ ImageReply *Client::createImageEdit(const Core::ImageEditRequest &request)
     if (request.hasMask())
         files.append({"mask", request.maskFileName(), request.maskData()});
 
-    auto factory = multipartPostFactory(networkAccessManager(),
+    auto factory = multipartPostFactory(d, networkAccessManager(),
                                         apiRequest(d, QStringLiteral("/images/edits")),
                                         request.formFields(), std::move(files));
     return new ImageReply(std::move(factory), d->retryPolicy);
@@ -688,7 +719,7 @@ ImageReply *Client::createImageVariation(const Core::ImageVariationRequest &requ
 {
     Q_D(Client);
     detail::FormFilePart file {"image", request.fileName(), request.imageData()};
-    auto factory = multipartPostFactory(networkAccessManager(),
+    auto factory = multipartPostFactory(d, networkAccessManager(),
                                         apiRequest(d, QStringLiteral("/images/variations")),
                                         request.formFields(), {std::move(file)});
     return new ImageReply(std::move(factory), d->retryPolicy);
@@ -702,14 +733,14 @@ VideoReply *Client::createVideo(const Core::CreateVideoRequest &request)
     if (request.hasInputReference()) {
         detail::FormFilePart file {"input_reference", request.inputReferenceFileName(),
                                    request.inputReferenceData()};
-        auto factory = multipartPostFactory(networkAccessManager(),
+        auto factory = multipartPostFactory(d, networkAccessManager(),
                                             apiRequest(d, QStringLiteral("/videos")),
                                             request.formFields(), {std::move(file)});
         return new VideoReply(std::move(factory), d->retryPolicy);
     }
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/videos")), body);
+    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/videos")), body);
     return new VideoReply(std::move(factory), d->retryPolicy);
 }
 
@@ -749,7 +780,7 @@ VideoReply *Client::remixVideo(const QString &videoId, const QString &prompt)
     const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/videos/") + videoId + QStringLiteral("/remix");
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new VideoReply(std::move(factory), d->retryPolicy);
 }
 
@@ -772,7 +803,7 @@ SpeechReply *Client::createSpeech(const Core::SpeechRequest &request)
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/audio/speech")), body);
+    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/audio/speech")), body);
     return new SpeechReply(std::move(factory), d->retryPolicy);
 }
 
@@ -780,9 +811,9 @@ FileReply *Client::uploadFile(const Core::FileUploadRequest &request)
 {
     Q_D(Client);
     detail::FormFilePart file {"file", request.fileName(), request.fileData()};
-    auto factory
-            = multipartPostFactory(networkAccessManager(), apiRequest(d, QStringLiteral("/files")),
-                                   request.formFields(), {std::move(file)});
+    auto factory = multipartPostFactory(d, networkAccessManager(),
+                                        apiRequest(d, QStringLiteral("/files")),
+                                        request.formFields(), {std::move(file)});
     return new FileReply(std::move(factory), d->retryPolicy);
 }
 
@@ -831,7 +862,7 @@ UploadReply *Client::createUpload(const Core::CreateUploadRequest &request)
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/uploads")), body);
+    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/uploads")), body);
     return new UploadReply(std::move(factory), d->retryPolicy);
 }
 
@@ -841,7 +872,7 @@ UploadPartReply *Client::addUploadPart(const QString &uploadId, const QByteArray
     // The chunk is the multipart `data` part; the filename is cosmetic here.
     detail::FormFilePart part {"data", QStringLiteral("part"), data};
     const QString path = QStringLiteral("/uploads/") + uploadId + QStringLiteral("/parts");
-    auto factory = multipartPostFactory(networkAccessManager(), apiRequest(d, path), {},
+    auto factory = multipartPostFactory(d, networkAccessManager(), apiRequest(d, path), {},
                                         {std::move(part)});
     return new UploadPartReply(std::move(factory), d->retryPolicy);
 }
@@ -860,7 +891,7 @@ UploadReply *Client::completeUpload(const QString &uploadId, const QStringList &
     const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/uploads/") + uploadId + QStringLiteral("/complete");
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new UploadReply(std::move(factory), d->retryPolicy);
 }
 
@@ -869,7 +900,7 @@ UploadReply *Client::cancelUpload(const QString &uploadId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/uploads/") + uploadId + QStringLiteral("/cancel");
-    auto factory = postFactory(manager, apiRequest(d, path));
+    auto factory = postFactory(d, manager, apiRequest(d, path));
     return new UploadReply(std::move(factory), d->retryPolicy);
 }
 
@@ -894,7 +925,7 @@ VectorStoreReply *Client::createVectorStore(const Core::CreateVectorStoreRequest
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, vectorStorePath({})), body);
+    auto factory = postFactory(d, manager, apiRequest(d, vectorStorePath({})), body);
     return new VectorStoreReply(std::move(factory), d->retryPolicy);
 }
 
@@ -922,7 +953,7 @@ VectorStoreReply *Client::updateVectorStore(const QString &vectorStoreId,
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, vectorStorePath(vectorStoreId)), body);
+    auto factory = postFactory(d, manager, apiRequest(d, vectorStorePath(vectorStoreId)), body);
     return new VectorStoreReply(std::move(factory), d->retryPolicy);
 }
 
@@ -949,7 +980,7 @@ VectorStoreFileReply *Client::createVectorStoreFile(const QString &vectorStoreId
     const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files"));
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new VectorStoreFileReply(std::move(factory), d->retryPolicy);
 }
 
@@ -988,7 +1019,7 @@ VectorStoreFileReply *Client::updateVectorStoreFileAttributes(const QString &vec
     const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files/") + fileId);
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new VectorStoreFileReply(std::move(factory), d->retryPolicy);
 }
 
@@ -1028,7 +1059,7 @@ VectorStoreFileBatchReply *Client::createVectorStoreFileBatch(const QString &vec
     const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/file_batches"));
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new VectorStoreFileBatchReply(std::move(factory), d->retryPolicy);
 }
 
@@ -1049,7 +1080,7 @@ VectorStoreFileBatchReply *Client::cancelVectorStoreFileBatch(const QString &vec
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/file_batches/") + batchId
                                                                 + QStringLiteral("/cancel"));
-    auto factory = postFactory(manager, apiRequest(d, path));
+    auto factory = postFactory(d, manager, apiRequest(d, path));
     return new VectorStoreFileBatchReply(std::move(factory), d->retryPolicy);
 }
 
@@ -1078,7 +1109,7 @@ VectorStoreSearchReply *Client::searchVectorStore(const QString &vectorStoreId,
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/search"));
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new VectorStoreSearchReply(std::move(factory), d->retryPolicy);
 }
 
@@ -1087,7 +1118,7 @@ ContainerReply *Client::createContainer(const Core::CreateContainerRequest &requ
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, containerPath({})), body);
+    auto factory = postFactory(d, manager, apiRequest(d, containerPath({})), body);
     return new ContainerReply(std::move(factory), d->retryPolicy);
 }
 
@@ -1123,7 +1154,7 @@ ContainerFileReply *Client::uploadContainerFile(const QString &containerId, cons
     Q_D(Client);
     detail::FormFilePart file {"file", fileName, data};
     const QString path = containerPath(containerId, QStringLiteral("/files"));
-    auto factory = multipartPostFactory(networkAccessManager(), apiRequest(d, path), {},
+    auto factory = multipartPostFactory(d, networkAccessManager(), apiRequest(d, path), {},
                                         {std::move(file)});
     return new ContainerFileReply(std::move(factory), d->retryPolicy);
 }
@@ -1136,7 +1167,7 @@ ContainerFileReply *Client::attachContainerFile(const QString &containerId, cons
     const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = containerPath(containerId, QStringLiteral("/files"));
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new ContainerFileReply(std::move(factory), d->retryPolicy);
 }
 
@@ -1184,7 +1215,7 @@ BatchReply *Client::createBatch(const Core::CreateBatchRequest &request)
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/batches")), body);
+    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/batches")), body);
     return new BatchReply(std::move(factory), d->retryPolicy);
 }
 
@@ -1212,7 +1243,7 @@ BatchReply *Client::cancelBatch(const QString &batchId)
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = QStringLiteral("/batches/") + batchId + QStringLiteral("/cancel");
-    auto factory = postFactory(manager, apiRequest(d, path));
+    auto factory = postFactory(d, manager, apiRequest(d, path));
     return new BatchReply(std::move(factory), d->retryPolicy);
 }
 
@@ -1226,7 +1257,7 @@ FineTuningJobReply *Client::createFineTuningJob(const Core::CreateFineTuningJobR
     Q_D(Client);
     const QByteArray body = compactJson(request.toJson());
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, fineTuningJobPath({})), body);
+    auto factory = postFactory(d, manager, apiRequest(d, fineTuningJobPath({})), body);
     return new FineTuningJobReply(std::move(factory), d->retryPolicy);
 }
 
@@ -1267,7 +1298,7 @@ FineTuningJobReply *Client::postFineTuningJobAction(const QString &jobId, const 
 {
     Q_D(Client);
     QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(manager, apiRequest(d, fineTuningJobPath(jobId, action)));
+    auto factory = postFactory(d, manager, apiRequest(d, fineTuningJobPath(jobId, action)));
     return new FineTuningJobReply(std::move(factory), d->retryPolicy);
 }
 
@@ -1320,7 +1351,7 @@ Client::createFineTuningCheckpointPermissions(const QString &checkpointId,
     const QByteArray body = compactJson(bodyObject);
     QNetworkAccessManager *manager = networkAccessManager();
     const QString path = fineTuningCheckpointPath(checkpointId, QStringLiteral("/permissions"));
-    auto factory = postFactory(manager, apiRequest(d, path), body);
+    auto factory = postFactory(d, manager, apiRequest(d, path), body);
     return new FineTuningPermissionListReply(std::move(factory), d->retryPolicy);
 }
 

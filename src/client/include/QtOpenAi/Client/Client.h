@@ -140,6 +140,14 @@ public:
     RetryPolicy retryPolicy() const;
     void setRetryPolicy(const RetryPolicy &policy);
 
+    // Send a generated `Idempotency-Key` header with every POST, so the
+    // automatic retries of a create call cannot be charged twice. On by
+    // default, because retrying POSTs is on by default; every attempt of one
+    // logical call shares the same key. Providers that do not know the header
+    // ignore it.
+    bool idempotencyKeysEnabled() const;
+    void setIdempotencyKeysEnabled(bool enabled);
+
     // Per-request transfer timeout in milliseconds (0 disables; default 0).
     int requestTimeoutMs() const;
     void setRequestTimeoutMs(int timeoutMs);
