@@ -210,5 +210,43 @@ BatchStatus batchStatusFromString(const QString &value)
     return BatchStatus::Validating;
 }
 
+QString fineTuningJobStatusToString(FineTuningJobStatus status)
+{
+    switch (status) {
+    case FineTuningJobStatus::ValidatingFiles:
+        return QStringLiteral("validating_files");
+    case FineTuningJobStatus::Queued:
+        return QStringLiteral("queued");
+    case FineTuningJobStatus::Running:
+        return QStringLiteral("running");
+    case FineTuningJobStatus::Succeeded:
+        return QStringLiteral("succeeded");
+    case FineTuningJobStatus::Failed:
+        return QStringLiteral("failed");
+    case FineTuningJobStatus::Cancelled:
+        return QStringLiteral("cancelled");
+    case FineTuningJobStatus::Paused:
+        return QStringLiteral("paused");
+    }
+    return QStringLiteral("queued");
+}
+
+FineTuningJobStatus fineTuningJobStatusFromString(const QString &value)
+{
+    if (value == QLatin1String("validating_files"))
+        return FineTuningJobStatus::ValidatingFiles;
+    if (value == QLatin1String("running"))
+        return FineTuningJobStatus::Running;
+    if (value == QLatin1String("succeeded"))
+        return FineTuningJobStatus::Succeeded;
+    if (value == QLatin1String("failed"))
+        return FineTuningJobStatus::Failed;
+    if (value == QLatin1String("cancelled"))
+        return FineTuningJobStatus::Cancelled;
+    if (value == QLatin1String("paused"))
+        return FineTuningJobStatus::Paused;
+    return FineTuningJobStatus::Queued;
+}
+
 } // namespace Core
 } // namespace QtOpenAi

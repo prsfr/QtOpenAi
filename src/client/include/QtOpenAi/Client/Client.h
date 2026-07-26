@@ -21,6 +21,13 @@
 #include <QtOpenAi/Client/EmbeddingReply.h>
 #include <QtOpenAi/Client/FileListReply.h>
 #include <QtOpenAi/Client/FileReply.h>
+#include <QtOpenAi/Client/FineTuningCheckpointListReply.h>
+#include <QtOpenAi/Client/FineTuningEventListReply.h>
+#include <QtOpenAi/Client/FineTuningJobListReply.h>
+#include <QtOpenAi/Client/FineTuningJobPoller.h>
+#include <QtOpenAi/Client/FineTuningJobReply.h>
+#include <QtOpenAi/Client/FineTuningPermissionListReply.h>
+#include <QtOpenAi/Client/FineTuningPermissionReply.h>
 #include <QtOpenAi/Client/GlobalClient.h>
 #include <QtOpenAi/Client/ImageReply.h>
 #include <QtOpenAi/Client/ListParams.h>
@@ -49,6 +56,7 @@
 #include <QtOpenAi/Core/CompletionRequest.h>
 #include <QtOpenAi/Core/CreateBatchRequest.h>
 #include <QtOpenAi/Core/CreateContainerRequest.h>
+#include <QtOpenAi/Core/CreateFineTuningJobRequest.h>
 #include <QtOpenAi/Core/CreateUploadRequest.h>
 #include <QtOpenAi/Core/CreateVectorStoreRequest.h>
 #include <QtOpenAi/Core/CreateVideoRequest.h>
@@ -474,6 +482,51 @@ public:
     // deletes itself once it stops unless setAutoDelete(false) is used.
     BatchPoller *pollBatch(const QString &batchId, int pollIntervalMs = 2000);
 
+    // --- Fine-tuning (/fine_tuning) ----------------------------------------
+    // Start a training run over an uploaded JSONL training file. The job starts
+    // in `validating_files`; poll getFineTuningJob() (or use
+    // pollFineTuningJob()) until isTerminal(), then use the job's
+    // fineTunedModel() as the model id in later requests.
+    FineTuningJobReply *createFineTuningJob(const Core::CreateFineTuningJobRequest &request);
+
+    FineTuningJobListReply *listFineTuningJobs(const ListParams &params = {});
+
+    FineTuningJobReply *getFineTuningJob(const QString &jobId);
+
+    // Stop a job for good.
+    FineTuningJobReply *cancelFineTuningJob(const QString &jobId);
+
+    // Suspend a running job and pick it up again later. A paused job is not
+    // terminal, so a poller keeps waiting across the pause.
+    FineTuningJobReply *pauseFineTuningJob(const QString &jobId);
+    FineTuningJobReply *resumeFineTuningJob(const QString &jobId);
+
+    // The job's progress log — status messages and periodic metrics samples.
+    FineTuningEventListReply *listFineTuningEvents(const QString &jobId,
+                                                   const ListParams &params = {});
+
+    // Mid-training snapshots, each usable as a model of its own.
+    FineTuningCheckpointListReply *listFineTuningCheckpoints(const QString &jobId,
+                                                             const ListParams &params = {});
+
+    // Poll a fine-tuning job until it reaches a terminal state. Returns a
+    // FineTuningJobPoller that emits progressed()/completed()/failed(); call
+    // start() on it. It deletes itself once it stops unless setAutoDelete(false)
+    // is used.
+    FineTuningJobPoller *pollFineTuningJob(const QString &jobId, int pollIntervalMs = 2000);
+
+    // Which projects may use a checkpoint. Creating grants answers with the
+    // whole list, so both calls share a reply type.
+    FineTuningPermissionListReply *
+    listFineTuningCheckpointPermissions(const QString &checkpointId, const ListParams &params = {});
+
+    FineTuningPermissionListReply *
+    createFineTuningCheckpointPermissions(const QString &checkpointId,
+                                          const QStringList &projectIds);
+
+    FineTuningPermissionReply *deleteFineTuningCheckpointPermission(const QString &checkpointId,
+                                                                    const QString &permissionId);
+
     // --- Models (/models) --------------------------------------------------
     // List the available models.
     ModelListReply *listModels();
@@ -487,6 +540,9 @@ Q_SIGNALS:
     void organizationChanged();
 
 private:
+    // cancel/pause/resume differ only in the path segment they POST to.
+    FineTuningJobReply *postFineTuningJobAction(const QString &jobId, const QString &action);
+
     Q_DECLARE_PRIVATE(Client)
     QScopedPointer<ClientPrivate> d_ptr;
 };

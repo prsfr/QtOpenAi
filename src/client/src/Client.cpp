@@ -298,26 +298,36 @@ std::function<QNetworkReply *()> multipartPostFactory(QNetworkAccessManager *man
     };
 }
 
-// Build a /vector_stores path, optionally below a store's files or file batches.
-// The routes nest three levels deep, so composing them in one place keeps the
-// endpoint methods free of string arithmetic.
-QString vectorStorePath(const QString &vectorStoreId, const QString &suffix = {})
+// Compose a nested resource path: a collection, optionally one member of it,
+// optionally a sub-resource below that — e.g. ("/vector_stores", "vs_1",
+// "/files/f_1"). Several endpoint families nest three levels deep, so building
+// them here keeps the endpoint methods free of string arithmetic.
+QString resourcePath(QLatin1String collection, const QString &id, const QString &suffix = {})
 {
-    QString path = QStringLiteral("/vector_stores");
-    if (!vectorStoreId.isEmpty())
-        path += QLatin1Char('/') + vectorStoreId;
+    QString path(collection);
+    if (!id.isEmpty())
+        path += QLatin1Char('/') + id;
     return path + suffix;
 }
 
-// Build a /containers path, optionally below a container's files. Mirrors
-// vectorStorePath(): the routes nest, so composing them once keeps the endpoint
-// methods free of string arithmetic.
+QString vectorStorePath(const QString &vectorStoreId, const QString &suffix = {})
+{
+    return resourcePath(QLatin1String("/vector_stores"), vectorStoreId, suffix);
+}
+
 QString containerPath(const QString &containerId, const QString &suffix = {})
 {
-    QString path = QStringLiteral("/containers");
-    if (!containerId.isEmpty())
-        path += QLatin1Char('/') + containerId;
-    return path + suffix;
+    return resourcePath(QLatin1String("/containers"), containerId, suffix);
+}
+
+QString fineTuningJobPath(const QString &jobId, const QString &suffix = {})
+{
+    return resourcePath(QLatin1String("/fine_tuning/jobs"), jobId, suffix);
+}
+
+QString fineTuningCheckpointPath(const QString &checkpointId, const QString &suffix = {})
+{
+    return resourcePath(QLatin1String("/fine_tuning/checkpoints"), checkpointId, suffix);
 }
 
 // Serialise a list of ids to a JSON array.
@@ -1209,6 +1219,120 @@ BatchReply *Client::cancelBatch(const QString &batchId)
 BatchPoller *Client::pollBatch(const QString &batchId, int pollIntervalMs)
 {
     return new BatchPoller(this, batchId, pollIntervalMs);
+}
+
+FineTuningJobReply *Client::createFineTuningJob(const Core::CreateFineTuningJobRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = compactJson(request.toJson());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(manager, apiRequest(d, fineTuningJobPath({})), body);
+    return new FineTuningJobReply(std::move(factory), d->retryPolicy);
+}
+
+FineTuningJobListReply *Client::listFineTuningJobs(const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, fineTuningJobPath({}));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new FineTuningJobListReply(std::move(factory), d->retryPolicy);
+}
+
+FineTuningJobReply *Client::getFineTuningJob(const QString &jobId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, apiRequest(d, fineTuningJobPath(jobId)));
+    return new FineTuningJobReply(std::move(factory), d->retryPolicy);
+}
+
+FineTuningJobReply *Client::cancelFineTuningJob(const QString &jobId)
+{
+    return postFineTuningJobAction(jobId, QStringLiteral("/cancel"));
+}
+
+FineTuningJobReply *Client::pauseFineTuningJob(const QString &jobId)
+{
+    return postFineTuningJobAction(jobId, QStringLiteral("/pause"));
+}
+
+FineTuningJobReply *Client::resumeFineTuningJob(const QString &jobId)
+{
+    return postFineTuningJobAction(jobId, QStringLiteral("/resume"));
+}
+
+FineTuningJobReply *Client::postFineTuningJobAction(const QString &jobId, const QString &action)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(manager, apiRequest(d, fineTuningJobPath(jobId, action)));
+    return new FineTuningJobReply(std::move(factory), d->retryPolicy);
+}
+
+FineTuningEventListReply *Client::listFineTuningEvents(const QString &jobId,
+                                                       const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, fineTuningJobPath(jobId, QStringLiteral("/events")));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new FineTuningEventListReply(std::move(factory), d->retryPolicy);
+}
+
+FineTuningCheckpointListReply *Client::listFineTuningCheckpoints(const QString &jobId,
+                                                                 const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, fineTuningJobPath(jobId, QStringLiteral("/checkpoints")));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new FineTuningCheckpointListReply(std::move(factory), d->retryPolicy);
+}
+
+FineTuningJobPoller *Client::pollFineTuningJob(const QString &jobId, int pollIntervalMs)
+{
+    return new FineTuningJobPoller(this, jobId, pollIntervalMs);
+}
+
+FineTuningPermissionListReply *
+Client::listFineTuningCheckpointPermissions(const QString &checkpointId, const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req
+            = apiRequest(d, fineTuningCheckpointPath(checkpointId, QStringLiteral("/permissions")));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new FineTuningPermissionListReply(std::move(factory), d->retryPolicy);
+}
+
+FineTuningPermissionListReply *
+Client::createFineTuningCheckpointPermissions(const QString &checkpointId,
+                                              const QStringList &projectIds)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("project_ids"), idsToArray(projectIds));
+    const QByteArray body = compactJson(bodyObject);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = fineTuningCheckpointPath(checkpointId, QStringLiteral("/permissions"));
+    auto factory = postFactory(manager, apiRequest(d, path), body);
+    return new FineTuningPermissionListReply(std::move(factory), d->retryPolicy);
+}
+
+FineTuningPermissionReply *Client::deleteFineTuningCheckpointPermission(const QString &checkpointId,
+                                                                        const QString &permissionId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = fineTuningCheckpointPath(checkpointId,
+                                                  QStringLiteral("/permissions/") + permissionId);
+    auto factory = deleteFactory(manager, apiRequest(d, path));
+    return new FineTuningPermissionReply(std::move(factory), d->retryPolicy);
 }
 
 ModelListReply *Client::listModels()

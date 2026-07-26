@@ -89,6 +89,21 @@ enum class BatchStatus {
 };
 Q_ENUM_NS(BatchStatus)
 
+// The lifecycle state of a fine-tuning job (Fine-tuning API). Mirrors the OpenAI
+// `status` field. A job is terminal once it reaches Succeeded, Failed or
+// Cancelled; ValidatingFiles, Queued, Running and Paused are transient — a
+// paused job resumes on request.
+enum class FineTuningJobStatus {
+    ValidatingFiles,
+    Queued,
+    Running,
+    Succeeded,
+    Failed,
+    Cancelled,
+    Paused,
+};
+Q_ENUM_NS(FineTuningJobStatus)
+
 // Convert a Role to/from its OpenAI wire representation.
 QTOPENAI_CORE_EXPORT QString roleToString(Role role);
 QTOPENAI_CORE_EXPORT Role roleFromString(const QString &value);
@@ -123,6 +138,12 @@ QTOPENAI_CORE_EXPORT VectorStoreFileStatus vectorStoreFileStatusFromString(const
 // polling an unfamiliar status keeps waiting instead of stopping early.
 QTOPENAI_CORE_EXPORT QString batchStatusToString(BatchStatus status);
 QTOPENAI_CORE_EXPORT BatchStatus batchStatusFromString(const QString &value);
+
+// Convert a FineTuningJobStatus to/from its OpenAI wire representation. An
+// unrecognised value decodes to Queued (a transient state), so a client polling
+// an unfamiliar status keeps waiting instead of stopping early.
+QTOPENAI_CORE_EXPORT QString fineTuningJobStatusToString(FineTuningJobStatus status);
+QTOPENAI_CORE_EXPORT FineTuningJobStatus fineTuningJobStatusFromString(const QString &value);
 
 } // namespace Core
 } // namespace QtOpenAi

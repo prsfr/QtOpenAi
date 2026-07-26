@@ -29,3 +29,4 @@ qtopenai_add_example(containers containers.cpp)
 
 # --- Batch, tuning & evals (v0.7) ---
 qtopenai_add_example(batch batch.cpp)
+qtopenai_add_example(fine_tuning fine_tuning.cpp)
