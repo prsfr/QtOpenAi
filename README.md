@@ -38,6 +38,13 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
   typed `finished(...)` signal, a getter named the way that endpoint names its
   payload, and the one line that fires the signal. The streaming replies, which
   carry real state, still derive from `RestReplyBase` directly.
+* **One request path** — the ~100 endpoint methods on `Client` are each a
+  single call into one of four private helpers (`get`, `post`, `postMultipart`,
+  `remove`). Building the request, merging the query, capturing a retry factory
+  and attaching the `RetryPolicy` happen in exactly one place, so a change to
+  how requests are made reaches every endpoint at once. Endpoint paths are
+  composed from a table of collection constants rather than spelled out at each
+  call site.
 * **Qt coding style** — getters are `content()` not `getContent()`; setters are
   `setContent()`; enums are exposed via `Q_ENUM`/`Q_NAMESPACE`.
 
@@ -789,6 +796,11 @@ client.setDefaultHeader("X-My-Header", "value");
 // cannot be charged twice. On by default; every attempt shares one key.
 client.setIdempotencyKeysEnabled(false); // opt out if a provider dislikes it
 
+// Bring your own QNetworkAccessManager (proxies, custom SSL, a test double).
+// The client does not take ownership -- it stays yours to delete. Left unset,
+// the client creates one on first use, parented to itself.
+client.setNetworkAccessManager(myManager);
+
 // Rate-limit headroom from the last response's headers:
 connect(reply, &Client::ChatCompletionReply::finished, this, [reply] {
     const auto rl = reply->rateLimit();  // remainingRequests / remainingTokens / ...
@@ -893,8 +905,21 @@ target_link_libraries(myapp PRIVATE QtOpenAi::Client)   # pulls in Core
 
 The suite is written with **QtTest** and runs entirely offline — the networking
 tests spin up a local stub HTTP server, so no API key or internet access is
-required. CI builds and tests on Linux, macOS and Windows (see
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+required.
+
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds and tests on
+**Linux only until 1.0**. The library has no platform-specific code, so the
+macOS and Windows jobs were re-proving the same result at roughly twice the
+wall-clock of the Linux one. Both are still one switch away, without editing the
+workflow:
+
+| To build and test all three platforms | |
+|---|---|
+| for every run | set the repository variable `CI_ALL_PLATFORMS` to `true` |
+| for a single run | *Actions → CI → Run workflow*, tick **all_platforms** |
+
+Restoring all platforms unconditionally is tracked in
+[#92](https://github.com/prsfr/QtOpenAi/issues/92) for the 1.0 release.
 
 ## License
 

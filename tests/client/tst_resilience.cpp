@@ -5,6 +5,8 @@
 #include <QtNetwork/QTcpSocket>
 #include <QtTest/QtTest>
 
+#include "support/AwaitedReply.h"
+
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
@@ -138,14 +140,12 @@ void TestResilience::retriesOn429ThenSucceeds()
     Client client(server.baseUrl(), QStringLiteral("k"));
     client.setRetryPolicy(fastPolicy(2));
 
-    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletion(sampleRequest()));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QCOMPARE(reply->retryCount(), 1);
     QCOMPARE(server.connectionCount(), 2);
-    delete reply;
 }
 
 void TestResilience::retryAfterHeaderOverridesBackoff()
@@ -174,15 +174,13 @@ void TestResilience::exhaustsRetriesThenFails()
     Client client(server.baseUrl(), QStringLiteral("k"));
     client.setRetryPolicy(fastPolicy(2));
 
-    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletion(sampleRequest()));
+    QVERIFY(reply);
 
     QVERIFY(!reply->isSuccess());
     QCOMPARE(reply->retryCount(), 2);      // 2 retries after the first try
     QCOMPARE(server.connectionCount(), 3); // 1 + 2
     QCOMPARE(reply->error().httpStatus(), 500);
-    delete reply;
 }
 
 void TestResilience::nonRetryableStatusFailsImmediately()
@@ -191,14 +189,12 @@ void TestResilience::nonRetryableStatusFailsImmediately()
     Client client(server.baseUrl(), QStringLiteral("k"));
     client.setRetryPolicy(fastPolicy(3));
 
-    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletion(sampleRequest()));
+    QVERIFY(reply);
 
     QVERIFY(!reply->isSuccess());
     QCOMPARE(reply->retryCount(), 0);
     QCOMPARE(server.connectionCount(), 1);
-    delete reply;
 }
 
 void TestResilience::parsesRateLimitHeaders()
@@ -212,9 +208,8 @@ void TestResilience::parsesRateLimitHeaders()
                              {"x-ratelimit-reset-requests", "1s"}}}});
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletion(sampleRequest()));
+    QVERIFY(reply);
 
     const RateLimit rl = reply->rateLimit();
     QCOMPARE(rl.limitRequests, 100);
@@ -222,7 +217,6 @@ void TestResilience::parsesRateLimitHeaders()
     QCOMPARE(rl.limitTokens, 10000);
     QCOMPARE(rl.remainingTokens, 9000);
     QCOMPARE(rl.resetRequestsMs, 1000);
-    delete reply;
 }
 
 void TestResilience::azureAuthSchemeAndApiVersion()
@@ -232,9 +226,8 @@ void TestResilience::azureAuthSchemeAndApiVersion()
     client.setAuthScheme(Client::AuthScheme::AzureApiKey);
     client.setApiVersion(QStringLiteral("2024-06-01"));
 
-    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletion(sampleRequest()));
+    QVERIFY(reply);
 
     QCOMPARE(server.requests().size(), 1);
     // Qt >= 6.10 normalises header-field names to canonical casing (api-key ->
@@ -243,7 +236,6 @@ void TestResilience::azureAuthSchemeAndApiVersion()
     QVERIFY(req.contains("api-key: secret"));
     QVERIFY(!req.contains("authorization:"));
     QVERIFY(req.contains("api-version=2024-06-01"));
-    delete reply;
 }
 
 void TestResilience::customHeaderAndUserAgent()
@@ -253,14 +245,12 @@ void TestResilience::customHeaderAndUserAgent()
     client.setUserAgent(QStringLiteral("QtOpenAi-Test/1.0"));
     client.setDefaultHeader("X-Custom", "yes");
 
-    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletion(sampleRequest()));
+    QVERIFY(reply);
 
     const QByteArray req = server.requests().first();
     QVERIFY(req.contains("User-Agent: QtOpenAi-Test/1.0"));
     QVERIFY(req.contains("X-Custom: yes"));
-    delete reply;
 }
 
 void TestResilience::sendsIdempotencyKeyOnPost()
@@ -270,16 +260,14 @@ void TestResilience::sendsIdempotencyKeyOnPost()
     ScriptedServer server({{200, okBody(), {}}});
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletion(sampleRequest()));
+    QVERIFY(reply);
 
     const QByteArray key = idempotencyKeyOf(server.requests().first());
     QVERIFY(!key.isEmpty());
     // A UUID without the surrounding braces QUuid::toString() adds by default.
     QCOMPARE(key.size(), 36);
     QVERIFY(!key.contains('{'));
-    delete reply;
 }
 
 void TestResilience::reusesIdempotencyKeyAcrossRetries()
@@ -289,15 +277,13 @@ void TestResilience::reusesIdempotencyKeyAcrossRetries()
     Client client(server.baseUrl(), QStringLiteral("k"));
     client.setRetryPolicy(fastPolicy(2));
 
-    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletion(sampleRequest()));
+    QVERIFY(reply);
 
     QCOMPARE(server.requests().size(), 2);
     const QByteArray first = idempotencyKeyOf(server.requests().at(0));
     QVERIFY(!first.isEmpty());
     QCOMPARE(idempotencyKeyOf(server.requests().at(1)), first);
-    delete reply;
 }
 
 void TestResilience::omitsIdempotencyKeyWhenDisabled()
@@ -306,12 +292,10 @@ void TestResilience::omitsIdempotencyKeyWhenDisabled()
     Client client(server.baseUrl(), QStringLiteral("k"));
     client.setIdempotencyKeysEnabled(false);
 
-    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletion(sampleRequest()));
+    QVERIFY(reply);
 
     QVERIFY(idempotencyKeyOf(server.requests().first()).isEmpty());
-    delete reply;
 }
 
 void TestResilience::omitsIdempotencyKeyOnGet()
@@ -320,13 +304,11 @@ void TestResilience::omitsIdempotencyKeyOnGet()
     ScriptedServer server({{200, R"({"object":"list","data":[]})", {}}});
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ModelListReply *reply = client.listModels();
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listModels());
+    QVERIFY(reply);
 
     QVERIFY(server.requests().first().startsWith("GET "));
     QVERIFY(idempotencyKeyOf(server.requests().first()).isEmpty());
-    delete reply;
 }
 
 QTEST_MAIN(TestResilience)

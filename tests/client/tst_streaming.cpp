@@ -7,6 +7,8 @@
 #include <QtNetwork/QTcpSocket>
 #include <QtTest/QtTest>
 
+#include "support/AwaitedReply.h"
+
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
@@ -166,10 +168,9 @@ void TestStreaming::streamReassemblesToolCalls()
     SseStubServer server(200, sse);
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ChatCompletionStreamReply *reply = client.createChatCompletionStream(
-            ChatCompletionRequest(QStringLiteral("gpt-4o"), {Message::user(QStringLiteral("hi"))}));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createChatCompletionStream(ChatCompletionRequest(
+            QStringLiteral("gpt-4o"), {Message::user(QStringLiteral("hi"))})));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     const QList<ToolCall> calls = reply->response().toolCalls();
@@ -178,7 +179,6 @@ void TestStreaming::streamReassemblesToolCalls()
     QCOMPARE(
             calls.first().function().argumentsObject().value(QStringLiteral("location")).toString(),
             QStringLiteral("Paris"));
-    delete reply;
 }
 
 void TestStreaming::streamHttpErrorEmitsFailed()

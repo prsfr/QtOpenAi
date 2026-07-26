@@ -8,6 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestStoredCompletions : public QObject
@@ -34,14 +35,12 @@ void TestStoredCompletions::getUsesGetAndParses()
     StubServer server(completionBody());
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ChatCompletionReply *reply = client.getChatCompletion(QStringLiteral("cmpl_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.getChatCompletion(QStringLiteral("cmpl_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/chat/completions/cmpl_1 "));
     QCOMPARE(reply->response().id(), QStringLiteral("cmpl_1"));
-    delete reply;
 }
 
 void TestStoredCompletions::listUsesGetWithPagination()
@@ -55,9 +54,8 @@ void TestStoredCompletions::listUsesGetWithPagination()
     ListParams params;
     params.limit = 5;
     params.after = QStringLiteral("cmpl_0");
-    ChatCompletionListReply *reply = client.listChatCompletions(params);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listChatCompletions(params));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/chat/completions?"));
@@ -65,7 +63,6 @@ void TestStoredCompletions::listUsesGetWithPagination()
     QVERIFY(server.requestLine().contains("after=cmpl_0"));
     QCOMPARE(reply->list().size(), 1);
     QVERIFY(reply->list().hasMore);
-    delete reply;
 }
 
 void TestStoredCompletions::deleteUsesDelete()
@@ -73,14 +70,12 @@ void TestStoredCompletions::deleteUsesDelete()
     StubServer server(R"({"id":"cmpl_1","object":"chat.completion.deleted","deleted":true})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ChatCompletionReply *reply = client.deleteChatCompletion(QStringLiteral("cmpl_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.deleteChatCompletion(QStringLiteral("cmpl_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("DELETE /v1/chat/completions/cmpl_1 "));
     QCOMPARE(reply->response().object(), QStringLiteral("chat.completion.deleted"));
-    delete reply;
 }
 
 void TestStoredCompletions::listMessagesUsesGet()
@@ -90,15 +85,12 @@ void TestStoredCompletions::listMessagesUsesGet()
         "first_id":"msg_1","last_id":"msg_1","has_more":false})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ChatCompletionMessageListReply *reply
-            = client.listChatCompletionMessages(QStringLiteral("cmpl_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listChatCompletionMessages(QStringLiteral("cmpl_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/chat/completions/cmpl_1/messages "));
     QCOMPARE(reply->list().size(), 1);
-    delete reply;
 }
 
 QTEST_MAIN(TestStoredCompletions)

@@ -5,6 +5,11 @@ on:
     branches: ["**"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      all_platforms:
+        description: "Build and test on macOS and Windows as well as Linux"
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,26 +31,51 @@ jobs:
           git ls-files '*.cpp' '*.h'
           | xargs clang-format --dry-run --Werror
 
+  # Which platforms build-and-test runs on. Until 1.0 that is Linux only: this
+  # is a Qt library with no platform-specific code, so macOS and Windows were
+  # re-proving the same result at roughly twice the wall-clock of the Linux job.
+  # Turn the other two back on without editing this file, either way:
+  #
+  #   * repository variable CI_ALL_PLATFORMS = true  -- for every run
+  #   * "Run workflow" with "all_platforms" ticked   -- for one run
+  #
+  # Restoring all platforms unconditionally is tracked in #92 (for 1.0).
+  platforms:
+    name: Select platforms
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - name: Select platforms
+        id: select
+        env:
+          # Linux and macOS build against Qt 6.11.1. Windows uses 6.10.3 because
+          # download.qt.io serves no retrievable checksum for the entire Qt 6.11
+          # Windows series (qt6_6110 and qt6_6111 Updates.xml), so aqtinstall
+          # cannot install any 6.11 patch there ("Failed to locate XML data").
+          # That is an upstream packaging gap; the library supports Qt 6.4+, so
+          # the compiler coverage holds either way.
+          LINUX_ONLY: >-
+            {"include":[{"os":"ubuntu-latest","qt_version":"6.11.1"}]}
+          ALL: >-
+            {"include":[{"os":"ubuntu-latest","qt_version":"6.11.1"},
+            {"os":"macos-latest","qt_version":"6.11.1"},
+            {"os":"windows-latest","qt_version":"6.10.3"}]}
+          REQUESTED: ${{ inputs.all_platforms || vars.CI_ALL_PLATFORMS }}
+        run: |
+          if [ "$REQUESTED" = "true" ]; then
+            echo "matrix=$(echo "$ALL" | tr -d ' \n')" >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix=$(echo "$LINUX_ONLY" | tr -d ' \n')" >> "$GITHUB_OUTPUT"
+          fi
+
   build-and-test:
     name: ${{ matrix.os }} / Qt ${{ matrix.qt_version }}
+    needs: platforms
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      # Linux and macOS build & test against Qt 6.11.1. Windows uses 6.10.3
-      # because download.qt.io currently serves no retrievable checksum for the
-      # entire Qt 6.11 Windows series (qt6_6110 and qt6_6111 Updates.xml), so
-      # aqtinstall cannot install any 6.11 patch on Windows ("Failed to locate
-      # XML data"). This is an upstream packaging gap; see the tracking issue to
-      # restore Windows to 6.11 once the checksums are published. The library
-      # itself supports Qt 6.4+, so the compiler/platform coverage still holds.
-      matrix:
-        include:
-          - os: ubuntu-latest
-            qt_version: "6.11.1"
-          - os: macos-latest
-            qt_version: "6.11.1"
-          - os: windows-latest
-            qt_version: "6.10.3"
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
 
     steps:
       - name: Checkout

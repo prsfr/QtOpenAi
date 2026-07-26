@@ -8,6 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestResponsesClient : public QObject
@@ -43,16 +44,14 @@ void TestResponsesClient::createResponsePostsAndParses()
     StubServer server(200, responseBody());
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ResponseReply *reply
-            = client.createResponse(ResponseRequest(QStringLiteral("gpt-5"), QStringLiteral("hi")));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(
+            client.createResponse(ResponseRequest(QStringLiteral("gpt-5"), QStringLiteral("hi"))));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/responses "));
     QCOMPARE(reply->response().id(), QStringLiteral("resp_1"));
     QCOMPARE(reply->response().outputText(), QStringLiteral("hi"));
-    delete reply;
 }
 
 void TestResponsesClient::getResponseUsesGet()
@@ -60,13 +59,11 @@ void TestResponsesClient::getResponseUsesGet()
     StubServer server(200, responseBody());
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ResponseReply *reply = client.getResponse(QStringLiteral("resp_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.getResponse(QStringLiteral("resp_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/responses/resp_1 "));
-    delete reply;
 }
 
 void TestResponsesClient::cancelResponsePostsToCancel()
@@ -74,14 +71,12 @@ void TestResponsesClient::cancelResponsePostsToCancel()
     StubServer server(200, responseBody("cancelled"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ResponseReply *reply = client.cancelResponse(QStringLiteral("resp_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.cancelResponse(QStringLiteral("resp_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/responses/resp_1/cancel "));
     QCOMPARE(reply->response().status(), QStringLiteral("cancelled"));
-    delete reply;
 }
 
 void TestResponsesClient::deleteResponseUsesDelete()
@@ -89,14 +84,12 @@ void TestResponsesClient::deleteResponseUsesDelete()
     StubServer server(200, R"({"id":"resp_1","object":"response.deleted","deleted":true})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ResponseReply *reply = client.deleteResponse(QStringLiteral("resp_1"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.deleteResponse(QStringLiteral("resp_1")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("DELETE /v1/responses/resp_1 "));
     QCOMPARE(reply->response().object(), QStringLiteral("response.deleted"));
-    delete reply;
 }
 
 void TestResponsesClient::httpErrorSurfacesMessage()
@@ -105,14 +98,12 @@ void TestResponsesClient::httpErrorSurfacesMessage()
     Client client(server.baseUrl(), QStringLiteral("k"));
     client.setRetryPolicy(RetryPolicy::none());
 
-    ResponseReply *reply = client.getResponse(QStringLiteral("missing"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.getResponse(QStringLiteral("missing")));
+    QVERIFY(reply);
 
     QVERIFY(!reply->isSuccess());
     QCOMPARE(reply->error().httpStatus(), 404);
     QCOMPARE(reply->error().message(), QStringLiteral("No response found"));
-    delete reply;
 }
 
 void TestResponsesClient::listsInputItemsWithPagination()
@@ -127,9 +118,8 @@ void TestResponsesClient::listsInputItemsWithPagination()
 
     ListParams params;
     params.limit = 2;
-    ConversationItemsReply *reply = client.listResponseInputItems(QStringLiteral("resp_1"), params);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listResponseInputItems(QStringLiteral("resp_1"), params));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/responses/resp_1/input_items?"));
@@ -137,7 +127,6 @@ void TestResponsesClient::listsInputItemsWithPagination()
     QCOMPARE(reply->items().size(), 2);
     QCOMPARE(reply->items().lastId, QStringLiteral("msg_2"));
     QVERIFY(!reply->items().hasMore);
-    delete reply;
 }
 
 void TestResponsesClient::compactsAStoredResponse()
@@ -145,10 +134,9 @@ void TestResponsesClient::compactsAStoredResponse()
     StubServer server(QByteArray(R"({"id":"resp_1","object":"response","status":"completed"})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ResponseReply *reply = client.compactResponse(QStringLiteral("resp_1"),
-                                                  QJsonObject {{QStringLiteral("keep_last"), 4}});
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.compactResponse(
+            QStringLiteral("resp_1"), QJsonObject {{QStringLiteral("keep_last"), 4}}));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/responses/compact "));
@@ -156,7 +144,6 @@ void TestResponsesClient::compactsAStoredResponse()
     // Unmodelled fields are passed through rather than dropped.
     QVERIFY(server.requestBody().contains("\"keep_last\":4"));
     QCOMPARE(reply->response().id(), QStringLiteral("resp_1"));
-    delete reply;
 }
 
 void TestResponsesClient::countsInputTokens()
@@ -165,9 +152,8 @@ void TestResponsesClient::countsInputTokens()
     Client client(server.baseUrl(), QStringLiteral("k"));
 
     ResponseRequest request(QStringLiteral("gpt-4o-mini"), QStringLiteral("hello"));
-    InputTokensReply *reply = client.countResponseInputTokens(request);
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.countResponseInputTokens(request));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/responses/input_tokens "));
@@ -176,7 +162,6 @@ void TestResponsesClient::countsInputTokens()
     // The whole payload stays reachable for fields this library does not name.
     QCOMPARE(reply->object().value(QStringLiteral("object")).toString(),
              QStringLiteral("response.input_tokens"));
-    delete reply;
 }
 
 QTEST_MAIN(TestResponsesClient)

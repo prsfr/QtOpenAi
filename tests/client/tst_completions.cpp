@@ -8,6 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestCompletionsClient : public QObject
@@ -26,16 +27,14 @@ void TestCompletionsClient::createPostsAndParses()
         "total_tokens":2}})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    CompletionReply *reply = client.createCompletion(
-            CompletionRequest(QStringLiteral("davinci-002"), QStringLiteral("Hello")));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createCompletion(
+            CompletionRequest(QStringLiteral("davinci-002"), QStringLiteral("Hello"))));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/completions "));
     QVERIFY(server.requestBody().contains("\"prompt\":\"Hello\""));
     QCOMPARE(reply->response().firstText(), QStringLiteral(" world"));
-    delete reply;
 }
 
 void TestCompletionsClient::networkErrorIsReported()
@@ -44,14 +43,12 @@ void TestCompletionsClient::networkErrorIsReported()
     Client client(QUrl(QStringLiteral("http://127.0.0.1:1/v1")), QStringLiteral("k"));
     client.setRetryPolicy(RetryPolicy::none());
 
-    CompletionReply *reply
-            = client.createCompletion(CompletionRequest(QStringLiteral("m"), QStringLiteral("x")));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(
+            client.createCompletion(CompletionRequest(QStringLiteral("m"), QStringLiteral("x"))));
+    QVERIFY(reply);
 
     QVERIFY(!reply->isSuccess());
     QVERIFY(reply->error().isError());
-    delete reply;
 }
 
 QTEST_MAIN(TestCompletionsClient)

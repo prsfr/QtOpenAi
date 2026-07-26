@@ -8,6 +8,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
+#include "support/AwaitedReply.h"
 #include "support/StubServer.h"
 
 class TestEmbeddingsAndModelsClient : public QObject
@@ -26,16 +27,14 @@ void TestEmbeddingsAndModelsClient::createEmbeddingsPostsAndParses()
         "model":"text-embedding-3-small","usage":{"prompt_tokens":1,"total_tokens":1}})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    EmbeddingReply *reply = client.createEmbeddings(
-            EmbeddingRequest(QStringLiteral("text-embedding-3-small"), QStringLiteral("hi")));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.createEmbeddings(
+            EmbeddingRequest(QStringLiteral("text-embedding-3-small"), QStringLiteral("hi"))));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/embeddings "));
     QVERIFY(server.requestBody().contains("\"input\":\"hi\""));
     QCOMPARE(reply->response().firstVector().size(), 3);
-    delete reply;
 }
 
 void TestEmbeddingsAndModelsClient::listModelsUsesGet()
@@ -45,14 +44,12 @@ void TestEmbeddingsAndModelsClient::listModelsUsesGet()
         {"id":"gpt-4o-mini","object":"model","created":2,"owned_by":"openai"}]})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ModelListReply *reply = client.listModels();
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.listModels());
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/models "));
     QCOMPARE(reply->models().size(), 2);
-    delete reply;
 }
 
 void TestEmbeddingsAndModelsClient::getModelUsesGet()
@@ -60,15 +57,13 @@ void TestEmbeddingsAndModelsClient::getModelUsesGet()
     StubServer server(R"({"id":"gpt-4o","object":"model","created":1,"owned_by":"openai"})");
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    ModelReply *reply = client.getModel(QStringLiteral("gpt-4o"));
-    reply->setAutoDelete(false);
-    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    const auto reply = awaited(client.getModel(QStringLiteral("gpt-4o")));
+    QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("GET /v1/models/gpt-4o "));
     QCOMPARE(reply->model().id(), QStringLiteral("gpt-4o"));
     QCOMPARE(reply->model().ownedBy(), QStringLiteral("openai"));
-    delete reply;
 }
 
 QTEST_MAIN(TestEmbeddingsAndModelsClient)
