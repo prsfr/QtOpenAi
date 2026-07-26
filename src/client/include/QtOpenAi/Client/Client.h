@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Client/BatchListReply.h>
+#include <QtOpenAi/Client/BatchPoller.h>
+#include <QtOpenAi/Client/BatchReply.h>
 #include <QtOpenAi/Client/BinaryReply.h>
 #include <QtOpenAi/Client/ChatCompletionListReply.h>
 #include <QtOpenAi/Client/ChatCompletionMessageListReply.h>
@@ -44,6 +47,7 @@
 #include <QtOpenAi/Client/VideoReply.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
+#include <QtOpenAi/Core/CreateBatchRequest.h>
 #include <QtOpenAi/Core/CreateContainerRequest.h>
 #include <QtOpenAi/Core/CreateUploadRequest.h>
 #include <QtOpenAi/Core/CreateVectorStoreRequest.h>
@@ -449,6 +453,26 @@ public:
     // (GET /containers/{id}/files/{file_id}/content). The reply exposes the raw
     // bytes and the response Content-Type.
     BinaryReply *downloadContainerFileContent(const QString &containerId, const QString &fileId);
+
+    // --- Batch (/batches) --------------------------------------------------
+    // Queue a JSONL file of requests for asynchronous, discounted processing.
+    // The batch starts in the `validating` state; poll getBatch() (or use
+    // pollBatch()) until isTerminal(), then fetch the results from the Files API
+    // with the batch's outputFileId()/errorFileId().
+    BatchReply *createBatch(const Core::CreateBatchRequest &request);
+
+    BatchListReply *listBatches(const ListParams &params = {});
+
+    BatchReply *getBatch(const QString &batchId);
+
+    // Request cancellation. The batch moves to `cancelling` first and reaches
+    // `cancelled` once the in-flight requests have drained.
+    BatchReply *cancelBatch(const QString &batchId);
+
+    // Poll a batch until it reaches a terminal state. Returns a BatchPoller that
+    // emits progressed()/completed()/failed(); call start() on it. The poller
+    // deletes itself once it stops unless setAutoDelete(false) is used.
+    BatchPoller *pollBatch(const QString &batchId, int pollIntervalMs = 2000);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.

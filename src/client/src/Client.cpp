@@ -1169,6 +1169,48 @@ BinaryReply *Client::downloadContainerFileContent(const QString &containerId, co
     return new BinaryReply(std::move(factory), d->retryPolicy);
 }
 
+BatchReply *Client::createBatch(const Core::CreateBatchRequest &request)
+{
+    Q_D(Client);
+    const QByteArray body = compactJson(request.toJson());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = postFactory(manager, apiRequest(d, QStringLiteral("/batches")), body);
+    return new BatchReply(std::move(factory), d->retryPolicy);
+}
+
+BatchListReply *Client::listBatches(const ListParams &params)
+{
+    Q_D(Client);
+    QNetworkRequest req = apiRequest(d, QStringLiteral("/batches"));
+    applyQuery(req, params.toQuery());
+    QNetworkAccessManager *manager = networkAccessManager();
+    auto factory = getFactory(manager, req);
+    return new BatchListReply(std::move(factory), d->retryPolicy);
+}
+
+BatchReply *Client::getBatch(const QString &batchId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/batches/") + batchId;
+    auto factory = getFactory(manager, apiRequest(d, path));
+    return new BatchReply(std::move(factory), d->retryPolicy);
+}
+
+BatchReply *Client::cancelBatch(const QString &batchId)
+{
+    Q_D(Client);
+    QNetworkAccessManager *manager = networkAccessManager();
+    const QString path = QStringLiteral("/batches/") + batchId + QStringLiteral("/cancel");
+    auto factory = postFactory(manager, apiRequest(d, path));
+    return new BatchReply(std::move(factory), d->retryPolicy);
+}
+
+BatchPoller *Client::pollBatch(const QString &batchId, int pollIntervalMs)
+{
+    return new BatchPoller(this, batchId, pollIntervalMs);
+}
+
 ModelListReply *Client::listModels()
 {
     Q_D(Client);

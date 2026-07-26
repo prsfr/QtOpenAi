@@ -26,3 +26,6 @@ qtopenai_add_example(files files.cpp)
 qtopenai_add_example(chunked_upload chunked_upload.cpp)
 qtopenai_add_example(vector_search vector_search.cpp)
 qtopenai_add_example(containers containers.cpp)
+
+# --- Batch, tuning & evals (v0.7) ---
+qtopenai_add_example(batch batch.cpp)

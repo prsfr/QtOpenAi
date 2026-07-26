@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/ClientError.h>
-#include <QtOpenAi/Client/GlobalClient.h>
+#include <QtOpenAi/Client/JobPoller.h>
 #include <QtOpenAi/Core/VideoJob.h>
-
-#include <QtCore/QObject>
 
 namespace QtOpenAi {
 namespace Client {
 
-class Client;
 class VideoPollerPrivate;
 
 // A signal-based poll-until-complete helper for Sora video jobs.
@@ -19,38 +15,20 @@ class VideoPollerPrivate;
 // /videos/{id} on a timer (via the owning Client) and reports every observed
 // state through progressed(). It stops automatically once the job reaches a
 // terminal state — emitting completed() — or when a request fails, emitting
-// failed(). Created by Client::pollVideo(); auto-deletes after it stops unless
-// disabled.
+// JobPoller::failed(). Created by Client::pollVideo(); auto-deletes after it
+// stops unless disabled.
 //
-// The get / typed-reply / isTerminal() coupling is the natural seam to
-// generalise into a shared poll-until-terminal helper if a second asynchronous
-// job type (e.g. the Batch API) lands; kept video-specific until then to avoid
-// speculative abstraction.
-class QTOPENAI_CLIENT_EXPORT VideoPoller : public QObject
+// The timer, the lifecycle flags and the auto-delete policy live in JobPoller,
+// which BatchPoller shares.
+class QTOPENAI_CLIENT_EXPORT VideoPoller : public JobPoller
 {
     Q_OBJECT
 public:
-    ~VideoPoller() override;
-
-    QString videoId() const;
-
-    // Delay between successive polls in milliseconds (default 2000).
-    int pollIntervalMs() const;
-    void setPollIntervalMs(int intervalMs);
-
-    bool isPolling() const;
-    bool isFinished() const;
+    // The polled video's id — jobId() spelled the way this endpoint spells it.
+    QString videoId() const { return jobId(); }
 
     // The most recently observed job state.
     Core::VideoJob job() const;
-
-    void setAutoDelete(bool enabled);
-    bool autoDelete() const;
-
-    // Begin polling (issues the first GET immediately). No-op if already polling.
-    void start();
-    // Stop polling without emitting completed()/failed().
-    void stop();
 
 Q_SIGNALS:
     // Emitted after every successful poll with the current job state, including
@@ -58,19 +36,14 @@ Q_SIGNALS:
     void progressed(const QtOpenAi::Core::VideoJob &job);
     // Emitted once when the job reaches a terminal state (Completed or Failed).
     void completed(const QtOpenAi::Core::VideoJob &job);
-    // Emitted once when a poll request itself fails (network/HTTP/parse).
-    void failed(const QtOpenAi::Client::ClientError &error);
 
 private:
     friend class Client;
     VideoPoller(Client *client, QString videoId, int intervalMs, QObject *parent = nullptr);
 
-    // Mark polling as finished and honour the auto-delete policy. Callers emit
-    // their terminal signal (completed/failed) around this.
-    void finish();
+    void requestPoll() override;
 
     Q_DECLARE_PRIVATE(VideoPoller)
-    QScopedPointer<VideoPollerPrivate> d_ptr;
 };
 
 } // namespace Client

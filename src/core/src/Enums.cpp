@@ -168,5 +168,47 @@ VectorStoreFileStatus vectorStoreFileStatusFromString(const QString &value)
     return VectorStoreFileStatus::InProgress;
 }
 
+QString batchStatusToString(BatchStatus status)
+{
+    switch (status) {
+    case BatchStatus::Validating:
+        return QStringLiteral("validating");
+    case BatchStatus::InProgress:
+        return QStringLiteral("in_progress");
+    case BatchStatus::Finalizing:
+        return QStringLiteral("finalizing");
+    case BatchStatus::Completed:
+        return QStringLiteral("completed");
+    case BatchStatus::Failed:
+        return QStringLiteral("failed");
+    case BatchStatus::Expired:
+        return QStringLiteral("expired");
+    case BatchStatus::Cancelling:
+        return QStringLiteral("cancelling");
+    case BatchStatus::Cancelled:
+        return QStringLiteral("cancelled");
+    }
+    return QStringLiteral("validating");
+}
+
+BatchStatus batchStatusFromString(const QString &value)
+{
+    if (value == QLatin1String("in_progress"))
+        return BatchStatus::InProgress;
+    if (value == QLatin1String("finalizing"))
+        return BatchStatus::Finalizing;
+    if (value == QLatin1String("completed"))
+        return BatchStatus::Completed;
+    if (value == QLatin1String("failed"))
+        return BatchStatus::Failed;
+    if (value == QLatin1String("expired"))
+        return BatchStatus::Expired;
+    if (value == QLatin1String("cancelling"))
+        return BatchStatus::Cancelling;
+    if (value == QLatin1String("cancelled"))
+        return BatchStatus::Cancelled;
+    return BatchStatus::Validating;
+}
+
 } // namespace Core
 } // namespace QtOpenAi

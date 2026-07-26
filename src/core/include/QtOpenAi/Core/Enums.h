@@ -74,6 +74,21 @@ enum class VectorStoreFileStatus {
 };
 Q_ENUM_NS(VectorStoreFileStatus)
 
+// The lifecycle state of a batch job (Batch API). Mirrors the OpenAI `status`
+// field. A batch is terminal once it reaches Completed, Failed, Expired or
+// Cancelled; Validating, InProgress, Finalizing and Cancelling are transient.
+enum class BatchStatus {
+    Validating,
+    InProgress,
+    Finalizing,
+    Completed,
+    Failed,
+    Expired,
+    Cancelling,
+    Cancelled,
+};
+Q_ENUM_NS(BatchStatus)
+
 // Convert a Role to/from its OpenAI wire representation.
 QTOPENAI_CORE_EXPORT QString roleToString(Role role);
 QTOPENAI_CORE_EXPORT Role roleFromString(const QString &value);
@@ -102,6 +117,12 @@ QTOPENAI_CORE_EXPORT VectorStoreStatus vectorStoreStatusFromString(const QString
 // unrecognised value decodes to InProgress (the initial state).
 QTOPENAI_CORE_EXPORT QString vectorStoreFileStatusToString(VectorStoreFileStatus status);
 QTOPENAI_CORE_EXPORT VectorStoreFileStatus vectorStoreFileStatusFromString(const QString &value);
+
+// Convert a BatchStatus to/from its OpenAI wire representation. An unrecognised
+// value decodes to Validating (the initial, non-terminal state), so a client
+// polling an unfamiliar status keeps waiting instead of stopping early.
+QTOPENAI_CORE_EXPORT QString batchStatusToString(BatchStatus status);
+QTOPENAI_CORE_EXPORT BatchStatus batchStatusFromString(const QString &value);
 
 } // namespace Core
 } // namespace QtOpenAi

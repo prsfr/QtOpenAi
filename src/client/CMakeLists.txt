@@ -33,6 +33,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/VideoReply.h
     include/QtOpenAi/Client/VideoListReply.h
     include/QtOpenAi/Client/VideoContentReply.h
+    include/QtOpenAi/Client/JobPoller.h
     include/QtOpenAi/Client/VideoPoller.h
     include/QtOpenAi/Client/UploadReply.h
     include/QtOpenAi/Client/UploadPartReply.h
@@ -48,6 +49,9 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ContainerListReply.h
     include/QtOpenAi/Client/ContainerFileReply.h
     include/QtOpenAi/Client/ContainerFileListReply.h
+    include/QtOpenAi/Client/BatchReply.h
+    include/QtOpenAi/Client/BatchListReply.h
+    include/QtOpenAi/Client/BatchPoller.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -58,6 +62,7 @@ add_library(QtOpenAiClient
     src/RestReplyBase_p.h
     src/SseParser_p.h
     src/Multipart_p.h
+    src/JobPoller_p.h
     src/ToolRegistry.cpp
     src/ClientError.cpp
     src/RetryPolicy.cpp
@@ -87,6 +92,7 @@ add_library(QtOpenAiClient
     src/VideoReply.cpp
     src/VideoListReply.cpp
     src/VideoContentReply.cpp
+    src/JobPoller.cpp
     src/VideoPoller.cpp
     src/UploadReply.cpp
     src/UploadPartReply.cpp
@@ -102,6 +108,9 @@ add_library(QtOpenAiClient
     src/ContainerListReply.cpp
     src/ContainerFileReply.cpp
     src/ContainerFileListReply.cpp
+    src/BatchReply.cpp
+    src/BatchListReply.cpp
+    src/BatchPoller.cpp
     src/Client.cpp
 )
 
