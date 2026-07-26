@@ -345,6 +345,26 @@ same `TranscriptionReply`. For the plain `text` / `srt` / `vtt` response formats
 the transcript is surfaced through `response().text()`. The internal multipart
 builder is reused by the other file-upload endpoints (image edits, ...).
 
+## Custom voices (`/audio/voices`, `/audio/voice_consents`)
+
+A cloned voice needs a recorded consent first; both uploads are multipart:
+
+```cpp
+Core::CreateVoiceConsentRequest consent("Jane Doe", "en", consentBytes, "consent.wav");
+auto *recorded = client.createVoiceConsent(consent);
+
+// ... then, citing the consent's id:
+Core::CreateVoiceRequest voice("Narrator", consentId, sampleBytes, "sample.wav");
+auto *created = client.createVoice(voice);
+```
+
+`listVoiceConsents`, `getVoiceConsent`, `updateVoiceConsent` and
+`deleteVoiceConsent` complete the consent CRUD; consents are cursor-paginated
+like every other list endpoint, so `PageWalker` iterates them. `voiceStatus()`
+and `consentStatus()` stay strings — the spec does not pin their value sets
+down, so provider values survive a round-trip instead of collapsing into a
+guessed enum. Note the API defines no list endpoint for voices, only creation.
+
 ## Images (`/images/generations`, `/edits`, `/variations`)
 
 Generate images from a prompt, or edit/vary an existing one. Generation is a
@@ -788,6 +808,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `embeddings`        | Embeddings (`/embeddings`)                            |
 | `moderations`       | Moderation (`/moderations`)                           |
 | `tts`               | Text-to-speech (`/audio/speech`)                      |
+| `voice_cloning`     | Custom voice: consent → voice (`/audio/voices`)      |
 | `transcribe`        | Speech-to-text (`/audio/transcriptions`)             |
 | `image`             | Image generation (`/images/generations`)             |
 | `video`             | Video / Sora: create → poll → download (`/videos`)   |

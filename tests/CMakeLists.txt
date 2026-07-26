@@ -77,6 +77,10 @@ qtopenai_add_test(tst_core_speech
     SOURCES core/tst_speech.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_voices
+    SOURCES core/tst_voices.cpp
+    LIBS QtOpenAi::Core)
+
 qtopenai_add_test(tst_core_video
     SOURCES core/tst_video.cpp
     LIBS QtOpenAi::Core)
@@ -192,4 +196,8 @@ qtopenai_add_test(tst_client_finetuning
 
 qtopenai_add_test(tst_client_pagination
     SOURCES client/tst_pagination.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_voices
+    SOURCES client/tst_voices.cpp
     LIBS QtOpenAi::Client)
