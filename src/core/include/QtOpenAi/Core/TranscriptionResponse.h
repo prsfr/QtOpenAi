@@ -72,8 +72,26 @@ public:
     QString text() const;
     void setText(const QString &text);
 
+    // Byte offset the decoder seeked to before this segment; 0 when absent.
+    int seek() const;
+    void setSeek(int seek);
+
+    // The sampling temperature this segment was decoded at.
+    double temperature() const;
+    void setTemperature(double temperature);
+
     double avgLogprob() const;
     void setAvgLogprob(double avgLogprob);
+
+    // gzip compression ratio of the segment's text. A high value (above ~2.4)
+    // means the text repeats itself, the usual sign of a hallucinated segment.
+    double compressionRatio() const;
+    void setCompressionRatio(double compressionRatio);
+
+    // Probability that the segment is silence. Combined with avgLogprob it is
+    // how callers filter out segments transcribed from nothing.
+    double noSpeechProb() const;
+    void setNoSpeechProb(double noSpeechProb);
 
     QJsonObject toJson() const;
     static TranscriptionSegment fromJson(const QJsonObject &json);
@@ -105,6 +123,11 @@ public:
 
     QString text() const;
     void setText(const QString &text);
+
+    // The task the audio was run through, "transcribe" or "translate"
+    // (verbose_json); empty otherwise.
+    QString task() const;
+    void setTask(const QString &task);
 
     QString language() const;
     void setLanguage(const QString &language);
