@@ -38,6 +38,13 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
   typed `finished(...)` signal, a getter named the way that endpoint names its
   payload, and the one line that fires the signal. The streaming replies, which
   carry real state, still derive from `RestReplyBase` directly.
+* **One request path** — the ~100 endpoint methods on `Client` are each a
+  single call into one of four private helpers (`get`, `post`, `postMultipart`,
+  `remove`). Building the request, merging the query, capturing a retry factory
+  and attaching the `RetryPolicy` happen in exactly one place, so a change to
+  how requests are made reaches every endpoint at once. Endpoint paths are
+  composed from a table of collection constants rather than spelled out at each
+  call site.
 * **Qt coding style** — getters are `content()` not `getContent()`; setters are
   `setContent()`; enums are exposed via `Q_ENUM`/`Q_NAMESPACE`.
 
@@ -788,6 +795,11 @@ client.setDefaultHeader("X-My-Header", "value");
 // Every POST carries a generated Idempotency-Key so a retried create call
 // cannot be charged twice. On by default; every attempt shares one key.
 client.setIdempotencyKeysEnabled(false); // opt out if a provider dislikes it
+
+// Bring your own QNetworkAccessManager (proxies, custom SSL, a test double).
+// The client does not take ownership -- it stays yours to delete. Left unset,
+// the client creates one on first use, parented to itself.
+client.setNetworkAccessManager(myManager);
 
 // Rate-limit headroom from the last response's headers:
 connect(reply, &Client::ChatCompletionReply::finished, this, [reply] {

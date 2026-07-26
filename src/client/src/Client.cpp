@@ -23,6 +23,11 @@ constexpr auto kDefaultBaseUrl = "https://api.openai.com/v1";
 class ClientPrivate
 {
 public:
+    explicit ClientPrivate(Client *client)
+        : q(client)
+    { }
+
+    Client *q;
     QUrl baseUrl = QUrl(QLatin1String(kDefaultBaseUrl));
     QString apiKey;
     QString organization;
@@ -34,7 +39,24 @@ public:
     QString userAgent;
     QHash<QByteArray, QByteArray> defaultHeaders;
     QNetworkAccessManager *manager = nullptr;
-    bool ownsManager = false;
+
+    // Issue a request against `path` and wrap it in the reply type the endpoint
+    // returns. Every endpoint method below is one of these four calls: they hold
+    // the plumbing -- build the request, apply the query, capture a retry
+    // factory, hand it the configured RetryPolicy -- that is identical for all
+    // ~100 of them and easy to get subtly wrong when spelled out each time.
+    // Defined below the request helpers they use.
+    template <typename Reply>
+    Reply *get(const QString &path, const QUrlQuery &query = {}) const;
+    template <typename Reply>
+    Reply *post(const QString &path, const QByteArray &body = {}) const;
+    template <typename Reply>
+    Reply *postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
+                         QList<detail::FormFilePart> files) const;
+    template <typename Reply>
+    Reply *remove(const QString &path) const;
+    template <typename Reply, typename Request>
+    Reply *postStream(const QString &path, Request request) const;
 
     // Join the base URL with an endpoint path (tolerating trailing slashes) and
     // append the Azure api-version query parameter when configured.
@@ -58,24 +80,21 @@ public:
 
 Client::Client(QObject *parent)
     : QObject(parent)
-    , d_ptr(new ClientPrivate)
+    , d_ptr(new ClientPrivate(this))
 { }
 
 Client::Client(QUrl baseUrl, QString apiKey, QObject *parent)
     : QObject(parent)
-    , d_ptr(new ClientPrivate)
+    , d_ptr(new ClientPrivate(this))
 {
     Q_D(Client);
     d->baseUrl = std::move(baseUrl);
     d->apiKey = std::move(apiKey);
 }
 
-Client::~Client()
-{
-    Q_D(Client);
-    if (d->ownsManager)
-        delete d->manager;
-}
+// A manager the Client created is a child of it and dies with it; one the caller
+// installed belongs to the caller. Either way there is nothing to free here.
+Client::~Client() = default;
 
 QUrl Client::baseUrl() const
 {
@@ -215,22 +234,17 @@ QHash<QByteArray, QByteArray> Client::defaultHeaders() const
 void Client::setNetworkAccessManager(QNetworkAccessManager *manager)
 {
     Q_D(Client);
-    if (d->manager == manager)
-        return;
-    if (d->ownsManager)
-        delete d->manager;
     d->manager = manager;
-    d->ownsManager = false;
 }
 
 QNetworkAccessManager *Client::networkAccessManager() const
 {
     Q_D(const Client);
     if (!d->manager) {
-        // Lazily create an owned manager on first use.
-        auto *self = const_cast<ClientPrivate *>(d);
-        self->manager = new QNetworkAccessManager(const_cast<Client *>(this));
-        self->ownsManager = false; // parented to the Client, freed with it
+        // Lazily create one on first use, parented to the Client so it is freed
+        // with it.
+        const_cast<ClientPrivate *>(d)->manager
+                = new QNetworkAccessManager(const_cast<Client *>(this));
     }
     return d->manager;
 }
@@ -273,12 +287,6 @@ void applyIdempotencyKey(const ClientPrivate *d, QNetworkRequest &request)
         return;
     request.setRawHeader("Idempotency-Key",
                          QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8());
-}
-
-// The /chat/completions request, retaining the original spelling for callers.
-QNetworkRequest chatRequest(const ClientPrivate *d)
-{
-    return apiRequest(d, QStringLiteral("/chat/completions"));
 }
 
 // Serialise a list of output/input items to a JSON array.
@@ -331,6 +339,25 @@ std::function<QNetworkReply *()> multipartPostFactory(const ClientPrivate *d,
 // optionally a sub-resource below that — e.g. ("/vector_stores", "vs_1",
 // "/files/f_1"). Several endpoint families nest three levels deep, so building
 // them here keeps the endpoint methods free of string arithmetic.
+// The collection segment of every endpoint family. Each spelling lives here
+// once, so a path is composed rather than re-typed at each call site.
+constexpr QLatin1String kChatCompletions("/chat/completions");
+constexpr QLatin1String kResponses("/responses");
+constexpr QLatin1String kConversations("/conversations");
+constexpr QLatin1String kVideos("/videos");
+constexpr QLatin1String kFiles("/files");
+constexpr QLatin1String kUploads("/uploads");
+constexpr QLatin1String kVectorStores("/vector_stores");
+constexpr QLatin1String kContainers("/containers");
+constexpr QLatin1String kBatches("/batches");
+constexpr QLatin1String kFineTuningJobs("/fine_tuning/jobs");
+constexpr QLatin1String kFineTuningCheckpoints("/fine_tuning/checkpoints");
+constexpr QLatin1String kEvals("/evals");
+constexpr QLatin1String kRuns("/runs");
+constexpr QLatin1String kVoiceConsents("/audio/voice_consents");
+constexpr QLatin1String kModels("/models");
+constexpr QLatin1String kCompletions("/completions");
+
 QString resourcePath(QLatin1String collection, const QString &id, const QString &suffix = {})
 {
     QString path(collection);
@@ -339,40 +366,10 @@ QString resourcePath(QLatin1String collection, const QString &id, const QString 
     return path + suffix;
 }
 
-QString vectorStorePath(const QString &vectorStoreId, const QString &suffix = {})
-{
-    return resourcePath(QLatin1String("/vector_stores"), vectorStoreId, suffix);
-}
-
-QString containerPath(const QString &containerId, const QString &suffix = {})
-{
-    return resourcePath(QLatin1String("/containers"), containerId, suffix);
-}
-
-QString fineTuningJobPath(const QString &jobId, const QString &suffix = {})
-{
-    return resourcePath(QLatin1String("/fine_tuning/jobs"), jobId, suffix);
-}
-
-QString voiceConsentPath(const QString &consentId, const QString &suffix = {})
-{
-    return resourcePath(QLatin1String("/audio/voice_consents"), consentId, suffix);
-}
-
-QString fineTuningCheckpointPath(const QString &checkpointId, const QString &suffix = {})
-{
-    return resourcePath(QLatin1String("/fine_tuning/checkpoints"), checkpointId, suffix);
-}
-
-QString evalPath(const QString &evalId, const QString &suffix = {})
-{
-    return resourcePath(QLatin1String("/evals"), evalId, suffix);
-}
-
 // Runs nest below an eval, so their paths compose two levels of resourcePath().
 QString evalRunPath(const QString &evalId, const QString &runId, const QString &suffix = {})
 {
-    return evalPath(evalId, resourcePath(QLatin1String("/runs"), runId, suffix));
+    return resourcePath(kEvals, evalId, resourcePath(kRuns, runId, suffix));
 }
 
 // Serialise a list of ids to a JSON array.
@@ -414,117 +411,113 @@ std::function<QNetworkReply *()> postFactory(const ClientPrivate *d, QNetworkAcc
 
 } // namespace
 
+template <typename Reply>
+Reply *ClientPrivate::get(const QString &path, const QUrlQuery &query) const
+{
+    QNetworkRequest request = apiRequest(this, path);
+    applyQuery(request, query);
+    return Client::makeReply<Reply>(getFactory(q->networkAccessManager(), std::move(request)),
+                                    retryPolicy);
+}
+
+template <typename Reply>
+Reply *ClientPrivate::post(const QString &path, const QByteArray &body) const
+{
+    return Client::makeReply<Reply>(
+            postFactory(this, q->networkAccessManager(), apiRequest(this, path), body),
+            retryPolicy);
+}
+
+template <typename Reply>
+Reply *ClientPrivate::postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
+                                    QList<detail::FormFilePart> files) const
+{
+    return Client::makeReply<Reply>(multipartPostFactory(this, q->networkAccessManager(),
+                                                         apiRequest(this, path), std::move(fields),
+                                                         std::move(files)),
+                                    retryPolicy);
+}
+
+template <typename Reply>
+Reply *ClientPrivate::remove(const QString &path) const
+{
+    return Client::makeReply<Reply>(
+            deleteFactory(q->networkAccessManager(), apiRequest(this, path)), retryPolicy);
+}
+
+// The streaming endpoints deliberately sit outside the retry machinery: an SSE
+// response is consumed incrementally, so a failure part-way through cannot be
+// replayed from the start. `request` is taken by value because streaming has to
+// be forced on -- on our copy, leaving the caller's request untouched.
+template <typename Reply, typename Request>
+Reply *ClientPrivate::postStream(const QString &path, Request request) const
+{
+    request.setStream(true);
+    QNetworkRequest networkRequest = apiRequest(this, path);
+    networkRequest.setRawHeader("Accept", "text/event-stream");
+    return Client::makeReply<Reply>(
+            q->networkAccessManager()->post(networkRequest, compactJson(request.toJson())));
+}
+
 ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    // Capture what a retry needs to re-issue the request.
-    auto factory = postFactory(d, manager, chatRequest(d), body);
-    return new ChatCompletionReply(std::move(factory), d->retryPolicy);
+    return d->post<ChatCompletionReply>(kChatCompletions, compactJson(request.toJson()));
 }
 
 ModerationReply *Client::createModeration(const Core::ModerationRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/moderations")), body);
-    return new ModerationReply(std::move(factory), d->retryPolicy);
+    return d->post<ModerationReply>(QStringLiteral("/moderations"), compactJson(request.toJson()));
 }
 
 CompletionReply *Client::createCompletion(const Core::CompletionRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/completions")), body);
-    return new CompletionReply(std::move(factory), d->retryPolicy);
+    return d->post<CompletionReply>(QStringLiteral("/completions"), compactJson(request.toJson()));
 }
 
 CompletionStreamReply *Client::createCompletionStream(const Core::CompletionRequest &request)
 {
     Q_D(Client);
-
-    // Force streaming on a copy so the caller's request is left untouched.
-    Core::CompletionRequest streamed = request;
-    streamed.setStream(true);
-
-    QNetworkRequest networkRequest = apiRequest(d, QStringLiteral("/completions"));
-    networkRequest.setRawHeader("Accept", "text/event-stream");
-
-    const QByteArray body = compactJson(streamed.toJson());
-    QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
-    return new CompletionStreamReply(reply);
+    return d->postStream<CompletionStreamReply>(kCompletions, request);
 }
 
 ChatCompletionStreamReply *
 Client::createChatCompletionStream(const Core::ChatCompletionRequest &request)
 {
     Q_D(Client);
-
-    // Force streaming on a copy so the caller's request is left untouched.
-    Core::ChatCompletionRequest streamed = request;
-    streamed.setStream(true);
-
-    QNetworkRequest networkRequest = chatRequest(d);
-    networkRequest.setRawHeader("Accept", "text/event-stream");
-
-    const QByteArray body = compactJson(streamed.toJson());
-    QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
-    return new ChatCompletionStreamReply(reply);
+    return d->postStream<ChatCompletionStreamReply>(kChatCompletions, request);
 }
 
 ResponseReply *Client::createResponse(const Core::ResponseRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/responses")), body);
-    return new ResponseReply(std::move(factory), d->retryPolicy);
+    return d->post<ResponseReply>(kResponses, compactJson(request.toJson()));
 }
 
 ResponseStreamReply *Client::createResponseStream(const Core::ResponseRequest &request)
 {
     Q_D(Client);
-
-    // Force streaming on a copy so the caller's request is left untouched.
-    Core::ResponseRequest streamed = request;
-    streamed.setStream(true);
-
-    QNetworkRequest networkRequest = apiRequest(d, QStringLiteral("/responses"));
-    networkRequest.setRawHeader("Accept", "text/event-stream");
-
-    const QByteArray body = compactJson(streamed.toJson());
-    QNetworkReply *reply = networkAccessManager()->post(networkRequest, body);
-    return new ResponseStreamReply(reply);
+    return d->postStream<ResponseStreamReply>(kResponses, request);
 }
 
 ResponseReply *Client::getResponse(const QString &responseId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/responses/") + responseId;
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new ResponseReply(std::move(factory), d->retryPolicy);
+    return d->get<ResponseReply>(resourcePath(kResponses, responseId));
 }
 
 ResponseReply *Client::cancelResponse(const QString &responseId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/responses/") + responseId + QStringLiteral("/cancel");
-    auto factory = postFactory(d, manager, apiRequest(d, path));
-    return new ResponseReply(std::move(factory), d->retryPolicy);
+    return d->post<ResponseReply>(resourcePath(kResponses, responseId, QStringLiteral("/cancel")));
 }
 
 ResponseReply *Client::deleteResponse(const QString &responseId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/responses/") + responseId;
-    auto factory = deleteFactory(manager, apiRequest(d, path));
-    return new ResponseReply(std::move(factory), d->retryPolicy);
+    return d->remove<ResponseReply>(resourcePath(kResponses, responseId));
 }
 
 ConversationReply *Client::createConversation(const QJsonObject &metadata,
@@ -536,19 +529,13 @@ ConversationReply *Client::createConversation(const QJsonObject &metadata,
         bodyObject.insert(QStringLiteral("metadata"), metadata);
     if (!items.isEmpty())
         bodyObject.insert(QStringLiteral("items"), itemsToArray(items));
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/conversations")), body);
-    return new ConversationReply(std::move(factory), d->retryPolicy);
+    return d->post<ConversationReply>(kConversations, compactJson(bodyObject));
 }
 
 ConversationReply *Client::getConversation(const QString &conversationId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/conversations/") + conversationId;
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new ConversationReply(std::move(factory), d->retryPolicy);
+    return d->get<ConversationReply>(resourcePath(kConversations, conversationId));
 }
 
 ConversationReply *Client::updateConversation(const QString &conversationId,
@@ -557,20 +544,14 @@ ConversationReply *Client::updateConversation(const QString &conversationId,
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("metadata"), metadata);
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/conversations/") + conversationId;
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new ConversationReply(std::move(factory), d->retryPolicy);
+    return d->post<ConversationReply>(resourcePath(kConversations, conversationId),
+                                      compactJson(bodyObject));
 }
 
 ConversationReply *Client::deleteConversation(const QString &conversationId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/conversations/") + conversationId;
-    auto factory = deleteFactory(manager, apiRequest(d, path));
-    return new ConversationReply(std::move(factory), d->retryPolicy);
+    return d->remove<ConversationReply>(resourcePath(kConversations, conversationId));
 }
 
 ResponseReply *Client::compactResponse(const QString &responseId, const QJsonObject &extra)
@@ -584,44 +565,29 @@ ResponseReply *Client::compactResponse(const QString &responseId, const QJsonObj
         if (!bodyObject.contains(it.key()))
             bodyObject.insert(it.key(), it.value());
     }
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory
-            = postFactory(d, manager, apiRequest(d, QStringLiteral("/responses/compact")), body);
-    return new ResponseReply(std::move(factory), d->retryPolicy);
+    return d->post<ResponseReply>(QStringLiteral("/responses/compact"), compactJson(bodyObject));
 }
 
 InputTokensReply *Client::countResponseInputTokens(const Core::ResponseRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/responses/input_tokens")),
-                               body);
-    return new InputTokensReply(std::move(factory), d->retryPolicy);
+    return d->post<InputTokensReply>(QStringLiteral("/responses/input_tokens"),
+                                     compactJson(request.toJson()));
 }
 
 ConversationItemsReply *Client::listResponseInputItems(const QString &responseId,
                                                        const ListParams &params)
 {
     Q_D(Client);
-    const QString path
-            = QStringLiteral("/responses/") + responseId + QStringLiteral("/input_items");
-    QNetworkRequest req = apiRequest(d, path);
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new ConversationItemsReply(std::move(factory), d->retryPolicy);
+    return d->get<ConversationItemsReply>(
+            resourcePath(kResponses, responseId, QStringLiteral("/input_items")), params.toQuery());
 }
 
 ConversationItemsReply *Client::listConversationItems(const QString &conversationId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path
-            = QStringLiteral("/conversations/") + conversationId + QStringLiteral("/items");
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new ConversationItemsReply(std::move(factory), d->retryPolicy);
+    return d->get<ConversationItemsReply>(
+            resourcePath(kConversations, conversationId, QStringLiteral("/items")));
 }
 
 ConversationItemsReply *
@@ -631,53 +597,37 @@ Client::createConversationItems(const QString &conversationId,
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("items"), itemsToArray(items));
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path
-            = QStringLiteral("/conversations/") + conversationId + QStringLiteral("/items");
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new ConversationItemsReply(std::move(factory), d->retryPolicy);
+    return d->post<ConversationItemsReply>(
+            resourcePath(kConversations, conversationId, QStringLiteral("/items")),
+            compactJson(bodyObject));
 }
 
 ConversationItemsReply *Client::getConversationItem(const QString &conversationId,
                                                     const QString &itemId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/conversations/") + conversationId
-                         + QStringLiteral("/items/") + itemId;
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new ConversationItemsReply(std::move(factory), d->retryPolicy);
+    return d->get<ConversationItemsReply>(
+            resourcePath(kConversations, conversationId, QStringLiteral("/items/") + itemId));
 }
 
 ConversationReply *Client::deleteConversationItem(const QString &conversationId,
                                                   const QString &itemId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/conversations/") + conversationId
-                         + QStringLiteral("/items/") + itemId;
-    auto factory = deleteFactory(manager, apiRequest(d, path));
-    return new ConversationReply(std::move(factory), d->retryPolicy);
+    return d->remove<ConversationReply>(
+            resourcePath(kConversations, conversationId, QStringLiteral("/items/") + itemId));
 }
 
 ChatCompletionListReply *Client::listChatCompletions(const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, QStringLiteral("/chat/completions"));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new ChatCompletionListReply(std::move(factory), d->retryPolicy);
+    return d->get<ChatCompletionListReply>(kChatCompletions, params.toQuery());
 }
 
 ChatCompletionReply *Client::getChatCompletion(const QString &completionId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/chat/completions/") + completionId;
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new ChatCompletionReply(std::move(factory), d->retryPolicy);
+    return d->get<ChatCompletionReply>(resourcePath(kChatCompletions, completionId));
 }
 
 ChatCompletionReply *Client::updateChatCompletion(const QString &completionId,
@@ -686,100 +636,73 @@ ChatCompletionReply *Client::updateChatCompletion(const QString &completionId,
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("metadata"), metadata);
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/chat/completions/") + completionId;
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new ChatCompletionReply(std::move(factory), d->retryPolicy);
+    return d->post<ChatCompletionReply>(resourcePath(kChatCompletions, completionId),
+                                        compactJson(bodyObject));
 }
 
 ChatCompletionReply *Client::deleteChatCompletion(const QString &completionId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/chat/completions/") + completionId;
-    auto factory = deleteFactory(manager, apiRequest(d, path));
-    return new ChatCompletionReply(std::move(factory), d->retryPolicy);
+    return d->remove<ChatCompletionReply>(resourcePath(kChatCompletions, completionId));
 }
 
 ChatCompletionMessageListReply *Client::listChatCompletionMessages(const QString &completionId,
                                                                    const ListParams &params)
 {
     Q_D(Client);
-    const QString path
-            = QStringLiteral("/chat/completions/") + completionId + QStringLiteral("/messages");
-    QNetworkRequest req = apiRequest(d, path);
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new ChatCompletionMessageListReply(std::move(factory), d->retryPolicy);
+    return d->get<ChatCompletionMessageListReply>(
+            resourcePath(kChatCompletions, completionId, QStringLiteral("/messages")),
+            params.toQuery());
 }
 
 EmbeddingReply *Client::createEmbeddings(const Core::EmbeddingRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/embeddings")), body);
-    return new EmbeddingReply(std::move(factory), d->retryPolicy);
+    return d->post<EmbeddingReply>(QStringLiteral("/embeddings"), compactJson(request.toJson()));
 }
 
 TranscriptionReply *Client::createTranscription(const Core::TranscriptionRequest &request)
 {
     Q_D(Client);
     detail::FormFilePart file {"file", request.fileName(), request.fileData()};
-    auto factory = multipartPostFactory(d, networkAccessManager(),
-                                        apiRequest(d, QStringLiteral("/audio/transcriptions")),
-                                        request.formFields(), {std::move(file)});
-    return new TranscriptionReply(std::move(factory), d->retryPolicy);
+    return d->postMultipart<TranscriptionReply>(QStringLiteral("/audio/transcriptions"),
+                                                request.formFields(), {std::move(file)});
 }
 
 TranscriptionReply *Client::createTranslation(const Core::TranslationRequest &request)
 {
     Q_D(Client);
     detail::FormFilePart file {"file", request.fileName(), request.fileData()};
-    auto factory = multipartPostFactory(d, networkAccessManager(),
-                                        apiRequest(d, QStringLiteral("/audio/translations")),
-                                        request.formFields(), {std::move(file)});
-    return new TranscriptionReply(std::move(factory), d->retryPolicy);
+    return d->postMultipart<TranscriptionReply>(QStringLiteral("/audio/translations"),
+                                                request.formFields(), {std::move(file)});
 }
 
 VoiceReply *Client::createVoice(const Core::CreateVoiceRequest &request)
 {
     Q_D(Client);
     detail::FormFilePart file {"audio_sample", request.fileName(), request.audioSample()};
-    auto factory = multipartPostFactory(d, networkAccessManager(),
-                                        apiRequest(d, QStringLiteral("/audio/voices")),
-                                        request.formFields(), {std::move(file)});
-    return new VoiceReply(std::move(factory), d->retryPolicy);
+    return d->postMultipart<VoiceReply>(QStringLiteral("/audio/voices"), request.formFields(),
+                                        {std::move(file)});
 }
 
 VoiceConsentReply *Client::createVoiceConsent(const Core::CreateVoiceConsentRequest &request)
 {
     Q_D(Client);
     detail::FormFilePart file {"recording", request.fileName(), request.recording()};
-    auto factory
-            = multipartPostFactory(d, networkAccessManager(), apiRequest(d, voiceConsentPath({})),
-                                   request.formFields(), {std::move(file)});
-    return new VoiceConsentReply(std::move(factory), d->retryPolicy);
+    return d->postMultipart<VoiceConsentReply>(kVoiceConsents, request.formFields(),
+                                               {std::move(file)});
 }
 
 VoiceConsentListReply *Client::listVoiceConsents(const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, voiceConsentPath({}));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new VoiceConsentListReply(std::move(factory), d->retryPolicy);
+    return d->get<VoiceConsentListReply>(kVoiceConsents, params.toQuery());
 }
 
 VoiceConsentReply *Client::getVoiceConsent(const QString &consentId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, apiRequest(d, voiceConsentPath(consentId)));
-    return new VoiceConsentReply(std::move(factory), d->retryPolicy);
+    return d->get<VoiceConsentReply>(resourcePath(kVoiceConsents, consentId));
 }
 
 VoiceConsentReply *Client::updateVoiceConsent(const QString &consentId, const QString &name)
@@ -787,28 +710,21 @@ VoiceConsentReply *Client::updateVoiceConsent(const QString &consentId, const QS
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("name"), name);
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, voiceConsentPath(consentId)), body);
-    return new VoiceConsentReply(std::move(factory), d->retryPolicy);
+    return d->post<VoiceConsentReply>(resourcePath(kVoiceConsents, consentId),
+                                      compactJson(bodyObject));
 }
 
 VoiceConsentReply *Client::deleteVoiceConsent(const QString &consentId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = deleteFactory(manager, apiRequest(d, voiceConsentPath(consentId)));
-    return new VoiceConsentReply(std::move(factory), d->retryPolicy);
+    return d->remove<VoiceConsentReply>(resourcePath(kVoiceConsents, consentId));
 }
 
 ImageReply *Client::createImage(const Core::ImageGenerationRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory
-            = postFactory(d, manager, apiRequest(d, QStringLiteral("/images/generations")), body);
-    return new ImageReply(std::move(factory), d->retryPolicy);
+    return d->post<ImageReply>(QStringLiteral("/images/generations"),
+                               compactJson(request.toJson()));
 }
 
 ImageReply *Client::createImageEdit(const Core::ImageEditRequest &request)
@@ -823,20 +739,16 @@ ImageReply *Client::createImageEdit(const Core::ImageEditRequest &request)
     if (request.hasMask())
         files.append({"mask", request.maskFileName(), request.maskData()});
 
-    auto factory = multipartPostFactory(d, networkAccessManager(),
-                                        apiRequest(d, QStringLiteral("/images/edits")),
-                                        request.formFields(), std::move(files));
-    return new ImageReply(std::move(factory), d->retryPolicy);
+    return d->postMultipart<ImageReply>(QStringLiteral("/images/edits"), request.formFields(),
+                                        std::move(files));
 }
 
 ImageReply *Client::createImageVariation(const Core::ImageVariationRequest &request)
 {
     Q_D(Client);
     detail::FormFilePart file {"image", request.fileName(), request.imageData()};
-    auto factory = multipartPostFactory(d, networkAccessManager(),
-                                        apiRequest(d, QStringLiteral("/images/variations")),
-                                        request.formFields(), {std::move(file)});
-    return new ImageReply(std::move(factory), d->retryPolicy);
+    return d->postMultipart<ImageReply>(QStringLiteral("/images/variations"), request.formFields(),
+                                        {std::move(file)});
 }
 
 VideoReply *Client::createVideo(const Core::CreateVideoRequest &request)
@@ -847,43 +759,27 @@ VideoReply *Client::createVideo(const Core::CreateVideoRequest &request)
     if (request.hasInputReference()) {
         detail::FormFilePart file {"input_reference", request.inputReferenceFileName(),
                                    request.inputReferenceData()};
-        auto factory = multipartPostFactory(d, networkAccessManager(),
-                                            apiRequest(d, QStringLiteral("/videos")),
-                                            request.formFields(), {std::move(file)});
-        return new VideoReply(std::move(factory), d->retryPolicy);
+        return d->postMultipart<VideoReply>(kVideos, request.formFields(), {std::move(file)});
     }
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/videos")), body);
-    return new VideoReply(std::move(factory), d->retryPolicy);
+    return d->post<VideoReply>(kVideos, compactJson(request.toJson()));
 }
 
 VideoReply *Client::getVideo(const QString &videoId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/videos/") + videoId;
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new VideoReply(std::move(factory), d->retryPolicy);
+    return d->get<VideoReply>(resourcePath(kVideos, videoId));
 }
 
 VideoListReply *Client::listVideos(const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, QStringLiteral("/videos"));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new VideoListReply(std::move(factory), d->retryPolicy);
+    return d->get<VideoListReply>(kVideos, params.toQuery());
 }
 
 VideoReply *Client::deleteVideo(const QString &videoId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/videos/") + videoId;
-    auto factory = deleteFactory(manager, apiRequest(d, path));
-    return new VideoReply(std::move(factory), d->retryPolicy);
+    return d->remove<VideoReply>(resourcePath(kVideos, videoId));
 }
 
 VideoReply *Client::remixVideo(const QString &videoId, const QString &prompt)
@@ -891,20 +787,14 @@ VideoReply *Client::remixVideo(const QString &videoId, const QString &prompt)
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("prompt"), prompt);
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/videos/") + videoId + QStringLiteral("/remix");
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new VideoReply(std::move(factory), d->retryPolicy);
+    return d->post<VideoReply>(resourcePath(kVideos, videoId, QStringLiteral("/remix")),
+                               compactJson(bodyObject));
 }
 
 VideoContentReply *Client::downloadVideoContent(const QString &videoId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/videos/") + videoId + QStringLiteral("/content");
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new VideoContentReply(std::move(factory), d->retryPolicy);
+    return d->get<VideoContentReply>(resourcePath(kVideos, videoId, QStringLiteral("/content")));
 }
 
 VideoPoller *Client::pollVideo(const QString &videoId, int pollIntervalMs)
@@ -915,20 +805,14 @@ VideoPoller *Client::pollVideo(const QString &videoId, int pollIntervalMs)
 SpeechReply *Client::createSpeech(const Core::SpeechRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/audio/speech")), body);
-    return new SpeechReply(std::move(factory), d->retryPolicy);
+    return d->post<SpeechReply>(QStringLiteral("/audio/speech"), compactJson(request.toJson()));
 }
 
 FileReply *Client::uploadFile(const Core::FileUploadRequest &request)
 {
     Q_D(Client);
     detail::FormFilePart file {"file", request.fileName(), request.fileData()};
-    auto factory = multipartPostFactory(d, networkAccessManager(),
-                                        apiRequest(d, QStringLiteral("/files")),
-                                        request.formFields(), {std::move(file)});
-    return new FileReply(std::move(factory), d->retryPolicy);
+    return d->postMultipart<FileReply>(kFiles, request.formFields(), {std::move(file)});
 }
 
 FileListReply *Client::listFiles(const ListParams &params, const QString &purpose)
@@ -937,47 +821,31 @@ FileListReply *Client::listFiles(const ListParams &params, const QString &purpos
     QUrlQuery query = params.toQuery();
     if (!purpose.isEmpty())
         query.addQueryItem(QStringLiteral("purpose"), purpose);
-    QNetworkRequest req = apiRequest(d, QStringLiteral("/files"));
-    applyQuery(req, query);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new FileListReply(std::move(factory), d->retryPolicy);
+    return d->get<FileListReply>(kFiles, query);
 }
 
 FileReply *Client::getFile(const QString &fileId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/files/") + fileId;
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new FileReply(std::move(factory), d->retryPolicy);
+    return d->get<FileReply>(resourcePath(kFiles, fileId));
 }
 
 FileReply *Client::deleteFile(const QString &fileId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/files/") + fileId;
-    auto factory = deleteFactory(manager, apiRequest(d, path));
-    return new FileReply(std::move(factory), d->retryPolicy);
+    return d->remove<FileReply>(resourcePath(kFiles, fileId));
 }
 
 BinaryReply *Client::downloadFileContent(const QString &fileId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/files/") + fileId + QStringLiteral("/content");
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new BinaryReply(std::move(factory), d->retryPolicy);
+    return d->get<BinaryReply>(resourcePath(kFiles, fileId, QStringLiteral("/content")));
 }
 
 UploadReply *Client::createUpload(const Core::CreateUploadRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/uploads")), body);
-    return new UploadReply(std::move(factory), d->retryPolicy);
+    return d->post<UploadReply>(kUploads, compactJson(request.toJson()));
 }
 
 UploadPartReply *Client::addUploadPart(const QString &uploadId, const QByteArray &data)
@@ -985,10 +853,8 @@ UploadPartReply *Client::addUploadPart(const QString &uploadId, const QByteArray
     Q_D(Client);
     // The chunk is the multipart `data` part; the filename is cosmetic here.
     detail::FormFilePart part {"data", QStringLiteral("part"), data};
-    const QString path = QStringLiteral("/uploads/") + uploadId + QStringLiteral("/parts");
-    auto factory = multipartPostFactory(d, networkAccessManager(), apiRequest(d, path), {},
-                                        {std::move(part)});
-    return new UploadPartReply(std::move(factory), d->retryPolicy);
+    return d->postMultipart<UploadPartReply>(
+            resourcePath(kUploads, uploadId, QStringLiteral("/parts")), {}, {std::move(part)});
 }
 
 UploadReply *Client::completeUpload(const QString &uploadId, const QStringList &partIds,
@@ -1002,20 +868,14 @@ UploadReply *Client::completeUpload(const QString &uploadId, const QStringList &
     bodyObject.insert(QStringLiteral("part_ids"), ids);
     if (!md5.isEmpty())
         bodyObject.insert(QStringLiteral("md5"), md5);
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/uploads/") + uploadId + QStringLiteral("/complete");
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new UploadReply(std::move(factory), d->retryPolicy);
+    return d->post<UploadReply>(resourcePath(kUploads, uploadId, QStringLiteral("/complete")),
+                                compactJson(bodyObject));
 }
 
 UploadReply *Client::cancelUpload(const QString &uploadId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/uploads/") + uploadId + QStringLiteral("/cancel");
-    auto factory = postFactory(d, manager, apiRequest(d, path));
-    return new UploadReply(std::move(factory), d->retryPolicy);
+    return d->post<UploadReply>(resourcePath(kUploads, uploadId, QStringLiteral("/cancel")));
 }
 
 ChunkedUploader *Client::uploadInChunks(const Core::CreateUploadRequest &request, QIODevice *source,
@@ -1037,46 +897,33 @@ ChunkedUploader *Client::uploadInChunks(const Core::CreateUploadRequest &request
 VectorStoreReply *Client::createVectorStore(const Core::CreateVectorStoreRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, vectorStorePath({})), body);
-    return new VectorStoreReply(std::move(factory), d->retryPolicy);
+    return d->post<VectorStoreReply>(kVectorStores, compactJson(request.toJson()));
 }
 
 VectorStoreListReply *Client::listVectorStores(const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, vectorStorePath({}));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new VectorStoreListReply(std::move(factory), d->retryPolicy);
+    return d->get<VectorStoreListReply>(kVectorStores, params.toQuery());
 }
 
 VectorStoreReply *Client::getVectorStore(const QString &vectorStoreId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, apiRequest(d, vectorStorePath(vectorStoreId)));
-    return new VectorStoreReply(std::move(factory), d->retryPolicy);
+    return d->get<VectorStoreReply>(resourcePath(kVectorStores, vectorStoreId));
 }
 
 VectorStoreReply *Client::updateVectorStore(const QString &vectorStoreId,
                                             const Core::CreateVectorStoreRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, vectorStorePath(vectorStoreId)), body);
-    return new VectorStoreReply(std::move(factory), d->retryPolicy);
+    return d->post<VectorStoreReply>(resourcePath(kVectorStores, vectorStoreId),
+                                     compactJson(request.toJson()));
 }
 
 VectorStoreReply *Client::deleteVectorStore(const QString &vectorStoreId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = deleteFactory(manager, apiRequest(d, vectorStorePath(vectorStoreId)));
-    return new VectorStoreReply(std::move(factory), d->retryPolicy);
+    return d->remove<VectorStoreReply>(resourcePath(kVectorStores, vectorStoreId));
 }
 
 VectorStoreFileReply *Client::createVectorStoreFile(const QString &vectorStoreId,
@@ -1091,11 +938,9 @@ VectorStoreFileReply *Client::createVectorStoreFile(const QString &vectorStoreId
         bodyObject.insert(QStringLiteral("chunking_strategy"), chunkingStrategy);
     if (!attributes.isEmpty())
         bodyObject.insert(QStringLiteral("attributes"), attributes);
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files"));
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new VectorStoreFileReply(std::move(factory), d->retryPolicy);
+    return d->post<VectorStoreFileReply>(
+            resourcePath(kVectorStores, vectorStoreId, QStringLiteral("/files")),
+            compactJson(bodyObject));
 }
 
 VectorStoreFileListReply *Client::listVectorStoreFiles(const QString &vectorStoreId,
@@ -1106,21 +951,16 @@ VectorStoreFileListReply *Client::listVectorStoreFiles(const QString &vectorStor
     QUrlQuery query = params.toQuery();
     if (!filter.isEmpty())
         query.addQueryItem(QStringLiteral("filter"), filter);
-    QNetworkRequest req = apiRequest(d, vectorStorePath(vectorStoreId, QStringLiteral("/files")));
-    applyQuery(req, query);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new VectorStoreFileListReply(std::move(factory), d->retryPolicy);
+    return d->get<VectorStoreFileListReply>(
+            resourcePath(kVectorStores, vectorStoreId, QStringLiteral("/files")), query);
 }
 
 VectorStoreFileReply *Client::getVectorStoreFile(const QString &vectorStoreId,
                                                  const QString &fileId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files/") + fileId);
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new VectorStoreFileReply(std::move(factory), d->retryPolicy);
+    return d->get<VectorStoreFileReply>(
+            resourcePath(kVectorStores, vectorStoreId, resourcePath(kFiles, fileId)));
 }
 
 VectorStoreFileReply *Client::updateVectorStoreFileAttributes(const QString &vectorStoreId,
@@ -1130,32 +970,26 @@ VectorStoreFileReply *Client::updateVectorStoreFileAttributes(const QString &vec
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("attributes"), attributes);
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files/") + fileId);
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new VectorStoreFileReply(std::move(factory), d->retryPolicy);
+    return d->post<VectorStoreFileReply>(
+            resourcePath(kVectorStores, vectorStoreId, resourcePath(kFiles, fileId)),
+            compactJson(bodyObject));
 }
 
 VectorStoreFileReply *Client::deleteVectorStoreFile(const QString &vectorStoreId,
                                                     const QString &fileId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files/") + fileId);
-    auto factory = deleteFactory(manager, apiRequest(d, path));
-    return new VectorStoreFileReply(std::move(factory), d->retryPolicy);
+    return d->remove<VectorStoreFileReply>(
+            resourcePath(kVectorStores, vectorStoreId, resourcePath(kFiles, fileId)));
 }
 
 VectorStoreFileContentReply *Client::getVectorStoreFileContent(const QString &vectorStoreId,
                                                                const QString &fileId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/files/") + fileId
-                                                                + QStringLiteral("/content"));
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new VectorStoreFileContentReply(std::move(factory), d->retryPolicy);
+    return d->get<VectorStoreFileContentReply>(
+            resourcePath(kVectorStores, vectorStoreId,
+                         resourcePath(kFiles, fileId, QStringLiteral("/content"))));
 }
 
 VectorStoreFileBatchReply *Client::createVectorStoreFileBatch(const QString &vectorStoreId,
@@ -1170,32 +1004,26 @@ VectorStoreFileBatchReply *Client::createVectorStoreFileBatch(const QString &vec
         bodyObject.insert(QStringLiteral("chunking_strategy"), chunkingStrategy);
     if (!attributes.isEmpty())
         bodyObject.insert(QStringLiteral("attributes"), attributes);
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/file_batches"));
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new VectorStoreFileBatchReply(std::move(factory), d->retryPolicy);
+    return d->post<VectorStoreFileBatchReply>(
+            resourcePath(kVectorStores, vectorStoreId, QStringLiteral("/file_batches")),
+            compactJson(bodyObject));
 }
 
 VectorStoreFileBatchReply *Client::getVectorStoreFileBatch(const QString &vectorStoreId,
                                                            const QString &batchId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/file_batches/") + batchId);
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new VectorStoreFileBatchReply(std::move(factory), d->retryPolicy);
+    return d->get<VectorStoreFileBatchReply>(
+            resourcePath(kVectorStores, vectorStoreId, QStringLiteral("/file_batches/") + batchId));
 }
 
 VectorStoreFileBatchReply *Client::cancelVectorStoreFileBatch(const QString &vectorStoreId,
                                                               const QString &batchId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/file_batches/") + batchId
-                                                                + QStringLiteral("/cancel"));
-    auto factory = postFactory(d, manager, apiRequest(d, path));
-    return new VectorStoreFileBatchReply(std::move(factory), d->retryPolicy);
+    return d->post<VectorStoreFileBatchReply>(
+            resourcePath(kVectorStores, vectorStoreId,
+                         QStringLiteral("/file_batches/") + batchId + QStringLiteral("/cancel")));
 }
 
 VectorStoreFileListReply *Client::listVectorStoreFileBatchFiles(const QString &vectorStoreId,
@@ -1207,59 +1035,43 @@ VectorStoreFileListReply *Client::listVectorStoreFileBatchFiles(const QString &v
     QUrlQuery query = params.toQuery();
     if (!filter.isEmpty())
         query.addQueryItem(QStringLiteral("filter"), filter);
-    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/file_batches/") + batchId
-                                                                + QStringLiteral("/files"));
-    QNetworkRequest req = apiRequest(d, path);
-    applyQuery(req, query);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new VectorStoreFileListReply(std::move(factory), d->retryPolicy);
+    return d->get<VectorStoreFileListReply>(
+            resourcePath(kVectorStores, vectorStoreId,
+                         QStringLiteral("/file_batches/") + batchId + kFiles),
+            query);
 }
 
 VectorStoreSearchReply *Client::searchVectorStore(const QString &vectorStoreId,
                                                   const Core::VectorStoreSearchRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = vectorStorePath(vectorStoreId, QStringLiteral("/search"));
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new VectorStoreSearchReply(std::move(factory), d->retryPolicy);
+    return d->post<VectorStoreSearchReply>(
+            resourcePath(kVectorStores, vectorStoreId, QStringLiteral("/search")),
+            compactJson(request.toJson()));
 }
 
 ContainerReply *Client::createContainer(const Core::CreateContainerRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, containerPath({})), body);
-    return new ContainerReply(std::move(factory), d->retryPolicy);
+    return d->post<ContainerReply>(kContainers, compactJson(request.toJson()));
 }
 
 ContainerListReply *Client::listContainers(const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, containerPath({}));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new ContainerListReply(std::move(factory), d->retryPolicy);
+    return d->get<ContainerListReply>(kContainers, params.toQuery());
 }
 
 ContainerReply *Client::getContainer(const QString &containerId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, apiRequest(d, containerPath(containerId)));
-    return new ContainerReply(std::move(factory), d->retryPolicy);
+    return d->get<ContainerReply>(resourcePath(kContainers, containerId));
 }
 
 ContainerReply *Client::deleteContainer(const QString &containerId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = deleteFactory(manager, apiRequest(d, containerPath(containerId)));
-    return new ContainerReply(std::move(factory), d->retryPolicy);
+    return d->remove<ContainerReply>(resourcePath(kContainers, containerId));
 }
 
 ContainerFileReply *Client::uploadContainerFile(const QString &containerId, const QString &fileName,
@@ -1267,10 +1079,9 @@ ContainerFileReply *Client::uploadContainerFile(const QString &containerId, cons
 {
     Q_D(Client);
     detail::FormFilePart file {"file", fileName, data};
-    const QString path = containerPath(containerId, QStringLiteral("/files"));
-    auto factory = multipartPostFactory(d, networkAccessManager(), apiRequest(d, path), {},
-                                        {std::move(file)});
-    return new ContainerFileReply(std::move(factory), d->retryPolicy);
+    return d->postMultipart<ContainerFileReply>(
+            resourcePath(kContainers, containerId, QStringLiteral("/files")), {},
+            {std::move(file)});
 }
 
 ContainerFileReply *Client::attachContainerFile(const QString &containerId, const QString &fileId)
@@ -1278,87 +1089,62 @@ ContainerFileReply *Client::attachContainerFile(const QString &containerId, cons
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("file_id"), fileId);
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = containerPath(containerId, QStringLiteral("/files"));
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new ContainerFileReply(std::move(factory), d->retryPolicy);
+    return d->post<ContainerFileReply>(
+            resourcePath(kContainers, containerId, QStringLiteral("/files")),
+            compactJson(bodyObject));
 }
 
 ContainerFileListReply *Client::listContainerFiles(const QString &containerId,
                                                    const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, containerPath(containerId, QStringLiteral("/files")));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new ContainerFileListReply(std::move(factory), d->retryPolicy);
+    return d->get<ContainerFileListReply>(
+            resourcePath(kContainers, containerId, QStringLiteral("/files")), params.toQuery());
 }
 
 ContainerFileReply *Client::getContainerFile(const QString &containerId, const QString &fileId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = containerPath(containerId, QStringLiteral("/files/") + fileId);
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new ContainerFileReply(std::move(factory), d->retryPolicy);
+    return d->get<ContainerFileReply>(
+            resourcePath(kContainers, containerId, resourcePath(kFiles, fileId)));
 }
 
 ContainerFileReply *Client::deleteContainerFile(const QString &containerId, const QString &fileId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = containerPath(containerId, QStringLiteral("/files/") + fileId);
-    auto factory = deleteFactory(manager, apiRequest(d, path));
-    return new ContainerFileReply(std::move(factory), d->retryPolicy);
+    return d->remove<ContainerFileReply>(
+            resourcePath(kContainers, containerId, resourcePath(kFiles, fileId)));
 }
 
 BinaryReply *Client::downloadContainerFileContent(const QString &containerId, const QString &fileId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = containerPath(containerId, QStringLiteral("/files/") + fileId
-                                                            + QStringLiteral("/content"));
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new BinaryReply(std::move(factory), d->retryPolicy);
+    return d->get<BinaryReply>(resourcePath(
+            kContainers, containerId, resourcePath(kFiles, fileId, QStringLiteral("/content"))));
 }
 
 BatchReply *Client::createBatch(const Core::CreateBatchRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, QStringLiteral("/batches")), body);
-    return new BatchReply(std::move(factory), d->retryPolicy);
+    return d->post<BatchReply>(kBatches, compactJson(request.toJson()));
 }
 
 BatchListReply *Client::listBatches(const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, QStringLiteral("/batches"));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new BatchListReply(std::move(factory), d->retryPolicy);
+    return d->get<BatchListReply>(kBatches, params.toQuery());
 }
 
 BatchReply *Client::getBatch(const QString &batchId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/batches/") + batchId;
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new BatchReply(std::move(factory), d->retryPolicy);
+    return d->get<BatchReply>(resourcePath(kBatches, batchId));
 }
 
 BatchReply *Client::cancelBatch(const QString &batchId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/batches/") + batchId + QStringLiteral("/cancel");
-    auto factory = postFactory(d, manager, apiRequest(d, path));
-    return new BatchReply(std::move(factory), d->retryPolicy);
+    return d->post<BatchReply>(resourcePath(kBatches, batchId, QStringLiteral("/cancel")));
 }
 
 BatchPoller *Client::pollBatch(const QString &batchId, int pollIntervalMs)
@@ -1369,28 +1155,19 @@ BatchPoller *Client::pollBatch(const QString &batchId, int pollIntervalMs)
 FineTuningJobReply *Client::createFineTuningJob(const Core::CreateFineTuningJobRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, fineTuningJobPath({})), body);
-    return new FineTuningJobReply(std::move(factory), d->retryPolicy);
+    return d->post<FineTuningJobReply>(kFineTuningJobs, compactJson(request.toJson()));
 }
 
 FineTuningJobListReply *Client::listFineTuningJobs(const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, fineTuningJobPath({}));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new FineTuningJobListReply(std::move(factory), d->retryPolicy);
+    return d->get<FineTuningJobListReply>(kFineTuningJobs, params.toQuery());
 }
 
 FineTuningJobReply *Client::getFineTuningJob(const QString &jobId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, apiRequest(d, fineTuningJobPath(jobId)));
-    return new FineTuningJobReply(std::move(factory), d->retryPolicy);
+    return d->get<FineTuningJobReply>(resourcePath(kFineTuningJobs, jobId));
 }
 
 FineTuningJobReply *Client::cancelFineTuningJob(const QString &jobId)
@@ -1411,31 +1188,23 @@ FineTuningJobReply *Client::resumeFineTuningJob(const QString &jobId)
 FineTuningJobReply *Client::postFineTuningJobAction(const QString &jobId, const QString &action)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, fineTuningJobPath(jobId, action)));
-    return new FineTuningJobReply(std::move(factory), d->retryPolicy);
+    return d->post<FineTuningJobReply>(resourcePath(kFineTuningJobs, jobId, action));
 }
 
 FineTuningEventListReply *Client::listFineTuningEvents(const QString &jobId,
                                                        const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, fineTuningJobPath(jobId, QStringLiteral("/events")));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new FineTuningEventListReply(std::move(factory), d->retryPolicy);
+    return d->get<FineTuningEventListReply>(
+            resourcePath(kFineTuningJobs, jobId, QStringLiteral("/events")), params.toQuery());
 }
 
 FineTuningCheckpointListReply *Client::listFineTuningCheckpoints(const QString &jobId,
                                                                  const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, fineTuningJobPath(jobId, QStringLiteral("/checkpoints")));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new FineTuningCheckpointListReply(std::move(factory), d->retryPolicy);
+    return d->get<FineTuningCheckpointListReply>(
+            resourcePath(kFineTuningJobs, jobId, QStringLiteral("/checkpoints")), params.toQuery());
 }
 
 FineTuningJobPoller *Client::pollFineTuningJob(const QString &jobId, int pollIntervalMs)
@@ -1447,12 +1216,9 @@ FineTuningPermissionListReply *
 Client::listFineTuningCheckpointPermissions(const QString &checkpointId, const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req
-            = apiRequest(d, fineTuningCheckpointPath(checkpointId, QStringLiteral("/permissions")));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new FineTuningPermissionListReply(std::move(factory), d->retryPolicy);
+    return d->get<FineTuningPermissionListReply>(
+            resourcePath(kFineTuningCheckpoints, checkpointId, QStringLiteral("/permissions")),
+            params.toQuery());
 }
 
 FineTuningPermissionListReply *
@@ -1462,49 +1228,35 @@ Client::createFineTuningCheckpointPermissions(const QString &checkpointId,
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("project_ids"), idsToArray(projectIds));
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = fineTuningCheckpointPath(checkpointId, QStringLiteral("/permissions"));
-    auto factory = postFactory(d, manager, apiRequest(d, path), body);
-    return new FineTuningPermissionListReply(std::move(factory), d->retryPolicy);
+    return d->post<FineTuningPermissionListReply>(
+            resourcePath(kFineTuningCheckpoints, checkpointId, QStringLiteral("/permissions")),
+            compactJson(bodyObject));
 }
 
 FineTuningPermissionReply *Client::deleteFineTuningCheckpointPermission(const QString &checkpointId,
                                                                         const QString &permissionId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = fineTuningCheckpointPath(checkpointId,
-                                                  QStringLiteral("/permissions/") + permissionId);
-    auto factory = deleteFactory(manager, apiRequest(d, path));
-    return new FineTuningPermissionReply(std::move(factory), d->retryPolicy);
+    return d->remove<FineTuningPermissionReply>(resourcePath(
+            kFineTuningCheckpoints, checkpointId, QStringLiteral("/permissions/") + permissionId));
 }
 
 EvalReply *Client::createEval(const Core::CreateEvalRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, evalPath({})), body);
-    return new EvalReply(std::move(factory), d->retryPolicy);
+    return d->post<EvalReply>(kEvals, compactJson(request.toJson()));
 }
 
 EvalListReply *Client::listEvals(const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, evalPath({}));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new EvalListReply(std::move(factory), d->retryPolicy);
+    return d->get<EvalListReply>(kEvals, params.toQuery());
 }
 
 EvalReply *Client::getEval(const QString &evalId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, apiRequest(d, evalPath(evalId)));
-    return new EvalReply(std::move(factory), d->retryPolicy);
+    return d->get<EvalReply>(resourcePath(kEvals, evalId));
 }
 
 EvalReply *Client::updateEval(const QString &evalId, const QString &name,
@@ -1516,64 +1268,47 @@ EvalReply *Client::updateEval(const QString &evalId, const QString &name,
         bodyObject.insert(QStringLiteral("name"), name);
     if (!metadata.isEmpty())
         bodyObject.insert(QStringLiteral("metadata"), metadata);
-    const QByteArray body = compactJson(bodyObject);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, evalPath(evalId)), body);
-    return new EvalReply(std::move(factory), d->retryPolicy);
+    return d->post<EvalReply>(resourcePath(kEvals, evalId), compactJson(bodyObject));
 }
 
 EvalReply *Client::deleteEval(const QString &evalId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = deleteFactory(manager, apiRequest(d, evalPath(evalId)));
-    return new EvalReply(std::move(factory), d->retryPolicy);
+    return d->remove<EvalReply>(resourcePath(kEvals, evalId));
 }
 
 EvalRunReply *Client::createEvalRun(const QString &evalId,
                                     const Core::CreateEvalRunRequest &request)
 {
     Q_D(Client);
-    const QByteArray body = compactJson(request.toJson());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = postFactory(d, manager, apiRequest(d, evalPath(evalId, QStringLiteral("/runs"))),
-                               body);
-    return new EvalRunReply(std::move(factory), d->retryPolicy);
+    return d->post<EvalRunReply>(resourcePath(kEvals, evalId, QStringLiteral("/runs")),
+                                 compactJson(request.toJson()));
 }
 
 EvalRunListReply *Client::listEvalRuns(const QString &evalId, const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req = apiRequest(d, evalPath(evalId, QStringLiteral("/runs")));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new EvalRunListReply(std::move(factory), d->retryPolicy);
+    return d->get<EvalRunListReply>(resourcePath(kEvals, evalId, QStringLiteral("/runs")),
+                                    params.toQuery());
 }
 
 EvalRunReply *Client::getEvalRun(const QString &evalId, const QString &runId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, apiRequest(d, evalRunPath(evalId, runId)));
-    return new EvalRunReply(std::move(factory), d->retryPolicy);
+    return d->get<EvalRunReply>(evalRunPath(evalId, runId));
 }
 
 EvalRunReply *Client::cancelEvalRun(const QString &evalId, const QString &runId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
     // Cancelling is a bare POST to the run itself, not to a /cancel sub-path.
-    auto factory = postFactory(d, manager, apiRequest(d, evalRunPath(evalId, runId)));
-    return new EvalRunReply(std::move(factory), d->retryPolicy);
+    return d->post<EvalRunReply>(evalRunPath(evalId, runId));
 }
 
 EvalRunReply *Client::deleteEvalRun(const QString &evalId, const QString &runId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = deleteFactory(manager, apiRequest(d, evalRunPath(evalId, runId)));
-    return new EvalRunReply(std::move(factory), d->retryPolicy);
+    return d->remove<EvalRunReply>(evalRunPath(evalId, runId));
 }
 
 EvalRunOutputItemListReply *Client::listEvalRunOutputItems(const QString &evalId,
@@ -1581,23 +1316,16 @@ EvalRunOutputItemListReply *Client::listEvalRunOutputItems(const QString &evalId
                                                            const ListParams &params)
 {
     Q_D(Client);
-    QNetworkRequest req
-            = apiRequest(d, evalRunPath(evalId, runId, QStringLiteral("/output_items")));
-    applyQuery(req, params.toQuery());
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, req);
-    return new EvalRunOutputItemListReply(std::move(factory), d->retryPolicy);
+    return d->get<EvalRunOutputItemListReply>(
+            evalRunPath(evalId, runId, QStringLiteral("/output_items")), params.toQuery());
 }
 
 EvalRunOutputItemReply *Client::getEvalRunOutputItem(const QString &evalId, const QString &runId,
                                                      const QString &outputItemId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path
-            = evalRunPath(evalId, runId, QStringLiteral("/output_items/") + outputItemId);
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new EvalRunOutputItemReply(std::move(factory), d->retryPolicy);
+    return d->get<EvalRunOutputItemReply>(
+            evalRunPath(evalId, runId, QStringLiteral("/output_items/") + outputItemId));
 }
 
 EvalRunPoller *Client::pollEvalRun(const QString &evalId, const QString &runId, int pollIntervalMs)
@@ -1608,18 +1336,13 @@ EvalRunPoller *Client::pollEvalRun(const QString &evalId, const QString &runId, 
 ModelListReply *Client::listModels()
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    auto factory = getFactory(manager, apiRequest(d, QStringLiteral("/models")));
-    return new ModelListReply(std::move(factory), d->retryPolicy);
+    return d->get<ModelListReply>(kModels);
 }
 
 ModelReply *Client::getModel(const QString &modelId)
 {
     Q_D(Client);
-    QNetworkAccessManager *manager = networkAccessManager();
-    const QString path = QStringLiteral("/models/") + modelId;
-    auto factory = getFactory(manager, apiRequest(d, path));
-    return new ModelReply(std::move(factory), d->retryPolicy);
+    return d->get<ModelReply>(resourcePath(kModels, modelId));
 }
 
 } // namespace Client

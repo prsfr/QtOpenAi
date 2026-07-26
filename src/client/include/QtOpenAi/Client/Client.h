@@ -95,6 +95,8 @@
 #include <QtCore/QStringList>
 #include <QtCore/QUrl>
 
+#include <utility>
+
 class QIODevice;
 class QNetworkAccessManager;
 
@@ -654,6 +656,17 @@ Q_SIGNALS:
 private:
     // cancel/pause/resume differ only in the path segment they POST to.
     FineTuningJobReply *postFineTuningJobAction(const QString &jobId, const QString &action);
+
+    // Every reply type keeps its constructor private and names Client as its
+    // only friend, so a reply cannot be created from outside the library. The
+    // request helpers that build them live in ClientPrivate, which reaches the
+    // constructors through here instead of being befriended by all ~55 of them.
+    // Defined in Client.cpp; not part of the public API.
+    template <typename Reply, typename... Args>
+    static Reply *makeReply(Args &&...args)
+    {
+        return new Reply(std::forward<Args>(args)...);
+    }
 
     Q_DECLARE_PRIVATE(Client)
     QScopedPointer<ClientPrivate> d_ptr;
