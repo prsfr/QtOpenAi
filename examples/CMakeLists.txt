@@ -6,6 +6,9 @@ function(qtopenai_add_example name source)
     target_link_libraries(${name} PRIVATE QtOpenAi::Client)
 endfunction()
 
+# --- Infrastructure ---
+qtopenai_add_example(pagination pagination.cpp)
+
 # --- Chat & core inference ---
 qtopenai_add_example(chat_tool_loop tool_loop.cpp)
 qtopenai_add_example(streaming streaming.cpp)

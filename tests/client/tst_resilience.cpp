@@ -113,7 +113,24 @@ private slots:
     void parsesRateLimitHeaders();
     void azureAuthSchemeAndApiVersion();
     void customHeaderAndUserAgent();
+    void sendsIdempotencyKeyOnPost();
+    void reusesIdempotencyKeyAcrossRetries();
+    void omitsIdempotencyKeyWhenDisabled();
+    void omitsIdempotencyKeyOnGet();
 };
+
+// Pull the Idempotency-Key value out of a recorded request header block; empty
+// when the header is absent.
+static QByteArray idempotencyKeyOf(const QByteArray &request)
+{
+    const QList<QByteArray> lines = request.split('\n');
+    for (const QByteArray &line : lines) {
+        const QByteArray trimmed = line.trimmed();
+        if (trimmed.toLower().startsWith("idempotency-key:"))
+            return trimmed.mid(QByteArray("idempotency-key:").size()).trimmed();
+    }
+    return QByteArray();
+}
 
 void TestResilience::retriesOn429ThenSucceeds()
 {
@@ -243,6 +260,72 @@ void TestResilience::customHeaderAndUserAgent()
     const QByteArray req = server.requests().first();
     QVERIFY(req.contains("User-Agent: QtOpenAi-Test/1.0"));
     QVERIFY(req.contains("X-Custom: yes"));
+    delete reply;
+}
+
+void TestResilience::sendsIdempotencyKeyOnPost()
+{
+    // Retries of a POST are only safe if the provider can recognise the repeat,
+    // so create calls carry a generated key by default.
+    ScriptedServer server({{200, okBody(), {}}});
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
+    reply->setAutoDelete(false);
+    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+
+    const QByteArray key = idempotencyKeyOf(server.requests().first());
+    QVERIFY(!key.isEmpty());
+    // A UUID without the surrounding braces QUuid::toString() adds by default.
+    QCOMPARE(key.size(), 36);
+    QVERIFY(!key.contains('{'));
+    delete reply;
+}
+
+void TestResilience::reusesIdempotencyKeyAcrossRetries()
+{
+    // The whole point: every attempt of one logical call sends the same key.
+    ScriptedServer server({{429, okBody(), {}}, {200, okBody(), {}}});
+    Client client(server.baseUrl(), QStringLiteral("k"));
+    client.setRetryPolicy(fastPolicy(2));
+
+    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
+    reply->setAutoDelete(false);
+    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+
+    QCOMPARE(server.requests().size(), 2);
+    const QByteArray first = idempotencyKeyOf(server.requests().at(0));
+    QVERIFY(!first.isEmpty());
+    QCOMPARE(idempotencyKeyOf(server.requests().at(1)), first);
+    delete reply;
+}
+
+void TestResilience::omitsIdempotencyKeyWhenDisabled()
+{
+    ScriptedServer server({{200, okBody(), {}}});
+    Client client(server.baseUrl(), QStringLiteral("k"));
+    client.setIdempotencyKeysEnabled(false);
+
+    ChatCompletionReply *reply = client.createChatCompletion(sampleRequest());
+    reply->setAutoDelete(false);
+    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+
+    QVERIFY(idempotencyKeyOf(server.requests().first()).isEmpty());
+    delete reply;
+}
+
+void TestResilience::omitsIdempotencyKeyOnGet()
+{
+    // GET is idempotent by definition; the header would be noise.
+    ScriptedServer server({{200, R"({"object":"list","data":[]})", {}}});
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    ModelListReply *reply = client.listModels();
+    reply->setAutoDelete(false);
+    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+
+    QVERIFY(server.requests().first().startsWith("GET "));
+    QVERIFY(idempotencyKeyOf(server.requests().first()).isEmpty());
     delete reply;
 }
 

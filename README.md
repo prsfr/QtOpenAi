@@ -707,11 +707,37 @@ client.setRequestTimeoutMs(30000);       // per-request transfer timeout
 client.setUserAgent("MyApp/1.0");
 client.setDefaultHeader("X-My-Header", "value");
 
+// Every POST carries a generated Idempotency-Key so a retried create call
+// cannot be charged twice. On by default; every attempt shares one key.
+client.setIdempotencyKeysEnabled(false); // opt out if a provider dislikes it
+
 // Rate-limit headroom from the last response's headers:
 connect(reply, &Client::ChatCompletionReply::finished, this, [reply] {
     const auto rl = reply->rateLimit();  // remainingRequests / remainingTokens / ...
 });
 ```
+
+### Iterating a paginated endpoint
+
+List endpoints return one page at a time (`has_more` plus a `last_id` cursor).
+`PageWalker` turns any of them into an iterate-all — it feeds each page's last
+id back as the next `after` and stops when the server clears `has_more`:
+
+```cpp
+auto *walker = new Client::PageWalker<Client::FileListReply, Core::FileList>(
+        [&client](const Client::ListParams &p) { return client.listFiles(p); });
+
+walker->setPageHandler([](const Core::FileList &page) {
+    for (const Core::FileObject &file : page.data)
+        qDebug() << file.id();
+});
+connect(walker, &Client::PageWalkerBase::finished, this, [] { /* all pages seen */ });
+connect(walker, &Client::PageWalkerBase::failed, this, [](const Client::ClientError &e) { ... });
+walker->start();   // deletes itself when it stops, unless setAutoDelete(false)
+```
+
+Only the two template arguments and the fetch lambda change per endpoint; a
+handler that has seen enough can call `stop()` mid-walk.
 
 **Azure OpenAI** (and other `api-key`-style providers):
 
@@ -737,6 +763,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 
 | Program             | Endpoint / feature                                   |
 |---------------------|------------------------------------------------------|
+| `pagination`        | Iterate every page of a list endpoint (`PageWalker`) |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
 | `streaming`         | Streamed chat completion (SSE), token by token       |
 | `responses`         | Responses API (`/responses`)                         |

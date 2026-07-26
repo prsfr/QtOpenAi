@@ -189,3 +189,7 @@ qtopenai_add_test(tst_client_batches
 qtopenai_add_test(tst_client_finetuning
     SOURCES client/tst_finetuning.cpp
     LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_pagination
+    SOURCES client/tst_pagination.cpp
+    LIBS QtOpenAi::Client)

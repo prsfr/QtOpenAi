@@ -18,6 +18,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ModerationReply.h
     include/QtOpenAi/Client/CompletionReply.h
     include/QtOpenAi/Client/ListParams.h
+    include/QtOpenAi/Client/PageWalker.h
     include/QtOpenAi/Client/ChatCompletionListReply.h
     include/QtOpenAi/Client/ChatCompletionMessageListReply.h
     include/QtOpenAi/Client/EmbeddingReply.h
@@ -75,6 +76,7 @@ add_library(QtOpenAiClient
     src/RetryPolicy.cpp
     src/RestReply.cpp
     src/RestReplyBase.cpp
+    src/PageWalker.cpp
     src/BinaryReply.cpp
     src/ChatCompletionReply.cpp
     src/ChatCompletionAccumulator.cpp
