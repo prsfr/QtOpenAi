@@ -439,6 +439,16 @@ QByteArray compactJson(const QJsonObject &json)
     return QJsonDocument(json).toJson(QJsonDocument::Compact);
 }
 
+// The body of the several "modify" endpoints whose only field is `metadata`.
+// They span four resource families that otherwise share nothing, so the shape
+// is spelled here rather than four times over.
+QByteArray metadataBody(const QJsonObject &metadata)
+{
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("metadata"), metadata);
+    return compactJson(bodyObject);
+}
+
 // Request factories capturing everything a retry needs to re-issue the call.
 // One per HTTP verb; the multipart POST variant lives in multipartPostFactory().
 std::function<QNetworkReply *()> getFactory(QNetworkAccessManager *manager, QNetworkRequest request)
@@ -594,10 +604,8 @@ ConversationReply *Client::updateConversation(const QString &conversationId,
                                               const QJsonObject &metadata)
 {
     Q_D(Client);
-    QJsonObject bodyObject;
-    bodyObject.insert(QStringLiteral("metadata"), metadata);
     return d->post<ConversationReply>(resourcePath(kConversations, conversationId),
-                                      compactJson(bodyObject));
+                                      metadataBody(metadata));
 }
 
 ConversationReply *Client::deleteConversation(const QString &conversationId)
@@ -686,10 +694,8 @@ ChatCompletionReply *Client::updateChatCompletion(const QString &completionId,
                                                   const QJsonObject &metadata)
 {
     Q_D(Client);
-    QJsonObject bodyObject;
-    bodyObject.insert(QStringLiteral("metadata"), metadata);
     return d->post<ChatCompletionReply>(resourcePath(kChatCompletions, completionId),
-                                        compactJson(bodyObject));
+                                        metadataBody(metadata));
 }
 
 ChatCompletionReply *Client::deleteChatCompletion(const QString &completionId)
@@ -1479,11 +1485,9 @@ ThreadMessageReply *Client::updateThreadMessage(const QString &threadId, const Q
                                                 const QJsonObject &metadata)
 {
     Q_D(Client);
-    QJsonObject bodyObject;
-    bodyObject.insert(QStringLiteral("metadata"), metadata);
     return d->post<ThreadMessageReply>(
             resourcePath(kThreads, threadId, resourcePath(kMessages, messageId)),
-            compactJson(bodyObject), kAssistantsBeta);
+            metadataBody(metadata), kAssistantsBeta);
 }
 
 ThreadMessageReply *Client::deleteThreadMessage(const QString &threadId, const QString &messageId)
@@ -1538,9 +1542,7 @@ RunReply *Client::updateRun(const QString &threadId, const QString &runId,
                             const QJsonObject &metadata)
 {
     Q_D(Client);
-    QJsonObject bodyObject;
-    bodyObject.insert(QStringLiteral("metadata"), metadata);
-    return d->post<RunReply>(threadRunPath(threadId, runId), compactJson(bodyObject),
+    return d->post<RunReply>(threadRunPath(threadId, runId), metadataBody(metadata),
                              kAssistantsBeta);
 }
 

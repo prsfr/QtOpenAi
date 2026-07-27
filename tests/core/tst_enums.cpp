@@ -28,6 +28,8 @@ private slots:
     void evalRunStatusRoundTripsEveryValue();
     void runStatusRoundTripsEveryValue();
     void runStepStatusRoundTripsEveryValue();
+    void terminalStatesAreExactlyTheDocumentedOnes();
+    void unknownStatusIsNeverTerminal();
     void unknownWireValueDecodesToTheDocumentedFallback();
     void spellingsAreDistinct();
 };
@@ -123,6 +125,82 @@ void TestEnums::runStatusRoundTripsEveryValue()
 void TestEnums::runStepStatusRoundTripsEveryValue()
 {
     checkRoundTrip<RunStepStatus>(runStepStatusToString, runStepStatusFromString);
+}
+
+void TestEnums::terminalStatesAreExactlyTheDocumentedOnes()
+{
+    // Terminality now lives in the same table rows as the wire spelling, which
+    // is what stops the two from disagreeing -- but a wrong column would be
+    // silent. This pins the whole set per enum, so flipping any one row fails
+    // here rather than in a poller that stops early or never stops.
+    QCOMPARE(isTerminal(VideoStatus::Completed), true);
+    QCOMPARE(isTerminal(VideoStatus::Failed), true);
+    QCOMPARE(isTerminal(VideoStatus::Queued), false);
+    QCOMPARE(isTerminal(VideoStatus::InProgress), false);
+
+    // Only a pending upload accepts further parts.
+    QCOMPARE(isTerminal(UploadStatus::Pending), false);
+    QCOMPARE(isTerminal(UploadStatus::Completed), true);
+    QCOMPARE(isTerminal(UploadStatus::Cancelled), true);
+    QCOMPARE(isTerminal(UploadStatus::Expired), true);
+
+    // Cancelling still has in-flight requests to drain.
+    QCOMPARE(isTerminal(BatchStatus::Cancelling), false);
+    QCOMPARE(isTerminal(BatchStatus::Cancelled), true);
+    QCOMPARE(isTerminal(BatchStatus::Completed), true);
+    QCOMPARE(isTerminal(BatchStatus::Failed), true);
+    QCOMPARE(isTerminal(BatchStatus::Expired), true);
+    QCOMPARE(isTerminal(BatchStatus::Validating), false);
+    QCOMPARE(isTerminal(BatchStatus::InProgress), false);
+    QCOMPARE(isTerminal(BatchStatus::Finalizing), false);
+
+    // A paused job resumes on request, so a poller keeps waiting.
+    QCOMPARE(isTerminal(FineTuningJobStatus::Paused), false);
+    QCOMPARE(isTerminal(FineTuningJobStatus::Succeeded), true);
+    QCOMPARE(isTerminal(FineTuningJobStatus::Failed), true);
+    QCOMPARE(isTerminal(FineTuningJobStatus::Cancelled), true);
+    QCOMPARE(isTerminal(FineTuningJobStatus::ValidatingFiles), false);
+    QCOMPARE(isTerminal(FineTuningJobStatus::Queued), false);
+    QCOMPARE(isTerminal(FineTuningJobStatus::Running), false);
+
+    QCOMPARE(isTerminal(EvalRunStatus::Completed), true);
+    QCOMPARE(isTerminal(EvalRunStatus::Failed), true);
+    QCOMPARE(isTerminal(EvalRunStatus::Canceled), true);
+    QCOMPARE(isTerminal(EvalRunStatus::Queued), false);
+    QCOMPARE(isTerminal(EvalRunStatus::InProgress), false);
+
+    // RequiresAction is parked, not finished: the run continues once the tool
+    // outputs arrive.
+    QCOMPARE(isTerminal(RunStatus::RequiresAction), false);
+    QCOMPARE(isTerminal(RunStatus::Cancelling), false);
+    QCOMPARE(isTerminal(RunStatus::Queued), false);
+    QCOMPARE(isTerminal(RunStatus::InProgress), false);
+    QCOMPARE(isTerminal(RunStatus::Completed), true);
+    QCOMPARE(isTerminal(RunStatus::Failed), true);
+    QCOMPARE(isTerminal(RunStatus::Cancelled), true);
+    QCOMPARE(isTerminal(RunStatus::Incomplete), true);
+    QCOMPARE(isTerminal(RunStatus::Expired), true);
+
+    QCOMPARE(isTerminal(RunStepStatus::InProgress), false);
+    QCOMPARE(isTerminal(RunStepStatus::Cancelled), true);
+    QCOMPARE(isTerminal(RunStepStatus::Failed), true);
+    QCOMPARE(isTerminal(RunStepStatus::Completed), true);
+    QCOMPARE(isTerminal(RunStepStatus::Expired), true);
+}
+
+void TestEnums::unknownStatusIsNeverTerminal()
+{
+    // A status from a newer server decodes to the non-terminal fallback, and
+    // the terminality lookup agrees: a poller keeps waiting rather than
+    // reporting a job finished that is not.
+    const QString unknown = QStringLiteral("something_the_server_invented");
+    QVERIFY(!isTerminal(batchStatusFromString(unknown)));
+    QVERIFY(!isTerminal(runStatusFromString(unknown)));
+    QVERIFY(!isTerminal(fineTuningJobStatusFromString(unknown)));
+    QVERIFY(!isTerminal(evalRunStatusFromString(unknown)));
+    QVERIFY(!isTerminal(videoStatusFromString(unknown)));
+    QVERIFY(!isTerminal(uploadStatusFromString(unknown)));
+    QVERIFY(!isTerminal(runStepStatusFromString(unknown)));
 }
 
 void TestEnums::unknownWireValueDecodesToTheDocumentedFallback()

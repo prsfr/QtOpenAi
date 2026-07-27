@@ -204,5 +204,20 @@ QTOPENAI_CORE_EXPORT RunStatus runStatusFromString(const QString &value);
 QTOPENAI_CORE_EXPORT QString runStepStatusToString(RunStepStatus status);
 QTOPENAI_CORE_EXPORT RunStepStatus runStepStatusFromString(const QString &value);
 
+// Whether a status is one its lifecycle will not leave, so a client polling the
+// job can stop. These answer for the status alone; the job types wrap them as
+// `job.isTerminal()`, which is what callers normally use.
+//
+// A status the library does not know is never terminal — the same care the
+// decode fallbacks take, so an unfamiliar state from a newer server leaves a
+// poller waiting instead of stopping it early.
+QTOPENAI_CORE_EXPORT bool isTerminal(VideoStatus status);
+QTOPENAI_CORE_EXPORT bool isTerminal(UploadStatus status);
+QTOPENAI_CORE_EXPORT bool isTerminal(BatchStatus status);
+QTOPENAI_CORE_EXPORT bool isTerminal(FineTuningJobStatus status);
+QTOPENAI_CORE_EXPORT bool isTerminal(EvalRunStatus status);
+QTOPENAI_CORE_EXPORT bool isTerminal(RunStatus status);
+QTOPENAI_CORE_EXPORT bool isTerminal(RunStepStatus status);
+
 } // namespace Core
 } // namespace QtOpenAi

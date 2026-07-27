@@ -173,21 +173,7 @@ void FineTuningJob::setErrorParam(const QString &errorParam) { d->errorParam = e
 QJsonObject FineTuningJob::metadata() const { return d->metadata; }
 void FineTuningJob::setMetadata(const QJsonObject &metadata) { d->metadata = metadata; }
 
-bool FineTuningJob::isTerminal() const
-{
-    switch (d->status) {
-    case FineTuningJobStatus::Succeeded:
-    case FineTuningJobStatus::Failed:
-    case FineTuningJobStatus::Cancelled:
-        return true;
-    case FineTuningJobStatus::ValidatingFiles:
-    case FineTuningJobStatus::Queued:
-    case FineTuningJobStatus::Running:
-    case FineTuningJobStatus::Paused:
-        return false;
-    }
-    return false;
-}
+bool FineTuningJob::isTerminal() const { return Core::isTerminal(d->status); }
 
 QJsonObject FineTuningJob::toJson() const
 {

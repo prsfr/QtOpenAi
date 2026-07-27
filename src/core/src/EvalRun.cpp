@@ -102,19 +102,7 @@ void EvalRun::setErrorMessage(const QString &errorMessage) { d->errorMessage = e
 QJsonObject EvalRun::metadata() const { return d->metadata; }
 void EvalRun::setMetadata(const QJsonObject &metadata) { d->metadata = metadata; }
 
-bool EvalRun::isTerminal() const
-{
-    switch (d->status) {
-    case EvalRunStatus::Completed:
-    case EvalRunStatus::Failed:
-    case EvalRunStatus::Canceled:
-        return true;
-    case EvalRunStatus::Queued:
-    case EvalRunStatus::InProgress:
-        return false;
-    }
-    return false;
-}
+bool EvalRun::isTerminal() const { return Core::isTerminal(d->status); }
 
 QJsonObject EvalRun::toJson() const
 {

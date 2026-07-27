@@ -177,23 +177,7 @@ void Run::setResponseFormat(const QJsonValue &responseFormat)
     d->responseFormat = responseFormat;
 }
 
-bool Run::isTerminal() const
-{
-    switch (d->status) {
-    case RunStatus::Completed:
-    case RunStatus::Failed:
-    case RunStatus::Cancelled:
-    case RunStatus::Incomplete:
-    case RunStatus::Expired:
-        return true;
-    case RunStatus::Queued:
-    case RunStatus::InProgress:
-    case RunStatus::RequiresAction:
-    case RunStatus::Cancelling:
-        return false;
-    }
-    return false;
-}
+bool Run::isTerminal() const { return Core::isTerminal(d->status); }
 
 bool Run::requiresAction() const { return d->status == RunStatus::RequiresAction; }
 

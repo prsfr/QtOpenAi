@@ -63,10 +63,7 @@ void VideoJob::setErrorCode(const QString &errorCode) { d->errorCode = errorCode
 QString VideoJob::errorMessage() const { return d->errorMessage; }
 void VideoJob::setErrorMessage(const QString &errorMessage) { d->errorMessage = errorMessage; }
 
-bool VideoJob::isTerminal() const
-{
-    return d->status == VideoStatus::Completed || d->status == VideoStatus::Failed;
-}
+bool VideoJob::isTerminal() const { return Core::isTerminal(d->status); }
 
 QJsonObject VideoJob::toJson() const
 {
