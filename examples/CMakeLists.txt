@@ -38,3 +38,6 @@ qtopenai_add_example(evals evals.cpp)
 
 # --- Assistants beta (v0.8) ---
 qtopenai_add_example(assistant assistant.cpp)
+
+# --- Realtime & newer surfaces (v0.9) ---
+qtopenai_add_example(skills skills.cpp)

@@ -852,6 +852,56 @@ content parts nest their text differently from the chat ones, so
 carries. `listRunSteps()` and `getRunStep()` are the audit trail: which message
 the assistant wrote, which tools it called.
 
+## Skills (`/skills`)
+
+A skill is a named, reusable bundle of files a model can be pointed at. The
+skill object holds no content of its own — it points at *versions*, which are
+immutable once published:
+
+```cpp
+// A directory bundle: the file names are paths relative to the skill root.
+Core::CreateSkillRequest bundle;
+bundle.addFile("SKILL.md", markdown);
+bundle.addFile("scripts/build.py", script);
+auto *created = client.createSkill(bundle);           // becomes version 1
+
+// A zip works just as well, and is the single-file constructor.
+auto *fromZip = client.createSkill({"pdf-report.zip", zipBytes});
+```
+
+Both forms go up as `multipart/form-data` under the same `files` field, so
+switching between them changes nothing but what you put in the request.
+
+Publishing a version does **not** promote it. `latest_version` moves on every
+upload; `default_version` — what callers get when they name no version — only
+moves when you say so, which makes rolling forward or back a single call that
+touches no content:
+
+```cpp
+Core::CreateSkillRequest revision;
+revision.addFile("SKILL.md", updatedMarkdown);
+auto *published = client.createSkillVersion(skillId, revision);
+
+client.setDefaultSkillVersion(skillId, "2");          // or: revision.setMakeDefault(true)
+```
+
+`revision.setMakeDefault(true)` does both in one request; it is the multipart
+`default` flag, spelled `makeDefault()` here because `default` is a C++ keyword.
+`POST /skills` has no such field, so an untouched request never sends one.
+
+Bundles come back as zips, which are bytes rather than JSON and therefore use the
+shared `BinaryReply`:
+
+```cpp
+auto *zip = client.downloadSkillContent(skillId);                 // default version
+auto *pinned = client.downloadSkillVersionContent(skillId, "2");  // one version
+```
+
+`version` is a string everywhere — it is a path segment, not an object id, so it
+is kept exactly as the API spells it. Deleting a skill or a version answers with
+the same value types, reporting `object()` as `skill.deleted` /
+`skill.version.deleted`.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -952,6 +1002,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `fine_tuning`       | Fine-tuning: train → poll → events (`/fine_tuning`)  |
 | `evals`             | Evals: define → run → poll → items (`/evals`)        |
 | `assistant`         | Assistant + thread + tool-calling run (`/threads`)   |
+| `skills`            | Skill: publish → version → promote → zip (`/skills`) |
 
 ## Building
 

@@ -370,6 +370,10 @@ constexpr QLatin1String kSteps("/steps");
 constexpr QLatin1String kVoiceConsents("/audio/voice_consents");
 constexpr QLatin1String kModels("/models");
 constexpr QLatin1String kCompletions("/completions");
+constexpr QLatin1String kSkills("/skills");
+constexpr QLatin1String kVersions("/versions");
+// The sub-resource every downloadable object hangs its bytes off.
+constexpr QLatin1String kContent("/content");
 
 // The Assistants surface is still a beta of its own, and the API rejects a
 // request that does not say which version it speaks.
@@ -393,6 +397,26 @@ QString evalRunPath(const QString &evalId, const QString &runId, const QString &
 QString threadRunPath(const QString &threadId, const QString &runId, const QString &suffix = {})
 {
     return resourcePath(kThreads, threadId, resourcePath(kRuns, runId, suffix));
+}
+
+// Skill versions nest below a skill. The version is a number the API spells as
+// a path segment, not an object id, but it composes exactly the same way.
+QString skillVersionPath(const QString &skillId, const QString &version, const QString &suffix = {})
+{
+    return resourcePath(kSkills, skillId, resourcePath(kVersions, version, suffix));
+}
+
+// The file parts of a skill upload. A bundle is either a single zip or one part
+// per file of a directory; both travel under the same `files` field name, which
+// is what makes the two forms one request rather than two.
+QList<detail::FormFilePart> skillFileParts(const Core::CreateSkillRequest &request)
+{
+    QList<detail::FormFilePart> parts;
+    const QList<Core::CreateSkillRequest::SkillFile> files = request.files();
+    parts.reserve(files.size());
+    for (const auto &file : files)
+        parts.append({"files", file.first, file.second});
+    return parts;
 }
 
 // The body of a submit_tool_outputs call. Both the blocking and the streamed
@@ -852,7 +876,7 @@ VideoReply *Client::remixVideo(const QString &videoId, const QString &prompt)
 VideoContentReply *Client::downloadVideoContent(const QString &videoId)
 {
     Q_D(Client);
-    return d->get<VideoContentReply>(resourcePath(kVideos, videoId, QStringLiteral("/content")));
+    return d->get<VideoContentReply>(resourcePath(kVideos, videoId, kContent));
 }
 
 VideoPoller *Client::pollVideo(const QString &videoId, int pollIntervalMs)
@@ -897,7 +921,7 @@ FileReply *Client::deleteFile(const QString &fileId)
 BinaryReply *Client::downloadFileContent(const QString &fileId)
 {
     Q_D(Client);
-    return d->get<BinaryReply>(resourcePath(kFiles, fileId, QStringLiteral("/content")));
+    return d->get<BinaryReply>(resourcePath(kFiles, fileId, kContent));
 }
 
 UploadReply *Client::createUpload(const Core::CreateUploadRequest &request)
@@ -1046,8 +1070,7 @@ VectorStoreFileContentReply *Client::getVectorStoreFileContent(const QString &ve
 {
     Q_D(Client);
     return d->get<VectorStoreFileContentReply>(
-            resourcePath(kVectorStores, vectorStoreId,
-                         resourcePath(kFiles, fileId, QStringLiteral("/content"))));
+            resourcePath(kVectorStores, vectorStoreId, resourcePath(kFiles, fileId, kContent)));
 }
 
 VectorStoreFileBatchReply *Client::createVectorStoreFileBatch(const QString &vectorStoreId,
@@ -1177,8 +1200,8 @@ ContainerFileReply *Client::deleteContainerFile(const QString &containerId, cons
 BinaryReply *Client::downloadContainerFileContent(const QString &containerId, const QString &fileId)
 {
     Q_D(Client);
-    return d->get<BinaryReply>(resourcePath(
-            kContainers, containerId, resourcePath(kFiles, fileId, QStringLiteral("/content"))));
+    return d->get<BinaryReply>(
+            resourcePath(kContainers, containerId, resourcePath(kFiles, fileId, kContent)));
 }
 
 BatchReply *Client::createBatch(const Core::CreateBatchRequest &request)
@@ -1589,6 +1612,77 @@ RunStepReply *Client::getRunStep(const QString &threadId, const QString &runId,
     Q_D(Client);
     return d->get<RunStepReply>(threadRunPath(threadId, runId, resourcePath(kSteps, stepId)), {},
                                 kAssistantsBeta);
+}
+
+SkillReply *Client::createSkill(const Core::CreateSkillRequest &request)
+{
+    Q_D(Client);
+    return d->postMultipart<SkillReply>(kSkills, request.formFields(), skillFileParts(request));
+}
+
+SkillListReply *Client::listSkills(const ListParams &params)
+{
+    Q_D(Client);
+    return d->get<SkillListReply>(kSkills, params.toQuery());
+}
+
+SkillReply *Client::getSkill(const QString &skillId)
+{
+    Q_D(Client);
+    return d->get<SkillReply>(resourcePath(kSkills, skillId));
+}
+
+SkillReply *Client::setDefaultSkillVersion(const QString &skillId, const QString &version)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("default_version"), version);
+    return d->post<SkillReply>(resourcePath(kSkills, skillId), compactJson(bodyObject));
+}
+
+SkillReply *Client::deleteSkill(const QString &skillId)
+{
+    Q_D(Client);
+    return d->remove<SkillReply>(resourcePath(kSkills, skillId));
+}
+
+BinaryReply *Client::downloadSkillContent(const QString &skillId)
+{
+    Q_D(Client);
+    return d->get<BinaryReply>(resourcePath(kSkills, skillId, kContent));
+}
+
+SkillVersionReply *Client::createSkillVersion(const QString &skillId,
+                                              const Core::CreateSkillRequest &request)
+{
+    Q_D(Client);
+    return d->postMultipart<SkillVersionReply>(resourcePath(kSkills, skillId, kVersions),
+                                               request.formFields(), skillFileParts(request));
+}
+
+SkillVersionListReply *Client::listSkillVersions(const QString &skillId, const ListParams &params)
+{
+    Q_D(Client);
+    return d->get<SkillVersionListReply>(resourcePath(kSkills, skillId, kVersions),
+                                         params.toQuery());
+}
+
+SkillVersionReply *Client::getSkillVersion(const QString &skillId, const QString &version)
+{
+    Q_D(Client);
+    return d->get<SkillVersionReply>(skillVersionPath(skillId, version));
+}
+
+SkillVersionReply *Client::deleteSkillVersion(const QString &skillId, const QString &version)
+{
+    Q_D(Client);
+    return d->remove<SkillVersionReply>(skillVersionPath(skillId, version));
+}
+
+BinaryReply *Client::downloadSkillVersionContent(const QString &skillId, const QString &version)
+{
+    Q_D(Client);
+    return d->get<BinaryReply>(skillVersionPath(skillId, version, kContent));
 }
 
 ModelListReply *Client::listModels()

@@ -70,6 +70,9 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/Run.h
     include/QtOpenAi/Core/RunStep.h
     include/QtOpenAi/Core/CreateRunRequest.h
+    include/QtOpenAi/Core/Skill.h
+    include/QtOpenAi/Core/SkillVersion.h
+    include/QtOpenAi/Core/CreateSkillRequest.h
 )
 
 add_library(QtOpenAiCore
@@ -138,6 +141,9 @@ add_library(QtOpenAiCore
     src/Run.cpp
     src/RunStep.cpp
     src/CreateRunRequest.cpp
+    src/Skill.cpp
+    src/SkillVersion.cpp
+    src/CreateSkillRequest.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

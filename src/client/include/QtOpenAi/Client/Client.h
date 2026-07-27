@@ -53,6 +53,10 @@
 #include <QtOpenAi/Client/RunStepListReply.h>
 #include <QtOpenAi/Client/RunStepReply.h>
 #include <QtOpenAi/Client/RunStreamReply.h>
+#include <QtOpenAi/Client/SkillListReply.h>
+#include <QtOpenAi/Client/SkillReply.h>
+#include <QtOpenAi/Client/SkillVersionListReply.h>
+#include <QtOpenAi/Client/SkillVersionReply.h>
 #include <QtOpenAi/Client/SpeechReply.h>
 #include <QtOpenAi/Client/ThreadMessageListReply.h>
 #include <QtOpenAi/Client/ThreadMessageReply.h>
@@ -82,6 +86,7 @@
 #include <QtOpenAi/Core/CreateEvalRequest.h>
 #include <QtOpenAi/Core/CreateFineTuningJobRequest.h>
 #include <QtOpenAi/Core/CreateRunRequest.h>
+#include <QtOpenAi/Core/CreateSkillRequest.h>
 #include <QtOpenAi/Core/CreateThreadRequest.h>
 #include <QtOpenAi/Core/CreateUploadRequest.h>
 #include <QtOpenAi/Core/CreateVectorStoreRequest.h>
@@ -758,6 +763,42 @@ public:
                                    const ListParams &params = {});
 
     RunStepReply *getRunStep(const QString &threadId, const QString &runId, const QString &stepId);
+
+    // --- Skills (/skills) --------------------------------------------------
+    // Upload a skill bundle, either as a single zip or as one part per file of
+    // a directory; the upload becomes the skill's first version.
+    SkillReply *createSkill(const Core::CreateSkillRequest &request);
+
+    SkillListReply *listSkills(const ListParams &params = {});
+
+    SkillReply *getSkill(const QString &skillId);
+
+    // Promote a published version to the skill's default (POST /skills/{id}).
+    // Publishing a version does not do this on its own.
+    SkillReply *setDefaultSkillVersion(const QString &skillId, const QString &version);
+
+    // Delete a skill. On success the reply's skill() carries the deletion
+    // acknowledgement (object "skill.deleted").
+    SkillReply *deleteSkill(const QString &skillId);
+
+    // Download the default version's bundle as a zip.
+    BinaryReply *downloadSkillContent(const QString &skillId);
+
+    // Publish a new immutable version of a skill from another bundle. Set the
+    // request's makeDefault() to promote it in the same call.
+    SkillVersionReply *createSkillVersion(const QString &skillId,
+                                          const Core::CreateSkillRequest &request);
+
+    SkillVersionListReply *listSkillVersions(const QString &skillId, const ListParams &params = {});
+
+    SkillVersionReply *getSkillVersion(const QString &skillId, const QString &version);
+
+    // Delete one version. On success the reply's version() carries the deletion
+    // acknowledgement (object "skill.version.deleted").
+    SkillVersionReply *deleteSkillVersion(const QString &skillId, const QString &version);
+
+    // Download one version's bundle as a zip.
+    BinaryReply *downloadSkillVersionContent(const QString &skillId, const QString &version);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.
