@@ -842,7 +842,9 @@ not done — so the poller stops for it without pretending the run finished.
 
 Streaming works the same way as elsewhere: `createRunStream()` emits
 `messageDelta()` for incremental assistant text and `runChanged()` for each new
-run state, ending in `finished()` or `requiresAction()`.
+run state. A parked run emits `requiresAction()` and then `finished()` — the
+request is over either way — and `submitToolOutputsStream()` resumes it as a new
+stream, so a streamed tool loop never has to fall back to polling.
 
 `listThreadMessages()` returns the transcript (most-recent-first). The Assistants
 content parts nest their text differently from the chat ones, so

@@ -179,12 +179,17 @@ private:
                 });
     }
 
-    // Both resources outlive the program otherwise.
+    // Both resources outlive the program otherwise. They are deleted one after
+    // the other rather than at once: quitting on whichever finished first would
+    // abort the other request mid-flight and leave it behind.
     void cleanUp()
     {
-        m_client->deleteThread(m_threadId);
-        Client::AssistantReply *reply = m_client->deleteAssistant(m_assistantId);
-        QObject::connect(reply, &Client::AssistantReply::done, qApp, &QCoreApplication::quit);
+        Client::ThreadReply *thread = m_client->deleteThread(m_threadId);
+        QObject::connect(thread, &Client::ThreadReply::done, [this] {
+            Client::AssistantReply *assistant = m_client->deleteAssistant(m_assistantId);
+            QObject::connect(assistant, &Client::AssistantReply::done, qApp,
+                             &QCoreApplication::quit);
+        });
     }
 
     // Every request in the chain reports a failure the same way.

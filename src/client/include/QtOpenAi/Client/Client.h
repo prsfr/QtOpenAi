@@ -742,6 +742,12 @@ public:
     RunReply *submitToolOutputs(const QString &threadId, const QString &runId,
                                 const QList<Core::ToolOutput> &outputs);
 
+    // The same, streamed: the run resumes as a Server-Sent-Events stream, so a
+    // streamed run that parked on `requires_action` can be followed to the end
+    // without falling back to polling.
+    RunStreamReply *submitToolOutputsStream(const QString &threadId, const QString &runId,
+                                            const QList<Core::ToolOutput> &outputs);
+
     // Poll a run until it stops. Returns a RunPoller that emits
     // progressed()/completed()/requiresAction(); call start() on it. It deletes
     // itself once it stops unless setAutoDelete(false) is used.

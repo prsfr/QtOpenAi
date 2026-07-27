@@ -20,6 +20,8 @@ namespace Core {
 // The common case is a plain user turn, which only needs `text`. Multimodal
 // input goes through `content` instead: an array of Assistants content parts
 // (`{"type":"image_file", ...}`, ...), which wins over `text` when non-empty.
+// With neither set the `content` field is omitted entirely — the API requires
+// it, so it answers by naming what is missing.
 struct QTOPENAI_CORE_EXPORT ThreadMessageInput
 {
     // "user" or "assistant"; the API rejects the other roles here.

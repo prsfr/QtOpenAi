@@ -395,6 +395,35 @@ QString threadRunPath(const QString &threadId, const QString &runId, const QStri
     return resourcePath(kThreads, threadId, resourcePath(kRuns, runId, suffix));
 }
 
+// The body of a submit_tool_outputs call. Both the blocking and the streamed
+// variant post it, and postStream() needs a request object it can flip the
+// `stream` flag on -- which is all this is.
+class ToolOutputsBody
+{
+public:
+    explicit ToolOutputsBody(const QList<Core::ToolOutput> &outputs)
+        : m_outputs(outputs)
+    { }
+
+    void setStream(bool stream) { m_stream = stream; }
+
+    QJsonObject toJson() const
+    {
+        QJsonArray array;
+        for (const Core::ToolOutput &output : m_outputs)
+            array.append(output.toJson());
+        QJsonObject json;
+        json.insert(QStringLiteral("tool_outputs"), array);
+        if (m_stream)
+            json.insert(QStringLiteral("stream"), true);
+        return json;
+    }
+
+private:
+    QList<Core::ToolOutput> m_outputs;
+    bool m_stream = false;
+};
+
 // Serialise a list of ids to a JSON array.
 QJsonArray idsToArray(const QStringList &ids)
 {
@@ -1526,13 +1555,17 @@ RunReply *Client::submitToolOutputs(const QString &threadId, const QString &runI
                                     const QList<Core::ToolOutput> &outputs)
 {
     Q_D(Client);
-    QJsonArray array;
-    for (const Core::ToolOutput &output : outputs)
-        array.append(output.toJson());
-    QJsonObject bodyObject;
-    bodyObject.insert(QStringLiteral("tool_outputs"), array);
     return d->post<RunReply>(threadRunPath(threadId, runId, QStringLiteral("/submit_tool_outputs")),
-                             compactJson(bodyObject), kAssistantsBeta);
+                             compactJson(ToolOutputsBody(outputs).toJson()), kAssistantsBeta);
+}
+
+RunStreamReply *Client::submitToolOutputsStream(const QString &threadId, const QString &runId,
+                                                const QList<Core::ToolOutput> &outputs)
+{
+    Q_D(Client);
+    return d->postStream<RunStreamReply>(
+            threadRunPath(threadId, runId, QStringLiteral("/submit_tool_outputs")),
+            ToolOutputsBody(outputs), kAssistantsBeta);
 }
 
 RunPoller *Client::pollRun(const QString &threadId, const QString &runId, int pollIntervalMs)

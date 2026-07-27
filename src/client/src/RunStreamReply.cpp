@@ -35,6 +35,18 @@ QString deltaText(const QJsonObject &payload)
     return text;
 }
 
+// Whether a `thread.message*` event carries a message that will not change
+// again. The event name says so directly; a server that omits the name leaves
+// the message's own status as the only signal.
+bool isSettledMessage(const QString &type, const Core::ThreadMessage &message)
+{
+    if (type == QLatin1String("thread.message.completed")
+        || type == QLatin1String("thread.message.incomplete"))
+        return true;
+    return type == QLatin1String("thread.message")
+            && message.status() != QLatin1String("in_progress");
+}
+
 } // namespace
 
 class RunStreamReplyPrivate
@@ -61,29 +73,38 @@ RunStreamReply::RunStreamReply(QNetworkReply *reply, QObject *parent)
 
     connect(reply, &QNetworkReply::readyRead, this, [this]() {
         Q_D(RunStreamReply);
-        const QList<QByteArray> payloads = d->parser.feed(d->networkReply->readAll());
-        for (const QByteArray &data : payloads) {
-            if (data == "[DONE]")
+        const QList<detail::SseEvent> events = d->parser.feed(d->networkReply->readAll());
+        for (const detail::SseEvent &sse : events) {
+            if (sse.data == "[DONE]")
                 continue;
-            const QJsonDocument doc = QJsonDocument::fromJson(data);
+            const QJsonDocument doc = QJsonDocument::fromJson(sse.data);
             if (!doc.isObject())
                 continue;
             const QJsonObject object = doc.object();
-            // Assistants events name their type in the SSE `event:` field, which
-            // the framing parser does not surface -- but every payload is a
-            // whole Assistants object that names itself, so the routing key is
-            // read from the body instead.
-            const QString objectType = object.value(QStringLiteral("object")).toString();
+            // Unlike the other streams, the Assistants events carry their type
+            // only in the SSE `event:` field: `thread.message.created` and
+            // `thread.message.completed` are both a bare message object, and
+            // nothing inside them says which of the two arrived. The payload's
+            // own `object` is the fallback for a server that omits the name.
+            const QString type = !sse.name.isEmpty()
+                    ? QString::fromUtf8(sse.name)
+                    : object.value(QStringLiteral("object")).toString();
 
-            Q_EMIT event(objectType, object);
+            Q_EMIT event(type, object);
 
-            if (objectType == QLatin1String("thread.message.delta")) {
+            if (type == QLatin1String("thread.message.delta")) {
                 const QString text = deltaText(object);
                 if (!text.isEmpty())
                     Q_EMIT messageDelta(text);
-            } else if (objectType == QLatin1String("thread.message")) {
-                Q_EMIT messageCompleted(Core::ThreadMessage::fromJson(object));
-            } else if (objectType == QLatin1String("thread.run")) {
+            } else if (type.startsWith(QLatin1String("thread.message"))) {
+                // Only the settled message is worth a signal -- `created` and
+                // `in_progress` carry the same object with no content yet.
+                const Core::ThreadMessage message = Core::ThreadMessage::fromJson(object);
+                if (isSettledMessage(type, message))
+                    Q_EMIT messageCompleted(message);
+            } else if (type == QLatin1String("thread.run")
+                       || (type.startsWith(QLatin1String("thread.run."))
+                           && !type.startsWith(QLatin1String("thread.run.step")))) {
                 d->run = Core::Run::fromJson(object);
                 Q_EMIT runChanged(d->run);
                 if (d->run.requiresAction()) {
@@ -92,16 +113,15 @@ RunStreamReply::RunStreamReply(QNetworkReply *reply, QObject *parent)
                 } else if (d->run.isTerminal()) {
                     d->sawTerminal = true;
                 }
-            } else if (objectType.isEmpty() && object.contains(QStringLiteral("error"))) {
-                // An error event is the one payload that is not an object of the
-                // API's own model.
-                const QJsonObject errorObject = object.value(QStringLiteral("error")).toObject();
-                d->error = ClientError(
-                        ClientError::Kind::Http,
-                        errorObject.value(QStringLiteral("message"))
-                                .toString(QStringLiteral("run stream reported an error")));
-                d->error.setType(errorObject.value(QStringLiteral("type")).toString());
-                d->error.setCode(errorObject.value(QStringLiteral("code")).toString());
+            } else if (type == QLatin1String("error")) {
+                // The error event is the one payload that is not an object of
+                // the API's own model: a bare {code, message, param, type}.
+                d->error = ClientError(ClientError::Kind::Http,
+                                       object.value(QStringLiteral("message"))
+                                               .toString(QStringLiteral(
+                                                       "run stream reported an error")));
+                d->error.setType(object.value(QStringLiteral("type")).toString());
+                d->error.setCode(object.value(QStringLiteral("code")).toString());
             }
         }
     });

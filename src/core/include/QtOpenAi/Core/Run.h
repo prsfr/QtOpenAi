@@ -52,7 +52,7 @@ class RunData;
 //     if (run.requiresAction()) {
 //         QList<Core::ToolOutput> outputs;
 //         for (const Core::ToolCall &call : run.requiredToolCalls())
-//             outputs.append({call.id(), registry.invoke(call)});
+//             outputs.append({call.id(), registry.invoke(call).content()});
 //         client.submitToolOutputs(run.threadId(), run.id(), outputs);
 //     }
 //

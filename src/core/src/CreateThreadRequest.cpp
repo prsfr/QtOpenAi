@@ -14,10 +14,12 @@ QJsonObject ThreadMessageInput::toJson() const
 {
     QJsonObject json;
     json.insert(QStringLiteral("role"), roleToString(role));
-    // Content is either a bare string or an array of parts; the parts win.
+    // Content is either a bare string or an array of parts; the parts win. With
+    // neither set the field is left out rather than sent as "", so the API
+    // answers by naming the missing parameter instead of rejecting an empty one.
     if (!content.isEmpty())
         json.insert(QStringLiteral("content"), content);
-    else
+    else if (!text.isEmpty())
         json.insert(QStringLiteral("content"), text);
     if (!attachments.isEmpty())
         json.insert(QStringLiteral("attachments"), attachments);

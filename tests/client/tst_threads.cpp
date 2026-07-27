@@ -31,6 +31,7 @@ public:
     }
 
     QByteArray requestHead() const { return m_request.left(m_request.indexOf("\r\n\r\n")); }
+    QByteArray requestBody() const { return m_request.mid(m_request.indexOf("\r\n\r\n") + 4); }
 
 private slots:
     void onConnection()
@@ -80,6 +81,10 @@ private slots:
     void pollerStopsOnRequiredAction();
     void pollerFollowsRunToCompletion();
     void streamsMessageDeltasAndRunStates();
+    void streamReportsOnlySettledMessages();
+    void streamSurfacesErrorEvents();
+    void streamedToolOutputsResumeTheRun();
+    void updateRunPostsMetadata();
 };
 
 void TestThreadsClient::createsThreadWithSeedMessages()
@@ -456,6 +461,137 @@ void TestThreadsClient::streamsMessageDeltasAndRunStates()
     QVERIFY(head.contains("openai-beta: assistants=v2"));
     QVERIFY(head.contains("accept: text/event-stream"));
     delete reply;
+}
+
+void TestThreadsClient::streamReportsOnlySettledMessages()
+{
+    // Every message lifecycle event carries the same bare message object -- only
+    // the SSE `event:` name says which of them arrived, so routing on the
+    // payload alone would report one finished message three times.
+    const QByteArray sse
+            = "event: thread.message.created\n"
+              "data: {\"id\":\"msg_1\",\"object\":\"thread.message\","
+              "\"status\":\"in_progress\",\"content\":[]}\n\n"
+              "event: thread.message.in_progress\n"
+              "data: {\"id\":\"msg_1\",\"object\":\"thread.message\","
+              "\"status\":\"in_progress\",\"content\":[]}\n\n"
+              "event: thread.message.delta\n"
+              "data: {\"id\":\"msg_1\",\"object\":\"thread.message.delta\",\"delta\":{"
+              "\"content\":[{\"index\":0,\"type\":\"text\",\"text\":{\"value\":"
+              "\"Sunny\"}}]}}\n\n"
+              "event: thread.message.completed\n"
+              "data: {\"id\":\"msg_1\",\"object\":\"thread.message\","
+              "\"status\":\"completed\",\"content\":[{\"type\":\"text\",\"text\":{"
+              "\"value\":\"Sunny\"}}]}\n\n"
+              "event: thread.run.completed\n"
+              "data: {\"id\":\"run_1\",\"object\":\"thread.run\","
+              "\"status\":\"completed\"}\n\n"
+              "event: done\ndata: [DONE]\n\n";
+    RunSseStubServer server(sse);
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    RunStreamReply *reply
+            = client.createRunStream(QStringLiteral("thread_1"),
+                                     CreateRunRequest(QStringLiteral("asst_1")));
+    reply->setAutoDelete(false);
+
+    QList<ThreadMessage> completed;
+    connect(reply, &RunStreamReply::messageCompleted, this,
+            [&completed](const ThreadMessage &message) { completed.append(message); });
+    QStringList eventTypes;
+    connect(reply, &RunStreamReply::event, this,
+            [&eventTypes](const QString &type, const QJsonObject &) { eventTypes.append(type); });
+    QSignalSpy finishedSpy(reply, &RunStreamReply::finished);
+
+    QVERIFY(finishedSpy.wait(5000));
+
+    QCOMPARE(completed.size(), 1);
+    QCOMPARE(completed.first().status(), QStringLiteral("completed"));
+    QCOMPARE(completed.first().text(), QStringLiteral("Sunny"));
+    // The event signal reports the name the API used, not the payload's object.
+    QVERIFY(eventTypes.contains(QStringLiteral("thread.message.created")));
+    QVERIFY(eventTypes.contains(QStringLiteral("thread.message.completed")));
+    delete reply;
+}
+
+void TestThreadsClient::streamSurfacesErrorEvents()
+{
+    // The error event is a bare ErrorObject -- no `error` wrapper, no `object`.
+    const QByteArray sse = "event: thread.run.created\n"
+                           "data: {\"id\":\"run_1\",\"object\":\"thread.run\","
+                           "\"status\":\"queued\"}\n\n"
+                           "event: error\n"
+                           "data: {\"message\":\"The server had an error\","
+                           "\"type\":\"server_error\",\"code\":\"internal\"}\n\n";
+    RunSseStubServer server(sse);
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    RunStreamReply *reply
+            = client.createRunStream(QStringLiteral("thread_1"),
+                                     CreateRunRequest(QStringLiteral("asst_1")));
+    reply->setAutoDelete(false);
+
+    QSignalSpy failedSpy(reply, &RunStreamReply::failed);
+    QVERIFY(failedSpy.wait(5000));
+
+    QVERIFY(!reply->isSuccess());
+    // The provider's own message survives instead of a generic parse error.
+    QCOMPARE(reply->error().kind(), ClientError::Kind::Http);
+    QCOMPARE(reply->error().message(), QStringLiteral("The server had an error"));
+    QCOMPARE(reply->error().type(), QStringLiteral("server_error"));
+    QCOMPARE(reply->error().code(), QStringLiteral("internal"));
+    delete reply;
+}
+
+void TestThreadsClient::streamedToolOutputsResumeTheRun()
+{
+    // A streamed run that parks on requires_action is resumed as a new stream,
+    // so the tool loop never has to fall back to polling.
+    const QByteArray sse = "event: thread.run.in_progress\n"
+                           "data: {\"id\":\"run_1\",\"object\":\"thread.run\","
+                           "\"status\":\"in_progress\"}\n\n"
+                           "event: thread.run.completed\n"
+                           "data: {\"id\":\"run_1\",\"object\":\"thread.run\","
+                           "\"status\":\"completed\"}\n\n"
+                           "event: done\ndata: [DONE]\n\n";
+    RunSseStubServer server(sse);
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    QList<ToolOutput> outputs;
+    outputs.append({QStringLiteral("call_1"), QStringLiteral("{\"temp_c\":17}")});
+
+    RunStreamReply *reply = client.submitToolOutputsStream(QStringLiteral("thread_1"),
+                                                            QStringLiteral("run_1"), outputs);
+    reply->setAutoDelete(false);
+
+    QSignalSpy finishedSpy(reply, &RunStreamReply::finished);
+    QVERIFY(finishedSpy.wait(5000));
+
+    QVERIFY(reply->isSuccess());
+    QCOMPARE(reply->run().status(), RunStatus::Completed);
+    const QByteArray head = server.requestHead();
+    QVERIFY(head.startsWith("POST /v1/threads/thread_1/runs/run_1/submit_tool_outputs "));
+    QVERIFY(head.toLower().contains("openai-beta: assistants=v2"));
+    QVERIFY(server.requestBody().contains("\"stream\":true"));
+    QVERIFY(server.requestBody().contains("\"tool_call_id\":\"call_1\""));
+    delete reply;
+}
+
+void TestThreadsClient::updateRunPostsMetadata()
+{
+    StubServer server(QByteArray(R"({"id":"run_1","metadata":{"k":"v"}})"));
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    const auto reply = awaited(client.updateRun(QStringLiteral("thread_1"),
+                                                QStringLiteral("run_1"),
+                                                QJsonObject {{QStringLiteral("k"),
+                                                              QStringLiteral("v")}}));
+    QVERIFY(reply);
+
+    QVERIFY(reply->isSuccess());
+    QVERIFY(server.requestLine().startsWith("POST /v1/threads/thread_1/runs/run_1 "));
+    QCOMPARE(server.requestBody(), QByteArray(R"({"metadata":{"k":"v"}})"));
+    QCOMPARE(reply->run().metadata().value(QStringLiteral("k")).toString(), QStringLiteral("v"));
 }
 
 QTEST_MAIN(TestThreadsClient)

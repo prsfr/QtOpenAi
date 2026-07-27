@@ -206,7 +206,9 @@ QJsonObject Run::toJson() const
     detail::insertIfNotEmpty(json, QStringLiteral("thread_id"), d->threadId);
     detail::insertIfNotEmpty(json, QStringLiteral("assistant_id"), d->assistantId);
     json.insert(QStringLiteral("status"), runStatusToString(d->status));
-    if (!d->requiredActionType.isEmpty()) {
+    // Keyed on the calls as well as the type, so a run assembled through the
+    // setters cannot lose them to an unset sibling field.
+    if (!d->requiredActionType.isEmpty() || !d->requiredToolCalls.isEmpty()) {
         QJsonArray calls;
         for (const ToolCall &call : d->requiredToolCalls)
             calls.append(call.toJson());

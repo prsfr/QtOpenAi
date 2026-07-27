@@ -20,7 +20,7 @@ class AssistantData;
 
 // A configured assistant (POST/GET /assistants, GET/POST/DELETE
 // /assistants/{id}) — a model plus the instructions, tools and resources it
-// should always run with. Threads (#24) are then run against it.
+// should always run with. Threads are then run against it (see Run).
 //
 // `tools` is an open union in the spec: a function tool carries a whole schema,
 // while `code_interpreter` and `file_search` carry their own configuration

@@ -28,10 +28,11 @@ class RunStreamReplyPrivate;
 // The stream ends the way the run does. A terminal run state emits finished()
 // with the final Run; a run that parks on `requires_action` emits
 // requiresAction() and then finished() as well, because the request itself is
-// over — answer the tool calls with Client::submitToolOutputs(), which starts a
-// new stream (or run) of its own. An HTTP error, or a stream that stops before
-// any terminal state, emits failed(). Both precede done(), after which the
-// object deletes itself unless disabled.
+// over — answer the tool calls with Client::submitToolOutputsStream(), which
+// resumes the run as a new stream (or submitToolOutputs() to continue without
+// one). An HTTP error, or a stream that stops before any terminal state, emits
+// failed(). Both precede done(), after which the object deletes itself unless
+// disabled.
 class QTOPENAI_CLIENT_EXPORT RunStreamReply : public QObject
 {
     Q_OBJECT

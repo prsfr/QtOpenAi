@@ -32,8 +32,10 @@ private slots:
     void reportsTerminalStatus();
     void parsesRunStep();
     void runStepRoundTrip();
+    void keepsRequiredToolCallsWithoutActionType();
     void serialisesToolOutputs();
     void messageInputSerialisesTextOrParts();
+    void omitsContentWhenNothingWasSet();
     void createThreadRequestSerialisesBody();
     void createRunRequestSerialisesBody();
     void createRunRequestNestsThread();
@@ -395,6 +397,26 @@ void TestThreads::runStepRoundTrip()
     QCOMPARE(RunStep::fromJson(step.toJson()), step);
 }
 
+void TestThreads::keepsRequiredToolCallsWithoutActionType()
+{
+    // The calls must not ride on a sibling field: a run assembled through the
+    // setters keeps them even when the action type was never set.
+    Run run;
+    run.setStatus(RunStatus::RequiresAction);
+    run.setRequiredToolCalls({ToolCall(QStringLiteral("call_1"),
+                                       FunctionCall(QStringLiteral("get_weather"),
+                                                    QStringLiteral("{}")))});
+
+    const Run parsed = Run::fromJson(run.toJson());
+    QCOMPARE(parsed.requiredToolCalls().size(), 1);
+    QCOMPARE(parsed.requiredToolCalls().first().id(), QStringLiteral("call_1"));
+    QCOMPARE(parsed, run);
+
+    // A run with no required action still leaves the field out entirely.
+    Run plain;
+    QVERIFY(!plain.toJson().contains(QStringLiteral("required_action")));
+}
+
 void TestThreads::serialisesToolOutputs()
 {
     ToolOutput output;
@@ -429,6 +451,16 @@ void TestThreads::messageInputSerialisesTextOrParts()
 
     QCOMPARE(ThreadMessageInput::fromJson(plainJson), plain);
     QCOMPARE(ThreadMessageInput::fromJson(multimodalJson).content, multimodal.content);
+}
+
+void TestThreads::omitsContentWhenNothingWasSet()
+{
+    // Sending "content":"" would be rejected as an invalid value; leaving the
+    // field out makes the API name the parameter it is missing.
+    const ThreadMessageInput empty;
+    const QJsonObject json = empty.toJson();
+    QVERIFY(!json.contains(QStringLiteral("content")));
+    QCOMPARE(json.value(QStringLiteral("role")).toString(), QStringLiteral("user"));
 }
 
 void TestThreads::createThreadRequestSerialisesBody()

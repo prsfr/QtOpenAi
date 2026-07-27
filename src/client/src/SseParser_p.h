@@ -2,9 +2,14 @@
 #pragma once
 
 // Internal Server-Sent-Events framing helper shared by the streaming replies.
-// Accumulates raw bytes and yields the decoded `data:` payload of each complete
-// event (events are separated by a blank line). The terminating "[DONE]"
-// sentinel is passed through verbatim for the caller to detect. Not installed.
+// Accumulates raw bytes and yields each complete event (events are separated by
+// a blank line): its `event:` name and its decoded `data:` payload. The
+// terminating "[DONE]" sentinel is passed through verbatim for the caller to
+// detect. Not installed.
+//
+// Most OpenAI streams repeat the event type inside the payload and leave the
+// name unused; the Assistants run stream is the one that does not name it
+// anywhere else, so the name has to survive framing.
 
 #include <QtCore/QByteArray>
 #include <QtCore/QList>
@@ -13,41 +18,46 @@ namespace QtOpenAi {
 namespace Client {
 namespace detail {
 
+// One framed event: the `event:` field (empty when the stream does not name its
+// events) and the concatenation of its `data:` fields.
+struct SseEvent
+{
+    QByteArray name;
+    QByteArray data;
+};
+
 class SseParser
 {
 public:
-    // Append newly-received bytes and return the `data:` payload of every event
-    // that completed in this feed (in order). Payloads that carry no `data:`
-    // field are skipped; multi-line `data:` fields are concatenated.
-    QList<QByteArray> feed(const QByteArray &bytes)
+    // Append newly-received bytes and return every event that completed in this
+    // feed (in order). Events carrying no `data:` field are skipped; multi-line
+    // `data:` fields are concatenated.
+    QList<SseEvent> feed(const QByteArray &bytes)
     {
-        QList<QByteArray> payloads;
+        QList<SseEvent> events;
         m_buffer += bytes;
         // SSE events are separated by a blank line. Normalise CRLF first.
         m_buffer.replace("\r\n", "\n");
 
         int sep;
         while ((sep = m_buffer.indexOf("\n\n")) != -1) {
-            const QByteArray event = m_buffer.left(sep);
+            const QByteArray block = m_buffer.left(sep);
             m_buffer.remove(0, sep + 2);
 
-            QByteArray data;
-            const QList<QByteArray> lines = event.split('\n');
+            SseEvent event;
+            const QList<QByteArray> lines = block.split('\n');
             for (const QByteArray &rawLine : lines) {
-                QByteArray line = rawLine;
-                if (line.startsWith(':')) // comment / heartbeat
+                if (rawLine.startsWith(':')) // comment / heartbeat
                     continue;
-                if (line.startsWith("data:")) {
-                    line = line.mid(5);
-                    if (line.startsWith(' '))
-                        line = line.mid(1);
-                    data += line;
-                }
+                if (rawLine.startsWith("event:"))
+                    event.name = fieldValue(rawLine.mid(6));
+                else if (rawLine.startsWith("data:"))
+                    event.data += fieldValue(rawLine.mid(5));
             }
-            if (!data.isEmpty())
-                payloads.append(data);
+            if (!event.data.isEmpty())
+                events.append(event);
         }
-        return payloads;
+        return events;
     }
 
     // Bytes received but not yet forming a complete event. On an error response
@@ -55,6 +65,14 @@ public:
     QByteArray buffered() const { return m_buffer; }
 
 private:
+    // A field value is separated from its name by an optional single space.
+    static QByteArray fieldValue(QByteArray value)
+    {
+        if (value.startsWith(' '))
+            value = value.mid(1);
+        return value;
+    }
+
     QByteArray m_buffer;
 };
 
