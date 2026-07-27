@@ -19,9 +19,12 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
 |----------------------|-------------------|------------------------------------------------------------|
 | `QtOpenAi::Core`     | `QtOpenAiCore`    | Value types & JSON (de)serialisation for the chat API.     |
 | `QtOpenAi::Client`   | `QtOpenAiClient`  | Async networking `Client`, replies, and the `ToolRegistry`.|
+| `QtOpenAi::Realtime` | `QtOpenAiRealtime`| The Realtime WebSocket channel (optional).                 |
 
 `QtOpenAi::Client` depends on `QtOpenAi::Core`; `Core` has no dependency beyond
-`Qt6::Core`.
+`Qt6::Core`. `QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets` — the
+one dependency nothing else needs, which is why it is a module of its own and is
+built only when that component is found (`QTOPENAI_BUILD_REALTIME`).
 
 ## Design
 
@@ -852,6 +855,102 @@ content parts nest their text differently from the chat ones, so
 carries. `listRunSteps()` and `getRunStep()` are the audit trail: which message
 the assistant wrote, which tools it called.
 
+## Realtime (`/realtime`)
+
+Every other endpoint in this library is a request that ends in a reply. The
+Realtime API is a **channel**: a WebSocket that stays open while both sides send
+events, with audio flowing in both directions as the model speaks. That is why
+it lives in its own module — `QtOpenAi::Realtime` is the only part of the library
+that needs `Qt6::WebSockets`, and it is built only when that component is
+present (`QTOPENAI_BUILD_REALTIME`).
+
+The REST half stays on `Client`, because minting a credential is an ordinary
+request. Doing that first is the point: the API key never leaves your process,
+and the channel is opened with a short-lived secret — exactly what you would
+hand a browser or a mobile client.
+
+```cpp
+Core::RealtimeSessionConfig config;
+config.setModel("gpt-realtime");
+config.setInstructions("You are concise.");
+config.setOutputModalities({"audio"});          // or {"text"}; not both
+auto *minted = client.createRealtimeClientSecret(config, 600);   // seconds
+
+// ... then, with minted->clientSecret().value():
+Realtime::RealtimeConnection connection;
+connection.setApiKey(secret.value());           // or the API key, server-side
+connection.setModel("gpt-realtime");
+connection.open();
+connection.sendText("Explain a WebSocket in one sentence.");
+```
+
+An API key and an ephemeral secret are presented identically, so moving a
+program from server-side to browser-side changes only that one string. Events
+sent before the handshake completes are queued and flushed on connect, so
+`sendText()` on the line after `open()` is not a race.
+
+Output arrives as signals, with audio already base64-decoded so a player can be
+fed straight from it:
+
+```cpp
+connect(&connection, &Realtime::RealtimeConnection::textDelta, this, &Ui::append);
+connect(&connection, &Realtime::RealtimeConnection::transcriptDelta, this, &Ui::append);
+connect(&connection, &Realtime::RealtimeConnection::audioDelta, this, &Player::play);
+connect(&connection, &Realtime::RealtimeConnection::responseFinished, this, &Ui::done);
+```
+
+The protocol is two discriminated unions — some 45 server events and 11 client
+ones. Modelling 56 classes would mean 56 places to update whenever the API grows
+one, and a client that silently drops whatever it does not know. So
+`Core::RealtimeEvent` types the envelope (`type`, `event_id`), keeps the rest of
+every event verbatim in `payload()`, and names the fields that recur across the
+union — `delta()`, `itemId()`, `responseId()`, `session()`, `errorMessage()`.
+The named signals above are the handful callers almost always want;
+`eventReceived()` carries everything, including events this library has never
+heard of:
+
+```cpp
+connect(&connection, &Realtime::RealtimeConnection::eventReceived, this,
+        [](const Core::RealtimeEvent &event) {
+            qDebug() << event.type() << event.payload();
+        });
+connection.sendEvent(Core::RealtimeEvent(u"response.cancel"_s));   // or any other
+```
+
+Audio in is the mirror image: `sendAudio(pcm)` appends to the input buffer
+(base64 is handled for you) and `commitAudio()` closes a turn — needed only when
+you have turned server-side turn detection off, since otherwise the server
+commits for you.
+
+An `error` event is a message on the channel, not a transport failure: it
+arrives as `errorReceived()` and the connection stays open.
+`socketError()` is the other one — a refused handshake or a dropped socket.
+
+`RealtimeSessionConfig` is one type rather than the usual request/response pair,
+because the API genuinely uses one shape in four places: two REST bodies, the
+`session.update` client event, and the `session.created` server event. Splitting
+it would mean converting between two identical types every time a session is
+reconfigured mid-call. Its `audio` tree, `tools`, `tool_choice`, `tracing` and
+`prompt` are carried verbatim, and `max_output_tokens` is a `QJsonValue` because
+the API answers with the string `"inf"` as readily as with a number.
+
+SIP calls bridged into a session are controlled over REST, answering a
+`realtime.call.incoming` webhook:
+
+```cpp
+client.acceptRealtimeCall(callId, config);          // ... or
+client.rejectRealtimeCall(callId, 486);             // 0 → the API's 603 Decline
+client.referRealtimeCall(callId, "tel:+14155550123");
+client.hangupRealtimeCall(callId);
+```
+
+These are the one family with nothing to decode — the API acknowledges and
+returns no object — so `RealtimeCallReply::finished()` carries no payload.
+
+> **Not covered:** `POST /realtime/calls`, the WebRTC SDP handshake. It takes an
+> SDP offer produced by a peer-connection stack, which Qt does not ship; the SIP
+> control endpoints above cover the calls the library can actually complete.
+
 ## ChatKit (`/chatkit`) — beta
 
 ChatKit is OpenAI's hosted chat UI; this is the backend half of it. The point of
@@ -1051,11 +1150,13 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `assistant`         | Assistant + thread + tool-calling run (`/threads`)   |
 | `skills`            | Skill: publish → version → promote → zip (`/skills`) |
 | `chatkit`           | ChatKit session secret + thread transcript (`/chatkit`)|
+| `realtime`          | Live Realtime session over a WebSocket (`/realtime`)  |
 
 ## Building
 
 Requirements: CMake ≥ 3.21, a C++17 compiler, and Qt 6 (`Core`, `Network`,
-plus `Test` for the test suite).
+plus `Test` for the test suite and `WebSockets` for the optional
+`QtOpenAi::Realtime` module).
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -1070,19 +1171,21 @@ ctest --test-dir build --output-on-failure
 | `QTOPENAI_BUILD_TESTS`    | `ON` top-level | Build the QtTest unit tests.         |
 | `QTOPENAI_BUILD_EXAMPLES` | `ON` top-level | Build the example programs.          |
 | `QTOPENAI_BUILD_SHARED`   | `ON`           | Build shared (vs. static) libraries. |
+| `QTOPENAI_BUILD_REALTIME` | Qt WebSockets  | Build `QtOpenAi::Realtime`; on when `Qt6::WebSockets` is found. |
 
 ### Using it from another CMake project
 
 ```cmake
 add_subdirectory(QtOpenAi)
-target_link_libraries(myapp PRIVATE QtOpenAi::Client)   # pulls in Core
+target_link_libraries(myapp PRIVATE QtOpenAi::Client)     # pulls in Core
+target_link_libraries(myapp PRIVATE QtOpenAi::Realtime)   # optional; adds WebSockets
 ```
 
 ## Testing
 
 The suite is written with **QtTest** and runs entirely offline — the networking
-tests spin up a local stub HTTP server, so no API key or internet access is
-required.
+tests spin up a local stub HTTP server, and the Realtime ones a local stub
+WebSocket server, so no API key, internet access or audio device is required.
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds and tests on
 **Linux only until 1.0**. The library has no platform-specific code, so the

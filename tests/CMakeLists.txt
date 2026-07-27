@@ -137,6 +137,10 @@ qtopenai_add_test(tst_core_chatkit
     SOURCES core/tst_chatkit.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_realtime
+    SOURCES core/tst_realtime.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp
@@ -253,3 +257,14 @@ qtopenai_add_test(tst_client_skills
 qtopenai_add_test(tst_client_chatkit
     SOURCES client/tst_chatkit.cpp
     LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_realtime
+    SOURCES client/tst_realtime.cpp
+    LIBS QtOpenAi::Client)
+
+# --- Realtime module tests (built with the module) ---
+if(QTOPENAI_BUILD_REALTIME)
+    qtopenai_add_test(tst_realtime_connection
+        SOURCES realtime/tst_connection.cpp
+        LIBS QtOpenAi::Realtime Qt6::WebSockets)
+endif()

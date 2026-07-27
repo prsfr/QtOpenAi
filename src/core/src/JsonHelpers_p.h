@@ -8,6 +8,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonValue>
 #include <QtCore/QString>
+#include <QtCore/QStringList>
 
 #include <optional>
 
@@ -28,6 +29,25 @@ inline void insertIfNonZero(QJsonObject &object, const QString &key, qint64 valu
 {
     if (value != 0)
         object.insert(key, value);
+}
+
+// Insert a list of plain strings as a JSON array, only when it is non-empty.
+inline void insertIfNotEmpty(QJsonObject &object, const QString &key, const QStringList &values)
+{
+    if (!values.isEmpty())
+        object.insert(key, QJsonArray::fromStringList(values));
+}
+
+// Read an array of plain strings; returns an empty list when absent. Non-string
+// entries decode to empty strings, the same way stringOr() treats a wrong type.
+inline QStringList stringListOr(const QJsonObject &object, const QString &key)
+{
+    QStringList values;
+    const QJsonArray array = object.value(key).toArray();
+    values.reserve(array.size());
+    for (const QJsonValue &value : array)
+        values.append(value.toString());
+    return values;
 }
 
 // Read an optional string; returns an empty QString when absent.

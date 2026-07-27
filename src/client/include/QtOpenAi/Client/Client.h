@@ -48,6 +48,9 @@
 #include <QtOpenAi/Client/ModelListReply.h>
 #include <QtOpenAi/Client/ModelReply.h>
 #include <QtOpenAi/Client/ModerationReply.h>
+#include <QtOpenAi/Client/RealtimeCallReply.h>
+#include <QtOpenAi/Client/RealtimeClientSecretReply.h>
+#include <QtOpenAi/Client/RealtimeSessionReply.h>
 #include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/ResponseStreamReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
@@ -103,6 +106,7 @@
 #include <QtOpenAi/Core/ImageGenerationRequest.h>
 #include <QtOpenAi/Core/ImageVariationRequest.h>
 #include <QtOpenAi/Core/ModerationRequest.h>
+#include <QtOpenAi/Core/RealtimeSessionConfig.h>
 #include <QtOpenAi/Core/ResponseOutputItem.h>
 #include <QtOpenAi/Core/ResponseRequest.h>
 #include <QtOpenAi/Core/SpeechRequest.h>
@@ -768,6 +772,48 @@ public:
                                    const ListParams &params = {});
 
     RunStepReply *getRunStep(const QString &threadId, const QString &runId, const QString &stepId);
+
+    // --- Realtime (/realtime) ----------------------------------------------
+    // The REST half of the Realtime API. The channel itself is a WebSocket and
+    // lives in the QtOpenAi::Realtime module; these endpoints mint the
+    // credential it connects with and control SIP calls bridged into it.
+    //
+    // Mint an ephemeral client secret for a browser or mobile client, so the
+    // API key never leaves this process. `expiresAfterSeconds` (10–7200)
+    // overrides the API's default of 600; 0 leaves it alone.
+    RealtimeClientSecretReply *
+    createRealtimeClientSecret(const Core::RealtimeSessionConfig &session,
+                               qint64 expiresAfterSeconds = 0);
+
+    // The same, for a realtime *translation* session.
+    RealtimeClientSecretReply *
+    createRealtimeTranslationClientSecret(const Core::RealtimeSessionConfig &session,
+                                          qint64 expiresAfterSeconds = 0);
+
+    // Create a session and get the configuration the server resolved for it.
+    RealtimeSessionReply *createRealtimeSession(const Core::RealtimeSessionConfig &session);
+
+    // The pre-GA transcription-session endpoint. It answers with the key nested
+    // under `client_secret`, which the value type accepts; new code should
+    // prefer createRealtimeClientSecret() with a transcription session.
+    RealtimeClientSecretReply *
+    createRealtimeTranscriptionSession(const Core::RealtimeSessionConfig &session);
+
+    // --- Realtime SIP calls (/realtime/calls) ------------------------------
+    // Answer a `realtime.call.incoming` webhook: accept the call and configure
+    // the session that will handle it.
+    RealtimeCallReply *acceptRealtimeCall(const QString &callId,
+                                          const Core::RealtimeSessionConfig &session);
+
+    // Decline an incoming call. `statusCode` is the SIP response to send back;
+    // 0 leaves it to the API, which answers 603 (Decline).
+    RealtimeCallReply *rejectRealtimeCall(const QString &callId, int statusCode = 0);
+
+    // End an active call, whether it arrived over SIP or WebRTC.
+    RealtimeCallReply *hangupRealtimeCall(const QString &callId);
+
+    // Transfer a SIP call, e.g. to "tel:+14155550123" or "sip:agent@example.com".
+    RealtimeCallReply *referRealtimeCall(const QString &callId, const QString &targetUri);
 
     // --- ChatKit (/chatkit) [beta] -----------------------------------------
     // The ChatKit endpoints are a beta surface: every call below sends the

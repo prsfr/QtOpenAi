@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Smoke test for the installed CMake package: exercises both modules through
+// Smoke test for the installed CMake package: exercises every module through
 // the namespaced imported targets to prove headers, libraries and the config
 // package all resolve.
 
@@ -8,13 +8,30 @@
 #include <QtOpenAi/Client/ToolRegistry.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QJsonObject>
 #include <QtCore/QUrl>
 
+#ifdef QTOPENAI_CONSUMER_HAS_REALTIME
+#include <QtOpenAi/Realtime/RealtimeConnection.h>
+#endif
+
 using namespace QtOpenAi;
 
-int main()
+int main(int argc, char **argv)
 {
+    // The library's QObject types expect an application object, the same as any
+    // Qt program using them would have.
+    QCoreApplication app(argc, argv);
+
+#ifdef QTOPENAI_CONSUMER_HAS_REALTIME
+    // The optional third module, when the package was built with it.
+    Realtime::RealtimeConnection connection;
+    connection.setModel(QStringLiteral("gpt-realtime"));
+    if (connection.isOpen())
+        return 1;
+#endif
+
     Client::Client client(QUrl(QStringLiteral("http://localhost:1234/v1")),
                           QStringLiteral("test-key"));
 

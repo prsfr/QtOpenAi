@@ -42,3 +42,9 @@ qtopenai_add_example(assistant assistant.cpp)
 # --- Realtime & newer surfaces (v0.9) ---
 qtopenai_add_example(skills skills.cpp)
 qtopenai_add_example(chatkit chatkit.cpp)
+
+# The Realtime example needs the optional WebSocket module as well as the client.
+if(QTOPENAI_BUILD_REALTIME)
+    qtopenai_add_example(realtime realtime.cpp)
+    target_link_libraries(realtime PRIVATE QtOpenAi::Realtime)
+endif()

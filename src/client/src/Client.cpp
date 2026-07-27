@@ -371,6 +371,9 @@ constexpr QLatin1String kVoiceConsents("/audio/voice_consents");
 constexpr QLatin1String kModels("/models");
 constexpr QLatin1String kCompletions("/completions");
 constexpr QLatin1String kSkills("/skills");
+constexpr QLatin1String kRealtime("/realtime");
+constexpr QLatin1String kRealtimeCalls("/realtime/calls");
+constexpr QLatin1String kRealtimeClientSecrets("/realtime/client_secrets");
 constexpr QLatin1String kChatKitSessions("/chatkit/sessions");
 constexpr QLatin1String kChatKitThreads("/chatkit/threads");
 // The sub-resource the item-bearing collections hang their entries off.
@@ -411,6 +414,12 @@ QString threadRunPath(const QString &threadId, const QString &runId, const QStri
 QString skillVersionPath(const QString &skillId, const QString &version, const QString &suffix = {})
 {
     return resourcePath(kSkills, skillId, resourcePath(kVersions, version, suffix));
+}
+
+// Realtime SIP call control hangs four verbs off one call.
+QString realtimeCallPath(const QString &callId, const QString &suffix)
+{
+    return resourcePath(kRealtimeCalls, callId, suffix);
 }
 
 // The file parts of a skill upload. A bundle is either a single zip or one part
@@ -477,6 +486,21 @@ QByteArray metadataBody(const QJsonObject &metadata)
 {
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("metadata"), metadata);
+    return compactJson(bodyObject);
+}
+
+// The body both client-secret endpoints take: the session to start from, plus
+// an optional lifetime for the secret itself. The anchor is a constant in the
+// API, so it travels with the seconds rather than being a second argument.
+QByteArray clientSecretBody(const Core::RealtimeSessionConfig &session, qint64 expiresAfterSeconds)
+{
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("session"), session.toJson());
+    if (expiresAfterSeconds > 0) {
+        bodyObject.insert(QStringLiteral("expires_after"),
+                          QJsonObject {{QStringLiteral("anchor"), QStringLiteral("created_at")},
+                                       {QStringLiteral("seconds"), expiresAfterSeconds}});
+    }
     return compactJson(bodyObject);
 }
 
@@ -1617,6 +1641,75 @@ RunStepReply *Client::getRunStep(const QString &threadId, const QString &runId,
     Q_D(Client);
     return d->get<RunStepReply>(threadRunPath(threadId, runId, resourcePath(kSteps, stepId)), {},
                                 kAssistantsBeta);
+}
+
+RealtimeClientSecretReply *
+Client::createRealtimeClientSecret(const Core::RealtimeSessionConfig &session,
+                                   qint64 expiresAfterSeconds)
+{
+    Q_D(Client);
+    return d->post<RealtimeClientSecretReply>(kRealtimeClientSecrets,
+                                              clientSecretBody(session, expiresAfterSeconds));
+}
+
+RealtimeClientSecretReply *
+Client::createRealtimeTranslationClientSecret(const Core::RealtimeSessionConfig &session,
+                                              qint64 expiresAfterSeconds)
+{
+    Q_D(Client);
+    return d->post<RealtimeClientSecretReply>(
+            QString(kRealtime) + QStringLiteral("/translations/client_secrets"),
+            clientSecretBody(session, expiresAfterSeconds));
+}
+
+RealtimeSessionReply *Client::createRealtimeSession(const Core::RealtimeSessionConfig &session)
+{
+    Q_D(Client);
+    return d->post<RealtimeSessionReply>(QString(kRealtime) + QStringLiteral("/sessions"),
+                                         compactJson(session.toJson()));
+}
+
+RealtimeClientSecretReply *
+Client::createRealtimeTranscriptionSession(const Core::RealtimeSessionConfig &session)
+{
+    Q_D(Client);
+    return d->post<RealtimeClientSecretReply>(QString(kRealtime)
+                                                      + QStringLiteral("/transcription_sessions"),
+                                              compactJson(session.toJson()));
+}
+
+RealtimeCallReply *Client::acceptRealtimeCall(const QString &callId,
+                                              const Core::RealtimeSessionConfig &session)
+{
+    Q_D(Client);
+    return d->post<RealtimeCallReply>(realtimeCallPath(callId, QStringLiteral("/accept")),
+                                      compactJson(session.toJson()));
+}
+
+RealtimeCallReply *Client::rejectRealtimeCall(const QString &callId, int statusCode)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    // Omitting the code lets the API answer its documented default, 603.
+    if (statusCode > 0)
+        bodyObject.insert(QStringLiteral("status_code"), statusCode);
+    return d->post<RealtimeCallReply>(realtimeCallPath(callId, QStringLiteral("/reject")),
+                                      compactJson(bodyObject));
+}
+
+RealtimeCallReply *Client::hangupRealtimeCall(const QString &callId)
+{
+    Q_D(Client);
+    return d->post<RealtimeCallReply>(realtimeCallPath(callId, QStringLiteral("/hangup")));
+}
+
+RealtimeCallReply *Client::referRealtimeCall(const QString &callId, const QString &targetUri)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("target_uri"), targetUri);
+    return d->post<RealtimeCallReply>(realtimeCallPath(callId, QStringLiteral("/refer")),
+                                      compactJson(bodyObject));
 }
 
 ChatKitSessionReply *Client::createChatKitSession(const Core::CreateChatKitSessionRequest &request)

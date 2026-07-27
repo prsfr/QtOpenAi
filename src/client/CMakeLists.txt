@@ -83,6 +83,9 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/RunStepListReply.h
     include/QtOpenAi/Client/RunStreamReply.h
     include/QtOpenAi/Client/RunPoller.h
+    include/QtOpenAi/Client/RealtimeClientSecretReply.h
+    include/QtOpenAi/Client/RealtimeSessionReply.h
+    include/QtOpenAi/Client/RealtimeCallReply.h
     include/QtOpenAi/Client/ChatKitSessionReply.h
     include/QtOpenAi/Client/ChatKitThreadReply.h
     include/QtOpenAi/Client/ChatKitThreadListReply.h

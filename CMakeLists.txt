@@ -52,6 +52,16 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 # --------------------------------------------------------------------------
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Network)
 
+# QtOpenAi::Realtime is the only module that needs Qt6::WebSockets, so it is
+# built only when that component is there. Everything else works without it.
+find_package(Qt6 6.4 QUIET COMPONENTS WebSockets)
+option(QTOPENAI_BUILD_REALTIME "Build the QtOpenAi::Realtime module (needs Qt6::WebSockets)"
+       ${Qt6WebSockets_FOUND})
+if(QTOPENAI_BUILD_REALTIME AND NOT Qt6WebSockets_FOUND)
+    message(FATAL_ERROR
+        "QTOPENAI_BUILD_REALTIME is ON but Qt6::WebSockets was not found.")
+endif()
+
 qt_standard_project_setup()
 
 # --------------------------------------------------------------------------
