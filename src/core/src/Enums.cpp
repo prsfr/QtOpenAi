@@ -107,6 +107,24 @@ constexpr WireName<EvalRunStatus> kEvalRunStatuses[] = {
         {EvalRunStatus::Canceled, "canceled"},
 };
 
+constexpr WireName<RunStatus> kRunStatuses[] = {
+        {RunStatus::Queued, "queued"},
+        {RunStatus::InProgress, "in_progress"},
+        {RunStatus::RequiresAction, "requires_action"},
+        {RunStatus::Cancelling, "cancelling"},
+        {RunStatus::Cancelled, "cancelled"},
+        {RunStatus::Failed, "failed"},
+        {RunStatus::Completed, "completed"},
+        {RunStatus::Incomplete, "incomplete"},
+        {RunStatus::Expired, "expired"},
+};
+
+constexpr WireName<RunStepStatus> kRunStepStatuses[] = {
+        {RunStepStatus::InProgress, "in_progress"}, {RunStepStatus::Cancelled, "cancelled"},
+        {RunStepStatus::Failed, "failed"},          {RunStepStatus::Completed, "completed"},
+        {RunStepStatus::Expired, "expired"},
+};
+
 } // namespace
 
 QString roleToString(Role role) { return toWire(role, kRoles, Role::User); }
@@ -190,6 +208,26 @@ QString evalRunStatusToString(EvalRunStatus status)
 EvalRunStatus evalRunStatusFromString(const QString &value)
 {
     return fromWire(value, kEvalRunStatuses, EvalRunStatus::Queued);
+}
+
+QString runStatusToString(RunStatus status)
+{
+    return toWire(status, kRunStatuses, RunStatus::Queued);
+}
+
+RunStatus runStatusFromString(const QString &value)
+{
+    return fromWire(value, kRunStatuses, RunStatus::Queued);
+}
+
+QString runStepStatusToString(RunStepStatus status)
+{
+    return toWire(status, kRunStepStatuses, RunStepStatus::InProgress);
+}
+
+RunStepStatus runStepStatusFromString(const QString &value)
+{
+    return fromWire(value, kRunStepStatuses, RunStepStatus::InProgress);
 }
 
 } // namespace Core

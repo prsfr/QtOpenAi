@@ -121,6 +121,14 @@ qtopenai_add_test(tst_core_evals
     SOURCES core/tst_evals.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_assistants
+    SOURCES core/tst_assistants.cpp
+    LIBS QtOpenAi::Core)
+
+qtopenai_add_test(tst_core_threads
+    SOURCES core/tst_threads.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp
@@ -220,4 +228,12 @@ qtopenai_add_test(tst_client_voices
 
 qtopenai_add_test(tst_client_evals
     SOURCES client/tst_evals.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_assistants
+    SOURCES client/tst_assistants.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_threads
+    SOURCES client/tst_threads.cpp
     LIBS QtOpenAi::Client)

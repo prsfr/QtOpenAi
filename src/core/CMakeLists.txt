@@ -62,6 +62,14 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/Eval.h
     include/QtOpenAi/Core/EvalRun.h
     include/QtOpenAi/Core/CreateEvalRequest.h
+    include/QtOpenAi/Core/Assistant.h
+    include/QtOpenAi/Core/CreateAssistantRequest.h
+    include/QtOpenAi/Core/Thread.h
+    include/QtOpenAi/Core/ThreadMessage.h
+    include/QtOpenAi/Core/CreateThreadRequest.h
+    include/QtOpenAi/Core/Run.h
+    include/QtOpenAi/Core/RunStep.h
+    include/QtOpenAi/Core/CreateRunRequest.h
 )
 
 add_library(QtOpenAiCore
@@ -122,6 +130,14 @@ add_library(QtOpenAiCore
     src/Eval.cpp
     src/EvalRun.cpp
     src/CreateEvalRequest.cpp
+    src/Assistant.cpp
+    src/CreateAssistantRequest.cpp
+    src/Thread.cpp
+    src/ThreadMessage.cpp
+    src/CreateThreadRequest.cpp
+    src/Run.cpp
+    src/RunStep.cpp
+    src/CreateRunRequest.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

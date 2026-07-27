@@ -35,3 +35,6 @@ qtopenai_add_example(containers containers.cpp)
 qtopenai_add_example(batch batch.cpp)
 qtopenai_add_example(fine_tuning fine_tuning.cpp)
 qtopenai_add_example(evals evals.cpp)
+
+# --- Assistants beta (v0.8) ---
+qtopenai_add_example(assistant assistant.cpp)

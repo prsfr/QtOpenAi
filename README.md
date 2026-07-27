@@ -775,6 +775,81 @@ itself (not a `/cancel` sub-path), and the delete acknowledgements name their id
 `eval_id`/`run_id`, which the value types accept as alternative spellings of
 `id`.
 
+## Assistants (`/assistants`) — beta
+
+An assistant is a *stored* configuration: a model plus the instructions, tools
+and resources it should always run with. It is created once and then run against
+threads (below), so a client only has to keep an id.
+
+```cpp
+Core::CreateAssistantRequest request("gpt-4o-mini");
+request.setName("Weather assistant");
+request.setInstructions("Answer weather questions in one sentence.");
+request.addTool(Core::Tool::function("get_weather", "Current weather", schema));
+request.addFileSearchTool();          // the hosted tools carry no schema
+auto *created = client.createAssistant(request);
+```
+
+The same body type modifies an assistant — `updateAssistant(id, request)` sends
+only the fields that were set, so a rename cannot reset the instructions.
+
+Because `tools`, `tool_resources` and `response_format` are open unions in the
+API (a function tool carries a schema, `file_search` carries its own config),
+`Assistant` keeps them as raw JSON; `addTool()` builds a function entry from the
+typed `Core::Tool` the rest of the library uses.
+
+Assistants are still a beta surface, and the API rejects a call that does not say
+which version it speaks. The client sends `OpenAI-Beta: assistants=v2` on every
+Assistants and threads request — nothing to configure. A provider that wants a
+different value can override it with `setDefaultHeader("OpenAI-Beta", ...)`.
+
+## Threads, messages & runs (`/threads`) — beta
+
+A thread is the conversation, kept server-side: append messages, run an assistant
+against it, and the transcript grows without the client resending it.
+
+```cpp
+Core::CreateThreadRequest thread;
+thread.addUserMessage("What is the weather in Oslo?");
+auto *opened = client.createThread(thread);           // or createThreadAndRun(...)
+
+Core::CreateRunRequest run(assistantId);
+auto *started = client.createRun(threadId, run);
+```
+
+A run is asynchronous, and it stops for **two** different reasons — `RunPoller`
+reports them separately, because only one of them means the run is over:
+
+```cpp
+auto *poller = client.pollRun(threadId, runId, 1000);
+connect(poller, &Client::RunPoller::completed, this, [](const Core::Run &run) {
+    qDebug() << "finished:" << Core::runStatusToString(run.status());
+});
+connect(poller, &Client::RunPoller::requiresAction, this, [&](const Core::Run &run) {
+    // The model called a tool this program owns. The calls arrive as ordinary
+    // ToolCalls, so the ToolRegistry answers them unchanged.
+    QList<Core::ToolOutput> outputs;
+    for (const Core::ToolCall &call : run.requiredToolCalls())
+        outputs.append({call.id(), registry.invoke(call).content()});
+    client.submitToolOutputs(threadId, run.id(), outputs);   // the run continues
+});
+poller->start();
+```
+
+`Run::isTerminal()` covers `completed`/`failed`/`cancelled`/`incomplete`/
+`expired`; `requires_action` is deliberately *not* terminal — the run is parked,
+not done — so the poller stops for it without pretending the run finished.
+
+Streaming works the same way as elsewhere: `createRunStream()` emits
+`messageDelta()` for incremental assistant text and `runChanged()` for each new
+run state, ending in `finished()` or `requiresAction()`.
+
+`listThreadMessages()` returns the transcript (most-recent-first). The Assistants
+content parts nest their text differently from the chat ones, so
+`ThreadMessage::text()` pulls the readable part out of whatever the message
+carries. `listRunSteps()` and `getRunStep()` are the audit trail: which message
+the assistant wrote, which tools it called.
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -874,6 +949,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `batch`             | Batch: upload → create → poll → results (`/batches`) |
 | `fine_tuning`       | Fine-tuning: train → poll → events (`/fine_tuning`)  |
 | `evals`             | Evals: define → run → poll → items (`/evals`)        |
+| `assistant`         | Assistant + thread + tool-calling run (`/threads`)   |
 
 ## Building
 
