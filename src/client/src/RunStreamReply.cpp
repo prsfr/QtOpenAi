@@ -44,7 +44,7 @@ bool isSettledMessage(const QString &type, const Core::ThreadMessage &message)
         || type == QLatin1String("thread.message.incomplete"))
         return true;
     return type == QLatin1String("thread.message")
-            && message.status() != QLatin1String("in_progress");
+           && message.status() != QLatin1String("in_progress");
 }
 
 } // namespace
@@ -87,8 +87,8 @@ RunStreamReply::RunStreamReply(QNetworkReply *reply, QObject *parent)
             // nothing inside them says which of the two arrived. The payload's
             // own `object` is the fallback for a server that omits the name.
             const QString type = !sse.name.isEmpty()
-                    ? QString::fromUtf8(sse.name)
-                    : object.value(QStringLiteral("object")).toString();
+                                         ? QString::fromUtf8(sse.name)
+                                         : object.value(QStringLiteral("object")).toString();
 
             Q_EMIT event(type, object);
 
@@ -116,10 +116,10 @@ RunStreamReply::RunStreamReply(QNetworkReply *reply, QObject *parent)
             } else if (type == QLatin1String("error")) {
                 // The error event is the one payload that is not an object of
                 // the API's own model: a bare {code, message, param, type}.
-                d->error = ClientError(ClientError::Kind::Http,
-                                       object.value(QStringLiteral("message"))
-                                               .toString(QStringLiteral(
-                                                       "run stream reported an error")));
+                d->error = ClientError(
+                        ClientError::Kind::Http,
+                        object.value(QStringLiteral("message"))
+                                .toString(QStringLiteral("run stream reported an error")));
                 d->error.setType(object.value(QStringLiteral("type")).toString());
                 d->error.setCode(object.value(QStringLiteral("code")).toString());
             }

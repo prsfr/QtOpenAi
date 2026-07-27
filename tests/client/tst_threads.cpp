@@ -468,31 +468,29 @@ void TestThreadsClient::streamReportsOnlySettledMessages()
     // Every message lifecycle event carries the same bare message object -- only
     // the SSE `event:` name says which of them arrived, so routing on the
     // payload alone would report one finished message three times.
-    const QByteArray sse
-            = "event: thread.message.created\n"
-              "data: {\"id\":\"msg_1\",\"object\":\"thread.message\","
-              "\"status\":\"in_progress\",\"content\":[]}\n\n"
-              "event: thread.message.in_progress\n"
-              "data: {\"id\":\"msg_1\",\"object\":\"thread.message\","
-              "\"status\":\"in_progress\",\"content\":[]}\n\n"
-              "event: thread.message.delta\n"
-              "data: {\"id\":\"msg_1\",\"object\":\"thread.message.delta\",\"delta\":{"
-              "\"content\":[{\"index\":0,\"type\":\"text\",\"text\":{\"value\":"
-              "\"Sunny\"}}]}}\n\n"
-              "event: thread.message.completed\n"
-              "data: {\"id\":\"msg_1\",\"object\":\"thread.message\","
-              "\"status\":\"completed\",\"content\":[{\"type\":\"text\",\"text\":{"
-              "\"value\":\"Sunny\"}}]}\n\n"
-              "event: thread.run.completed\n"
-              "data: {\"id\":\"run_1\",\"object\":\"thread.run\","
-              "\"status\":\"completed\"}\n\n"
-              "event: done\ndata: [DONE]\n\n";
+    const QByteArray sse = "event: thread.message.created\n"
+                           "data: {\"id\":\"msg_1\",\"object\":\"thread.message\","
+                           "\"status\":\"in_progress\",\"content\":[]}\n\n"
+                           "event: thread.message.in_progress\n"
+                           "data: {\"id\":\"msg_1\",\"object\":\"thread.message\","
+                           "\"status\":\"in_progress\",\"content\":[]}\n\n"
+                           "event: thread.message.delta\n"
+                           "data: {\"id\":\"msg_1\",\"object\":\"thread.message.delta\",\"delta\":{"
+                           "\"content\":[{\"index\":0,\"type\":\"text\",\"text\":{\"value\":"
+                           "\"Sunny\"}}]}}\n\n"
+                           "event: thread.message.completed\n"
+                           "data: {\"id\":\"msg_1\",\"object\":\"thread.message\","
+                           "\"status\":\"completed\",\"content\":[{\"type\":\"text\",\"text\":{"
+                           "\"value\":\"Sunny\"}}]}\n\n"
+                           "event: thread.run.completed\n"
+                           "data: {\"id\":\"run_1\",\"object\":\"thread.run\","
+                           "\"status\":\"completed\"}\n\n"
+                           "event: done\ndata: [DONE]\n\n";
     RunSseStubServer server(sse);
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    RunStreamReply *reply
-            = client.createRunStream(QStringLiteral("thread_1"),
-                                     CreateRunRequest(QStringLiteral("asst_1")));
+    RunStreamReply *reply = client.createRunStream(QStringLiteral("thread_1"),
+                                                   CreateRunRequest(QStringLiteral("asst_1")));
     reply->setAutoDelete(false);
 
     QList<ThreadMessage> completed;
@@ -526,9 +524,8 @@ void TestThreadsClient::streamSurfacesErrorEvents()
     RunSseStubServer server(sse);
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    RunStreamReply *reply
-            = client.createRunStream(QStringLiteral("thread_1"),
-                                     CreateRunRequest(QStringLiteral("asst_1")));
+    RunStreamReply *reply = client.createRunStream(QStringLiteral("thread_1"),
+                                                   CreateRunRequest(QStringLiteral("asst_1")));
     reply->setAutoDelete(false);
 
     QSignalSpy failedSpy(reply, &RunStreamReply::failed);
@@ -561,7 +558,7 @@ void TestThreadsClient::streamedToolOutputsResumeTheRun()
     outputs.append({QStringLiteral("call_1"), QStringLiteral("{\"temp_c\":17}")});
 
     RunStreamReply *reply = client.submitToolOutputsStream(QStringLiteral("thread_1"),
-                                                            QStringLiteral("run_1"), outputs);
+                                                           QStringLiteral("run_1"), outputs);
     reply->setAutoDelete(false);
 
     QSignalSpy finishedSpy(reply, &RunStreamReply::finished);
@@ -582,10 +579,9 @@ void TestThreadsClient::updateRunPostsMetadata()
     StubServer server(QByteArray(R"({"id":"run_1","metadata":{"k":"v"}})"));
     Client client(server.baseUrl(), QStringLiteral("k"));
 
-    const auto reply = awaited(client.updateRun(QStringLiteral("thread_1"),
-                                                QStringLiteral("run_1"),
-                                                QJsonObject {{QStringLiteral("k"),
-                                                              QStringLiteral("v")}}));
+    const auto reply
+            = awaited(client.updateRun(QStringLiteral("thread_1"), QStringLiteral("run_1"),
+                                       QJsonObject {{QStringLiteral("k"), QStringLiteral("v")}}));
     QVERIFY(reply);
 
     QVERIFY(reply->isSuccess());

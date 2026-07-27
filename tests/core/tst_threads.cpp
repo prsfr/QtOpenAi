@@ -403,9 +403,9 @@ void TestThreads::keepsRequiredToolCallsWithoutActionType()
     // setters keeps them even when the action type was never set.
     Run run;
     run.setStatus(RunStatus::RequiresAction);
-    run.setRequiredToolCalls({ToolCall(QStringLiteral("call_1"),
-                                       FunctionCall(QStringLiteral("get_weather"),
-                                                    QStringLiteral("{}")))});
+    run.setRequiredToolCalls(
+            {ToolCall(QStringLiteral("call_1"),
+                      FunctionCall(QStringLiteral("get_weather"), QStringLiteral("{}")))});
 
     const Run parsed = Run::fromJson(run.toJson());
     QCOMPARE(parsed.requiredToolCalls().size(), 1);
