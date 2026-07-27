@@ -157,22 +157,7 @@ void Batch::setErrors(const QList<BatchError> &errors) { d->errors = errors; }
 QJsonObject Batch::metadata() const { return d->metadata; }
 void Batch::setMetadata(const QJsonObject &metadata) { d->metadata = metadata; }
 
-bool Batch::isTerminal() const
-{
-    switch (d->status) {
-    case BatchStatus::Completed:
-    case BatchStatus::Failed:
-    case BatchStatus::Expired:
-    case BatchStatus::Cancelled:
-        return true;
-    case BatchStatus::Validating:
-    case BatchStatus::InProgress:
-    case BatchStatus::Finalizing:
-    case BatchStatus::Cancelling:
-        return false;
-    }
-    return false;
-}
+bool Batch::isTerminal() const { return Core::isTerminal(d->status); }
 
 QJsonObject Batch::toJson() const
 {

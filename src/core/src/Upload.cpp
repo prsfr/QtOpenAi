@@ -120,7 +120,7 @@ void Upload::setExpiresAt(qint64 expiresAt) { d->expiresAt = expiresAt; }
 std::optional<FileObject> Upload::file() const { return d->file; }
 void Upload::setFile(const FileObject &file) { d->file = file; }
 
-bool Upload::isTerminal() const { return d->status != UploadStatus::Pending; }
+bool Upload::isTerminal() const { return Core::isTerminal(d->status); }
 
 QJsonObject Upload::toJson() const
 {

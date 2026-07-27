@@ -91,19 +91,7 @@ void RunStep::setUsage(const Usage &usage) { d->usage = usage; }
 QJsonObject RunStep::metadata() const { return d->metadata; }
 void RunStep::setMetadata(const QJsonObject &metadata) { d->metadata = metadata; }
 
-bool RunStep::isTerminal() const
-{
-    switch (d->status) {
-    case RunStepStatus::Cancelled:
-    case RunStepStatus::Failed:
-    case RunStepStatus::Completed:
-    case RunStepStatus::Expired:
-        return true;
-    case RunStepStatus::InProgress:
-        return false;
-    }
-    return false;
-}
+bool RunStep::isTerminal() const { return Core::isTerminal(d->status); }
 
 QJsonObject RunStep::toJson() const
 {

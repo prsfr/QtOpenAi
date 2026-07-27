@@ -6,14 +6,24 @@ namespace Core {
 
 namespace {
 
-// The wire spelling of one enum value. Each enum below is described by a single
-// table, so the mapping and its inverse can never drift apart -- which they
-// could when both directions were hand-written as a switch and an if-chain.
+// One enum value: its wire spelling, and whether reaching it ends the lifecycle
+// the value belongs to. Each enum below is described by a single table, so the
+// mapping and its inverse can never drift apart -- which they could when both
+// directions were hand-written as a switch and an if-chain.
+//
+// `terminal` extends that same argument to the third thing a status is asked:
+// the job-shaped enums used to answer isTerminal() from a switch inside their
+// value type, one file away from the spelling. A status added here with the
+// wrong column, or added to the type's switch and not here, could disagree with
+// itself. Now there is one row per value and nowhere else to look. The enums
+// that describe no lifecycle (Role, FinishReason) leave the column at false and
+// are never asked.
 template <typename Enum>
 struct WireName
 {
     Enum value;
     const char *name;
+    bool terminal = false;
 };
 
 // An enum value the table does not cover encodes as `fallback`'s spelling, and
@@ -41,6 +51,19 @@ Enum fromWire(const QString &value, const WireName<Enum> (&table)[N], Enum fallb
     return fallback;
 }
 
+// A value the table does not cover is treated as non-terminal, matching the
+// decode fallbacks: an unfamiliar status from a newer server leaves a poller
+// waiting rather than stopping it early.
+template <typename Enum, size_t N>
+bool terminalIn(Enum value, const WireName<Enum> (&table)[N])
+{
+    for (const auto &row : table) {
+        if (row.value == value)
+            return row.terminal;
+    }
+    return false;
+}
+
 constexpr WireName<Role> kRoles[] = {
         {Role::System, "system"}, {Role::User, "user"},           {Role::Assistant, "assistant"},
         {Role::Tool, "tool"},     {Role::Developer, "developer"},
@@ -59,15 +82,16 @@ constexpr WireName<FinishReason> kFinishReasons[] = {
 constexpr WireName<VideoStatus> kVideoStatuses[] = {
         {VideoStatus::Queued, "queued"},
         {VideoStatus::InProgress, "in_progress"},
-        {VideoStatus::Completed, "completed"},
-        {VideoStatus::Failed, "failed"},
+        {VideoStatus::Completed, "completed", true},
+        {VideoStatus::Failed, "failed", true},
 };
 
+// Only a pending upload accepts further parts, so every other state is final.
 constexpr WireName<UploadStatus> kUploadStatuses[] = {
         {UploadStatus::Pending, "pending"},
-        {UploadStatus::Completed, "completed"},
-        {UploadStatus::Cancelled, "cancelled"},
-        {UploadStatus::Expired, "expired"},
+        {UploadStatus::Completed, "completed", true},
+        {UploadStatus::Cancelled, "cancelled", true},
+        {UploadStatus::Expired, "expired", true},
 };
 
 constexpr WireName<VectorStoreStatus> kVectorStoreStatuses[] = {
@@ -83,152 +107,99 @@ constexpr WireName<VectorStoreFileStatus> kVectorStoreFileStatuses[] = {
         {VectorStoreFileStatus::Failed, "failed"},
 };
 
+// Cancelling is not terminal: the batch still has to drain its in-flight
+// requests before it reaches Cancelled.
 constexpr WireName<BatchStatus> kBatchStatuses[] = {
         {BatchStatus::Validating, "validating"}, {BatchStatus::InProgress, "in_progress"},
-        {BatchStatus::Finalizing, "finalizing"}, {BatchStatus::Completed, "completed"},
-        {BatchStatus::Failed, "failed"},         {BatchStatus::Expired, "expired"},
-        {BatchStatus::Cancelling, "cancelling"}, {BatchStatus::Cancelled, "cancelled"},
+        {BatchStatus::Finalizing, "finalizing"}, {BatchStatus::Completed, "completed", true},
+        {BatchStatus::Failed, "failed", true},   {BatchStatus::Expired, "expired", true},
+        {BatchStatus::Cancelling, "cancelling"}, {BatchStatus::Cancelled, "cancelled", true},
 };
 
+// A paused job is not terminal -- it resumes on request, so a poller keeps
+// waiting across the pause.
 constexpr WireName<FineTuningJobStatus> kFineTuningJobStatuses[] = {
         {FineTuningJobStatus::ValidatingFiles, "validating_files"},
         {FineTuningJobStatus::Queued, "queued"},
         {FineTuningJobStatus::Running, "running"},
-        {FineTuningJobStatus::Succeeded, "succeeded"},
-        {FineTuningJobStatus::Failed, "failed"},
-        {FineTuningJobStatus::Cancelled, "cancelled"},
+        {FineTuningJobStatus::Succeeded, "succeeded", true},
+        {FineTuningJobStatus::Failed, "failed", true},
+        {FineTuningJobStatus::Cancelled, "cancelled", true},
         {FineTuningJobStatus::Paused, "paused"},
 };
 
 // Note the single-l "canceled" this endpoint family uses, unlike every other.
 constexpr WireName<EvalRunStatus> kEvalRunStatuses[] = {
-        {EvalRunStatus::Queued, "queued"},       {EvalRunStatus::InProgress, "in_progress"},
-        {EvalRunStatus::Completed, "completed"}, {EvalRunStatus::Failed, "failed"},
-        {EvalRunStatus::Canceled, "canceled"},
+        {EvalRunStatus::Queued, "queued"},
+        {EvalRunStatus::InProgress, "in_progress"},
+        {EvalRunStatus::Completed, "completed", true},
+        {EvalRunStatus::Failed, "failed", true},
+        {EvalRunStatus::Canceled, "canceled", true},
 };
 
+// RequiresAction is deliberately not terminal: the run is parked until the
+// client submits its tool outputs, and then continues.
 constexpr WireName<RunStatus> kRunStatuses[] = {
         {RunStatus::Queued, "queued"},
         {RunStatus::InProgress, "in_progress"},
         {RunStatus::RequiresAction, "requires_action"},
         {RunStatus::Cancelling, "cancelling"},
-        {RunStatus::Cancelled, "cancelled"},
-        {RunStatus::Failed, "failed"},
-        {RunStatus::Completed, "completed"},
-        {RunStatus::Incomplete, "incomplete"},
-        {RunStatus::Expired, "expired"},
+        {RunStatus::Cancelled, "cancelled", true},
+        {RunStatus::Failed, "failed", true},
+        {RunStatus::Completed, "completed", true},
+        {RunStatus::Incomplete, "incomplete", true},
+        {RunStatus::Expired, "expired", true},
 };
 
 constexpr WireName<RunStepStatus> kRunStepStatuses[] = {
-        {RunStepStatus::InProgress, "in_progress"}, {RunStepStatus::Cancelled, "cancelled"},
-        {RunStepStatus::Failed, "failed"},          {RunStepStatus::Completed, "completed"},
-        {RunStepStatus::Expired, "expired"},
+        {RunStepStatus::InProgress, "in_progress"}, {RunStepStatus::Cancelled, "cancelled", true},
+        {RunStepStatus::Failed, "failed", true},    {RunStepStatus::Completed, "completed", true},
+        {RunStepStatus::Expired, "expired", true},
 };
 
 } // namespace
 
-QString roleToString(Role role) { return toWire(role, kRoles, Role::User); }
-Role roleFromString(const QString &value) { return fromWire(value, kRoles, Role::User); }
+// Define one enum's pair of public conversions. Both directions name the same
+// table and the same fallback exactly once here, so a fallback cannot be
+// changed on the decode side and forgotten on the encode side -- the drift the
+// tables themselves were introduced to remove, one level up.
+#define QTOPENAI_WIRE_CONVERSIONS(ToName, FromName, Enum, table, fallback)                         \
+    QString ToName(Enum value) { return toWire(value, table, fallback); }                          \
+    Enum FromName(const QString &value) { return fromWire(value, table, fallback); }
 
-QString finishReasonToString(FinishReason reason)
-{
-    return toWire(reason, kFinishReasons, FinishReason::None);
-}
+QTOPENAI_WIRE_CONVERSIONS(roleToString, roleFromString, Role, kRoles, Role::User)
+QTOPENAI_WIRE_CONVERSIONS(finishReasonToString, finishReasonFromString, FinishReason,
+                          kFinishReasons, FinishReason::None)
+QTOPENAI_WIRE_CONVERSIONS(videoStatusToString, videoStatusFromString, VideoStatus, kVideoStatuses,
+                          VideoStatus::Queued)
+QTOPENAI_WIRE_CONVERSIONS(uploadStatusToString, uploadStatusFromString, UploadStatus,
+                          kUploadStatuses, UploadStatus::Pending)
+QTOPENAI_WIRE_CONVERSIONS(vectorStoreStatusToString, vectorStoreStatusFromString, VectorStoreStatus,
+                          kVectorStoreStatuses, VectorStoreStatus::InProgress)
+QTOPENAI_WIRE_CONVERSIONS(vectorStoreFileStatusToString, vectorStoreFileStatusFromString,
+                          VectorStoreFileStatus, kVectorStoreFileStatuses,
+                          VectorStoreFileStatus::InProgress)
+QTOPENAI_WIRE_CONVERSIONS(batchStatusToString, batchStatusFromString, BatchStatus, kBatchStatuses,
+                          BatchStatus::Validating)
+QTOPENAI_WIRE_CONVERSIONS(fineTuningJobStatusToString, fineTuningJobStatusFromString,
+                          FineTuningJobStatus, kFineTuningJobStatuses, FineTuningJobStatus::Queued)
+QTOPENAI_WIRE_CONVERSIONS(evalRunStatusToString, evalRunStatusFromString, EvalRunStatus,
+                          kEvalRunStatuses, EvalRunStatus::Queued)
+QTOPENAI_WIRE_CONVERSIONS(runStatusToString, runStatusFromString, RunStatus, kRunStatuses,
+                          RunStatus::Queued)
+QTOPENAI_WIRE_CONVERSIONS(runStepStatusToString, runStepStatusFromString, RunStepStatus,
+                          kRunStepStatuses, RunStepStatus::InProgress)
 
-FinishReason finishReasonFromString(const QString &value)
-{
-    return fromWire(value, kFinishReasons, FinishReason::None);
-}
+#undef QTOPENAI_WIRE_CONVERSIONS
 
-QString videoStatusToString(VideoStatus status)
-{
-    return toWire(status, kVideoStatuses, VideoStatus::Queued);
-}
-
-VideoStatus videoStatusFromString(const QString &value)
-{
-    return fromWire(value, kVideoStatuses, VideoStatus::Queued);
-}
-
-QString uploadStatusToString(UploadStatus status)
-{
-    return toWire(status, kUploadStatuses, UploadStatus::Pending);
-}
-
-UploadStatus uploadStatusFromString(const QString &value)
-{
-    return fromWire(value, kUploadStatuses, UploadStatus::Pending);
-}
-
-QString vectorStoreStatusToString(VectorStoreStatus status)
-{
-    return toWire(status, kVectorStoreStatuses, VectorStoreStatus::InProgress);
-}
-
-VectorStoreStatus vectorStoreStatusFromString(const QString &value)
-{
-    return fromWire(value, kVectorStoreStatuses, VectorStoreStatus::InProgress);
-}
-
-QString vectorStoreFileStatusToString(VectorStoreFileStatus status)
-{
-    return toWire(status, kVectorStoreFileStatuses, VectorStoreFileStatus::InProgress);
-}
-
-VectorStoreFileStatus vectorStoreFileStatusFromString(const QString &value)
-{
-    return fromWire(value, kVectorStoreFileStatuses, VectorStoreFileStatus::InProgress);
-}
-
-QString batchStatusToString(BatchStatus status)
-{
-    return toWire(status, kBatchStatuses, BatchStatus::Validating);
-}
-
-BatchStatus batchStatusFromString(const QString &value)
-{
-    return fromWire(value, kBatchStatuses, BatchStatus::Validating);
-}
-
-QString fineTuningJobStatusToString(FineTuningJobStatus status)
-{
-    return toWire(status, kFineTuningJobStatuses, FineTuningJobStatus::Queued);
-}
-
-FineTuningJobStatus fineTuningJobStatusFromString(const QString &value)
-{
-    return fromWire(value, kFineTuningJobStatuses, FineTuningJobStatus::Queued);
-}
-
-QString evalRunStatusToString(EvalRunStatus status)
-{
-    return toWire(status, kEvalRunStatuses, EvalRunStatus::Queued);
-}
-
-EvalRunStatus evalRunStatusFromString(const QString &value)
-{
-    return fromWire(value, kEvalRunStatuses, EvalRunStatus::Queued);
-}
-
-QString runStatusToString(RunStatus status)
-{
-    return toWire(status, kRunStatuses, RunStatus::Queued);
-}
-
-RunStatus runStatusFromString(const QString &value)
-{
-    return fromWire(value, kRunStatuses, RunStatus::Queued);
-}
-
-QString runStepStatusToString(RunStepStatus status)
-{
-    return toWire(status, kRunStepStatuses, RunStepStatus::InProgress);
-}
-
-RunStepStatus runStepStatusFromString(const QString &value)
-{
-    return fromWire(value, kRunStepStatuses, RunStepStatus::InProgress);
-}
+// The lifecycle question, answered from the same rows as the spelling.
+bool isTerminal(VideoStatus status) { return terminalIn(status, kVideoStatuses); }
+bool isTerminal(UploadStatus status) { return terminalIn(status, kUploadStatuses); }
+bool isTerminal(BatchStatus status) { return terminalIn(status, kBatchStatuses); }
+bool isTerminal(FineTuningJobStatus status) { return terminalIn(status, kFineTuningJobStatuses); }
+bool isTerminal(EvalRunStatus status) { return terminalIn(status, kEvalRunStatuses); }
+bool isTerminal(RunStatus status) { return terminalIn(status, kRunStatuses); }
+bool isTerminal(RunStepStatus status) { return terminalIn(status, kRunStepStatuses); }
 
 } // namespace Core
 } // namespace QtOpenAi
