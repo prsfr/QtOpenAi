@@ -72,6 +72,17 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/EvalRunOutputItemReply.h
     include/QtOpenAi/Client/EvalRunOutputItemListReply.h
     include/QtOpenAi/Client/EvalRunPoller.h
+    include/QtOpenAi/Client/AssistantReply.h
+    include/QtOpenAi/Client/AssistantListReply.h
+    include/QtOpenAi/Client/ThreadReply.h
+    include/QtOpenAi/Client/ThreadMessageReply.h
+    include/QtOpenAi/Client/ThreadMessageListReply.h
+    include/QtOpenAi/Client/RunReply.h
+    include/QtOpenAi/Client/RunListReply.h
+    include/QtOpenAi/Client/RunStepReply.h
+    include/QtOpenAi/Client/RunStepListReply.h
+    include/QtOpenAi/Client/RunStreamReply.h
+    include/QtOpenAi/Client/RunPoller.h
     include/QtOpenAi/Client/Client.h
 )
 
@@ -104,6 +115,8 @@ add_library(QtOpenAiClient
     src/BatchPoller.cpp
     src/FineTuningJobPoller.cpp
     src/EvalRunPoller.cpp
+    src/RunStreamReply.cpp
+    src/RunPoller.cpp
     src/Client.cpp
 )
 

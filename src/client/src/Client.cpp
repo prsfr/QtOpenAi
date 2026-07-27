@@ -46,17 +46,22 @@ public:
     // factory, hand it the configured RetryPolicy -- that is identical for all
     // ~100 of them and easy to get subtly wrong when spelled out each time.
     // Defined below the request helpers they use.
+    //
+    // `beta` is the value of the OpenAI-Beta header an endpoint family behind a
+    // beta flag has to send (null for the stable majority). It rides along here
+    // rather than at the call sites so no endpoint of such a family can forget
+    // it.
     template <typename Reply>
-    Reply *get(const QString &path, const QUrlQuery &query = {}) const;
+    Reply *get(const QString &path, const QUrlQuery &query = {}, const char *beta = nullptr) const;
     template <typename Reply>
-    Reply *post(const QString &path, const QByteArray &body = {}) const;
+    Reply *post(const QString &path, const QByteArray &body = {}, const char *beta = nullptr) const;
     template <typename Reply>
     Reply *postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
-                         QList<detail::FormFilePart> files) const;
+                         QList<detail::FormFilePart> files, const char *beta = nullptr) const;
     template <typename Reply>
-    Reply *remove(const QString &path) const;
+    Reply *remove(const QString &path, const char *beta = nullptr) const;
     template <typename Reply, typename Request>
-    Reply *postStream(const QString &path, Request request) const;
+    Reply *postStream(const QString &path, Request request, const char *beta = nullptr) const;
 
     // Join the base URL with an endpoint path (tolerating trailing slashes) and
     // append the Azure api-version query parameter when configured.
@@ -252,8 +257,10 @@ QNetworkAccessManager *Client::networkAccessManager() const
 namespace {
 
 // Build a network request for an endpoint path (URL + auth/content/custom
-// headers + timeout), applying the configured auth scheme.
-QNetworkRequest apiRequest(const ClientPrivate *d, const QString &path)
+// headers + timeout), applying the configured auth scheme. `beta` names the
+// beta an endpoint family speaks, sent as the OpenAI-Beta header; null for the
+// stable endpoints.
+QNetworkRequest apiRequest(const ClientPrivate *d, const QString &path, const char *beta = nullptr)
 {
     QNetworkRequest networkRequest(d->endpointUrl(path));
     networkRequest.setHeader(QNetworkRequest::ContentTypeHeader,
@@ -267,6 +274,8 @@ QNetworkRequest apiRequest(const ClientPrivate *d, const QString &path)
     }
     if (!d->organization.isEmpty())
         networkRequest.setRawHeader("OpenAI-Organization", d->organization.toUtf8());
+    if (beta)
+        networkRequest.setRawHeader("OpenAI-Beta", beta);
     if (!d->userAgent.isEmpty())
         networkRequest.setHeader(QNetworkRequest::UserAgentHeader, d->userAgent);
     for (auto it = d->defaultHeaders.constBegin(); it != d->defaultHeaders.constEnd(); ++it)
@@ -354,9 +363,17 @@ constexpr QLatin1String kFineTuningJobs("/fine_tuning/jobs");
 constexpr QLatin1String kFineTuningCheckpoints("/fine_tuning/checkpoints");
 constexpr QLatin1String kEvals("/evals");
 constexpr QLatin1String kRuns("/runs");
+constexpr QLatin1String kAssistants("/assistants");
+constexpr QLatin1String kThreads("/threads");
+constexpr QLatin1String kMessages("/messages");
+constexpr QLatin1String kSteps("/steps");
 constexpr QLatin1String kVoiceConsents("/audio/voice_consents");
 constexpr QLatin1String kModels("/models");
 constexpr QLatin1String kCompletions("/completions");
+
+// The Assistants surface is still a beta of its own, and the API rejects a
+// request that does not say which version it speaks.
+constexpr auto kAssistantsBeta = "assistants=v2";
 
 QString resourcePath(QLatin1String collection, const QString &id, const QString &suffix = {})
 {
@@ -371,6 +388,41 @@ QString evalRunPath(const QString &evalId, const QString &runId, const QString &
 {
     return resourcePath(kEvals, evalId, resourcePath(kRuns, runId, suffix));
 }
+
+// Assistant runs nest below a thread, the same two levels deep.
+QString threadRunPath(const QString &threadId, const QString &runId, const QString &suffix = {})
+{
+    return resourcePath(kThreads, threadId, resourcePath(kRuns, runId, suffix));
+}
+
+// The body of a submit_tool_outputs call. Both the blocking and the streamed
+// variant post it, and postStream() needs a request object it can flip the
+// `stream` flag on -- which is all this is.
+class ToolOutputsBody
+{
+public:
+    explicit ToolOutputsBody(const QList<Core::ToolOutput> &outputs)
+        : m_outputs(outputs)
+    { }
+
+    void setStream(bool stream) { m_stream = stream; }
+
+    QJsonObject toJson() const
+    {
+        QJsonArray array;
+        for (const Core::ToolOutput &output : m_outputs)
+            array.append(output.toJson());
+        QJsonObject json;
+        json.insert(QStringLiteral("tool_outputs"), array);
+        if (m_stream)
+            json.insert(QStringLiteral("stream"), true);
+        return json;
+    }
+
+private:
+    QList<Core::ToolOutput> m_outputs;
+    bool m_stream = false;
+};
 
 // Serialise a list of ids to a JSON array.
 QJsonArray idsToArray(const QStringList &ids)
@@ -412,37 +464,37 @@ std::function<QNetworkReply *()> postFactory(const ClientPrivate *d, QNetworkAcc
 } // namespace
 
 template <typename Reply>
-Reply *ClientPrivate::get(const QString &path, const QUrlQuery &query) const
+Reply *ClientPrivate::get(const QString &path, const QUrlQuery &query, const char *beta) const
 {
-    QNetworkRequest request = apiRequest(this, path);
+    QNetworkRequest request = apiRequest(this, path, beta);
     applyQuery(request, query);
     return Client::makeReply<Reply>(getFactory(q->networkAccessManager(), std::move(request)),
                                     retryPolicy);
 }
 
 template <typename Reply>
-Reply *ClientPrivate::post(const QString &path, const QByteArray &body) const
+Reply *ClientPrivate::post(const QString &path, const QByteArray &body, const char *beta) const
 {
     return Client::makeReply<Reply>(
-            postFactory(this, q->networkAccessManager(), apiRequest(this, path), body),
+            postFactory(this, q->networkAccessManager(), apiRequest(this, path, beta), body),
             retryPolicy);
 }
 
 template <typename Reply>
 Reply *ClientPrivate::postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
-                                    QList<detail::FormFilePart> files) const
+                                    QList<detail::FormFilePart> files, const char *beta) const
 {
     return Client::makeReply<Reply>(multipartPostFactory(this, q->networkAccessManager(),
-                                                         apiRequest(this, path), std::move(fields),
-                                                         std::move(files)),
+                                                         apiRequest(this, path, beta),
+                                                         std::move(fields), std::move(files)),
                                     retryPolicy);
 }
 
 template <typename Reply>
-Reply *ClientPrivate::remove(const QString &path) const
+Reply *ClientPrivate::remove(const QString &path, const char *beta) const
 {
     return Client::makeReply<Reply>(
-            deleteFactory(q->networkAccessManager(), apiRequest(this, path)), retryPolicy);
+            deleteFactory(q->networkAccessManager(), apiRequest(this, path, beta)), retryPolicy);
 }
 
 // The streaming endpoints deliberately sit outside the retry machinery: an SSE
@@ -450,10 +502,10 @@ Reply *ClientPrivate::remove(const QString &path) const
 // replayed from the start. `request` is taken by value because streaming has to
 // be forced on -- on our copy, leaving the caller's request untouched.
 template <typename Reply, typename Request>
-Reply *ClientPrivate::postStream(const QString &path, Request request) const
+Reply *ClientPrivate::postStream(const QString &path, Request request, const char *beta) const
 {
     request.setStream(true);
-    QNetworkRequest networkRequest = apiRequest(this, path);
+    QNetworkRequest networkRequest = apiRequest(this, path, beta);
     networkRequest.setRawHeader("Accept", "text/event-stream");
     return Client::makeReply<Reply>(
             q->networkAccessManager()->post(networkRequest, compactJson(request.toJson())));
@@ -1331,6 +1383,210 @@ EvalRunOutputItemReply *Client::getEvalRunOutputItem(const QString &evalId, cons
 EvalRunPoller *Client::pollEvalRun(const QString &evalId, const QString &runId, int pollIntervalMs)
 {
     return new EvalRunPoller(this, evalId, runId, pollIntervalMs);
+}
+
+AssistantReply *Client::createAssistant(const Core::CreateAssistantRequest &request)
+{
+    Q_D(Client);
+    return d->post<AssistantReply>(kAssistants, compactJson(request.toJson()), kAssistantsBeta);
+}
+
+AssistantListReply *Client::listAssistants(const ListParams &params)
+{
+    Q_D(Client);
+    return d->get<AssistantListReply>(kAssistants, params.toQuery(), kAssistantsBeta);
+}
+
+AssistantReply *Client::getAssistant(const QString &assistantId)
+{
+    Q_D(Client);
+    return d->get<AssistantReply>(resourcePath(kAssistants, assistantId), {}, kAssistantsBeta);
+}
+
+AssistantReply *Client::updateAssistant(const QString &assistantId,
+                                        const Core::CreateAssistantRequest &request)
+{
+    Q_D(Client);
+    return d->post<AssistantReply>(resourcePath(kAssistants, assistantId),
+                                   compactJson(request.toJson()), kAssistantsBeta);
+}
+
+AssistantReply *Client::deleteAssistant(const QString &assistantId)
+{
+    Q_D(Client);
+    return d->remove<AssistantReply>(resourcePath(kAssistants, assistantId), kAssistantsBeta);
+}
+
+ThreadReply *Client::createThread(const Core::CreateThreadRequest &request)
+{
+    Q_D(Client);
+    return d->post<ThreadReply>(kThreads, compactJson(request.toJson()), kAssistantsBeta);
+}
+
+ThreadReply *Client::getThread(const QString &threadId)
+{
+    Q_D(Client);
+    return d->get<ThreadReply>(resourcePath(kThreads, threadId), {}, kAssistantsBeta);
+}
+
+ThreadReply *Client::updateThread(const QString &threadId, const QJsonObject &metadata,
+                                  const QJsonObject &toolResources)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    if (!metadata.isEmpty())
+        bodyObject.insert(QStringLiteral("metadata"), metadata);
+    if (!toolResources.isEmpty())
+        bodyObject.insert(QStringLiteral("tool_resources"), toolResources);
+    return d->post<ThreadReply>(resourcePath(kThreads, threadId), compactJson(bodyObject),
+                                kAssistantsBeta);
+}
+
+ThreadReply *Client::deleteThread(const QString &threadId)
+{
+    Q_D(Client);
+    return d->remove<ThreadReply>(resourcePath(kThreads, threadId), kAssistantsBeta);
+}
+
+ThreadMessageReply *Client::createThreadMessage(const QString &threadId,
+                                                const Core::ThreadMessageInput &message)
+{
+    Q_D(Client);
+    return d->post<ThreadMessageReply>(resourcePath(kThreads, threadId, kMessages),
+                                       compactJson(message.toJson()), kAssistantsBeta);
+}
+
+ThreadMessageListReply *Client::listThreadMessages(const QString &threadId,
+                                                   const ListParams &params, const QString &runId)
+{
+    Q_D(Client);
+    QUrlQuery query = params.toQuery();
+    if (!runId.isEmpty())
+        query.addQueryItem(QStringLiteral("run_id"), runId);
+    return d->get<ThreadMessageListReply>(resourcePath(kThreads, threadId, kMessages), query,
+                                          kAssistantsBeta);
+}
+
+ThreadMessageReply *Client::getThreadMessage(const QString &threadId, const QString &messageId)
+{
+    Q_D(Client);
+    return d->get<ThreadMessageReply>(
+            resourcePath(kThreads, threadId, resourcePath(kMessages, messageId)), {},
+            kAssistantsBeta);
+}
+
+ThreadMessageReply *Client::updateThreadMessage(const QString &threadId, const QString &messageId,
+                                                const QJsonObject &metadata)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("metadata"), metadata);
+    return d->post<ThreadMessageReply>(
+            resourcePath(kThreads, threadId, resourcePath(kMessages, messageId)),
+            compactJson(bodyObject), kAssistantsBeta);
+}
+
+ThreadMessageReply *Client::deleteThreadMessage(const QString &threadId, const QString &messageId)
+{
+    Q_D(Client);
+    return d->remove<ThreadMessageReply>(
+            resourcePath(kThreads, threadId, resourcePath(kMessages, messageId)), kAssistantsBeta);
+}
+
+RunReply *Client::createRun(const QString &threadId, const Core::CreateRunRequest &request)
+{
+    Q_D(Client);
+    return d->post<RunReply>(resourcePath(kThreads, threadId, kRuns), compactJson(request.toJson()),
+                             kAssistantsBeta);
+}
+
+RunStreamReply *Client::createRunStream(const QString &threadId,
+                                        const Core::CreateRunRequest &request)
+{
+    Q_D(Client);
+    return d->postStream<RunStreamReply>(resourcePath(kThreads, threadId, kRuns), request,
+                                         kAssistantsBeta);
+}
+
+RunReply *Client::createThreadAndRun(const Core::CreateRunRequest &request)
+{
+    Q_D(Client);
+    return d->post<RunReply>(QString(kThreads) + kRuns, compactJson(request.toJson()),
+                             kAssistantsBeta);
+}
+
+RunStreamReply *Client::createThreadAndRunStream(const Core::CreateRunRequest &request)
+{
+    Q_D(Client);
+    return d->postStream<RunStreamReply>(QString(kThreads) + kRuns, request, kAssistantsBeta);
+}
+
+RunListReply *Client::listRuns(const QString &threadId, const ListParams &params)
+{
+    Q_D(Client);
+    return d->get<RunListReply>(resourcePath(kThreads, threadId, kRuns), params.toQuery(),
+                                kAssistantsBeta);
+}
+
+RunReply *Client::getRun(const QString &threadId, const QString &runId)
+{
+    Q_D(Client);
+    return d->get<RunReply>(threadRunPath(threadId, runId), {}, kAssistantsBeta);
+}
+
+RunReply *Client::updateRun(const QString &threadId, const QString &runId,
+                            const QJsonObject &metadata)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("metadata"), metadata);
+    return d->post<RunReply>(threadRunPath(threadId, runId), compactJson(bodyObject),
+                             kAssistantsBeta);
+}
+
+RunReply *Client::cancelRun(const QString &threadId, const QString &runId)
+{
+    Q_D(Client);
+    return d->post<RunReply>(threadRunPath(threadId, runId, QStringLiteral("/cancel")), {},
+                             kAssistantsBeta);
+}
+
+RunReply *Client::submitToolOutputs(const QString &threadId, const QString &runId,
+                                    const QList<Core::ToolOutput> &outputs)
+{
+    Q_D(Client);
+    return d->post<RunReply>(threadRunPath(threadId, runId, QStringLiteral("/submit_tool_outputs")),
+                             compactJson(ToolOutputsBody(outputs).toJson()), kAssistantsBeta);
+}
+
+RunStreamReply *Client::submitToolOutputsStream(const QString &threadId, const QString &runId,
+                                                const QList<Core::ToolOutput> &outputs)
+{
+    Q_D(Client);
+    return d->postStream<RunStreamReply>(
+            threadRunPath(threadId, runId, QStringLiteral("/submit_tool_outputs")),
+            ToolOutputsBody(outputs), kAssistantsBeta);
+}
+
+RunPoller *Client::pollRun(const QString &threadId, const QString &runId, int pollIntervalMs)
+{
+    return new RunPoller(this, threadId, runId, pollIntervalMs);
+}
+
+RunStepListReply *Client::listRunSteps(const QString &threadId, const QString &runId,
+                                       const ListParams &params)
+{
+    Q_D(Client);
+    return d->get<RunStepListReply>(threadRunPath(threadId, runId, kSteps), params.toQuery(),
+                                    kAssistantsBeta);
+}
+
+RunStepReply *Client::getRunStep(const QString &threadId, const QString &runId,
+                                 const QString &stepId)
+{
+    Q_D(Client);
+    return d->get<RunStepReply>(threadRunPath(threadId, runId, resourcePath(kSteps, stepId)), {},
+                                kAssistantsBeta);
 }
 
 ModelListReply *Client::listModels()

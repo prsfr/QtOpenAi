@@ -117,6 +117,35 @@ enum class EvalRunStatus {
 };
 Q_ENUM_NS(EvalRunStatus)
 
+// The lifecycle state of an assistant run (Assistants API). Mirrors the OpenAI
+// `status` field. A run is terminal once it reaches Completed, Failed,
+// Cancelled, Incomplete or Expired; Queued, InProgress and Cancelling are
+// transient. RequiresAction is the one state that is neither: the run is parked
+// until the client submits the outputs of the tool calls it asked for.
+enum class RunStatus {
+    Queued,
+    InProgress,
+    RequiresAction,
+    Cancelling,
+    Cancelled,
+    Failed,
+    Completed,
+    Incomplete,
+    Expired,
+};
+Q_ENUM_NS(RunStatus)
+
+// The lifecycle state of a single step of a run (Assistants API). A step is
+// terminal once it reaches Cancelled, Failed, Completed or Expired.
+enum class RunStepStatus {
+    InProgress,
+    Cancelled,
+    Failed,
+    Completed,
+    Expired,
+};
+Q_ENUM_NS(RunStepStatus)
+
 // Convert a Role to/from its OpenAI wire representation.
 QTOPENAI_CORE_EXPORT QString roleToString(Role role);
 QTOPENAI_CORE_EXPORT Role roleFromString(const QString &value);
@@ -163,6 +192,17 @@ QTOPENAI_CORE_EXPORT FineTuningJobStatus fineTuningJobStatusFromString(const QSt
 // client polling an unfamiliar status keeps waiting instead of stopping early.
 QTOPENAI_CORE_EXPORT QString evalRunStatusToString(EvalRunStatus status);
 QTOPENAI_CORE_EXPORT EvalRunStatus evalRunStatusFromString(const QString &value);
+
+// Convert a RunStatus to/from its OpenAI wire representation. An unrecognised
+// value decodes to Queued (the initial, non-terminal state), so a client polling
+// an unfamiliar status keeps waiting instead of stopping early.
+QTOPENAI_CORE_EXPORT QString runStatusToString(RunStatus status);
+QTOPENAI_CORE_EXPORT RunStatus runStatusFromString(const QString &value);
+
+// Convert a RunStepStatus to/from its OpenAI wire representation. An
+// unrecognised value decodes to InProgress (the initial, non-terminal state).
+QTOPENAI_CORE_EXPORT QString runStepStatusToString(RunStepStatus status);
+QTOPENAI_CORE_EXPORT RunStepStatus runStepStatusFromString(const QString &value);
 
 } // namespace Core
 } // namespace QtOpenAi

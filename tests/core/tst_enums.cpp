@@ -26,6 +26,8 @@ private slots:
     void batchStatusRoundTripsEveryValue();
     void fineTuningJobStatusRoundTripsEveryValue();
     void evalRunStatusRoundTripsEveryValue();
+    void runStatusRoundTripsEveryValue();
+    void runStepStatusRoundTripsEveryValue();
     void unknownWireValueDecodesToTheDocumentedFallback();
     void spellingsAreDistinct();
 };
@@ -113,6 +115,16 @@ void TestEnums::evalRunStatusRoundTripsEveryValue()
     checkRoundTrip<EvalRunStatus>(evalRunStatusToString, evalRunStatusFromString);
 }
 
+void TestEnums::runStatusRoundTripsEveryValue()
+{
+    checkRoundTrip<RunStatus>(runStatusToString, runStatusFromString);
+}
+
+void TestEnums::runStepStatusRoundTripsEveryValue()
+{
+    checkRoundTrip<RunStepStatus>(runStepStatusToString, runStepStatusFromString);
+}
+
 void TestEnums::unknownWireValueDecodesToTheDocumentedFallback()
 {
     // Each fallback is the state a client should keep waiting in, so an
@@ -127,6 +139,8 @@ void TestEnums::unknownWireValueDecodesToTheDocumentedFallback()
     QCOMPARE(batchStatusFromString(unknown), BatchStatus::Validating);
     QCOMPARE(fineTuningJobStatusFromString(unknown), FineTuningJobStatus::Queued);
     QCOMPARE(evalRunStatusFromString(unknown), EvalRunStatus::Queued);
+    QCOMPARE(runStatusFromString(unknown), RunStatus::Queued);
+    QCOMPARE(runStepStatusFromString(unknown), RunStepStatus::InProgress);
 }
 
 void TestEnums::spellingsAreDistinct()
@@ -136,6 +150,7 @@ void TestEnums::spellingsAreDistinct()
     QCOMPARE(evalRunStatusToString(EvalRunStatus::Canceled), QStringLiteral("canceled"));
     QCOMPARE(uploadStatusToString(UploadStatus::Cancelled), QStringLiteral("cancelled"));
     QCOMPARE(batchStatusToString(BatchStatus::Cancelled), QStringLiteral("cancelled"));
+    QCOMPARE(runStatusToString(RunStatus::Cancelled), QStringLiteral("cancelled"));
     // ...and a "cancelled" spelling must not decode as an eval's Canceled.
     QCOMPARE(evalRunStatusFromString(QStringLiteral("cancelled")), EvalRunStatus::Queued);
 }

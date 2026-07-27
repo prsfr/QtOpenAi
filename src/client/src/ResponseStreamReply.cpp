@@ -35,8 +35,11 @@ ResponseStreamReply::ResponseStreamReply(QNetworkReply *reply, QObject *parent)
 
     connect(reply, &QNetworkReply::readyRead, this, [this]() {
         Q_D(ResponseStreamReply);
-        const QList<QByteArray> payloads = d->parser.feed(d->networkReply->readAll());
-        for (const QByteArray &data : payloads) {
+        // These streams name their event type inside the payload, so only the
+        // framed data is of interest here.
+        const QList<detail::SseEvent> events = d->parser.feed(d->networkReply->readAll());
+        for (const detail::SseEvent &sse : events) {
+            const QByteArray &data = sse.data;
             if (data == "[DONE]")
                 continue;
             const QJsonDocument doc = QJsonDocument::fromJson(data);

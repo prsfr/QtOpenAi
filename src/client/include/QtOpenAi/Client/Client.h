@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Client/AssistantListReply.h>
+#include <QtOpenAi/Client/AssistantReply.h>
 #include <QtOpenAi/Client/BatchListReply.h>
 #include <QtOpenAi/Client/BatchPoller.h>
 #include <QtOpenAi/Client/BatchReply.h>
@@ -45,7 +47,16 @@
 #include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/ResponseStreamReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
+#include <QtOpenAi/Client/RunListReply.h>
+#include <QtOpenAi/Client/RunPoller.h>
+#include <QtOpenAi/Client/RunReply.h>
+#include <QtOpenAi/Client/RunStepListReply.h>
+#include <QtOpenAi/Client/RunStepReply.h>
+#include <QtOpenAi/Client/RunStreamReply.h>
 #include <QtOpenAi/Client/SpeechReply.h>
+#include <QtOpenAi/Client/ThreadMessageListReply.h>
+#include <QtOpenAi/Client/ThreadMessageReply.h>
+#include <QtOpenAi/Client/ThreadReply.h>
 #include <QtOpenAi/Client/TranscriptionReply.h>
 #include <QtOpenAi/Client/UploadPartReply.h>
 #include <QtOpenAi/Client/UploadReply.h>
@@ -65,10 +76,13 @@
 #include <QtOpenAi/Client/VoiceReply.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
 #include <QtOpenAi/Core/CompletionRequest.h>
+#include <QtOpenAi/Core/CreateAssistantRequest.h>
 #include <QtOpenAi/Core/CreateBatchRequest.h>
 #include <QtOpenAi/Core/CreateContainerRequest.h>
 #include <QtOpenAi/Core/CreateEvalRequest.h>
 #include <QtOpenAi/Core/CreateFineTuningJobRequest.h>
+#include <QtOpenAi/Core/CreateRunRequest.h>
+#include <QtOpenAi/Core/CreateThreadRequest.h>
 #include <QtOpenAi/Core/CreateUploadRequest.h>
 #include <QtOpenAi/Core/CreateVectorStoreRequest.h>
 #include <QtOpenAi/Core/CreateVideoRequest.h>
@@ -640,6 +654,110 @@ public:
     // deletes itself once it stops unless setAutoDelete(false) is used.
     EvalRunPoller *pollEvalRun(const QString &evalId, const QString &runId,
                                int pollIntervalMs = 2000);
+
+    // --- Assistants (/assistants) [beta] -----------------------------------
+    // The Assistants endpoints are a beta surface: every call below sends the
+    // `OpenAI-Beta: assistants=v2` header, which the API requires. Nothing else
+    // about them differs from the rest of the client.
+    //
+    // Create an assistant: a model plus the instructions, tools and resources it
+    // should always run with.
+    AssistantReply *createAssistant(const Core::CreateAssistantRequest &request);
+
+    AssistantListReply *listAssistants(const ListParams &params = {});
+
+    AssistantReply *getAssistant(const QString &assistantId);
+
+    // Modify an assistant (POST /assistants/{id}). The request carries only the
+    // fields to change — it is the same body type as creation, whose unset
+    // fields are left out.
+    AssistantReply *updateAssistant(const QString &assistantId,
+                                    const Core::CreateAssistantRequest &request);
+
+    // Delete an assistant. On success the reply's assistant() carries the
+    // deletion acknowledgement (object "assistant.deleted").
+    AssistantReply *deleteAssistant(const QString &assistantId);
+
+    // --- Threads, messages & runs (/threads) [beta] ------------------------
+    // Create a thread, optionally seeded with the messages it starts from.
+    ThreadReply *createThread(const Core::CreateThreadRequest &request = {});
+
+    ThreadReply *getThread(const QString &threadId);
+
+    // Replace a thread's metadata and/or its tool resources; empty arguments are
+    // left out of the body.
+    ThreadReply *updateThread(const QString &threadId, const QJsonObject &metadata,
+                              const QJsonObject &toolResources = {});
+
+    // Delete a thread. On success the reply's thread() carries the deletion
+    // acknowledgement (object "thread.deleted").
+    ThreadReply *deleteThread(const QString &threadId);
+
+    // Append a message to a thread.
+    ThreadMessageReply *createThreadMessage(const QString &threadId,
+                                            const Core::ThreadMessageInput &message);
+
+    // List a thread's messages (most-recent-first by default), optionally
+    // restricted to the ones a single run produced.
+    ThreadMessageListReply *listThreadMessages(const QString &threadId,
+                                               const ListParams &params = {},
+                                               const QString &runId = {});
+
+    ThreadMessageReply *getThreadMessage(const QString &threadId, const QString &messageId);
+
+    // Replace a message's metadata.
+    ThreadMessageReply *updateThreadMessage(const QString &threadId, const QString &messageId,
+                                            const QJsonObject &metadata);
+
+    ThreadMessageReply *deleteThreadMessage(const QString &threadId, const QString &messageId);
+
+    // Run an assistant against a thread. The run starts `queued`; poll getRun()
+    // (or use pollRun()) until isTerminal() — or until requiresAction(), which
+    // asks for submitToolOutputs().
+    RunReply *createRun(const QString &threadId, const Core::CreateRunRequest &request);
+
+    // Streamed run (Server-Sent Events). Forces the request's `stream` flag to
+    // true and returns a RunStreamReply emitting message deltas and run states.
+    // Ownership follows the reply's auto-delete policy.
+    RunStreamReply *createRunStream(const QString &threadId, const Core::CreateRunRequest &request);
+
+    // Create a thread and run it in one call (POST /threads/runs). The thread to
+    // create comes from the request's thread().
+    RunReply *createThreadAndRun(const Core::CreateRunRequest &request);
+
+    RunStreamReply *createThreadAndRunStream(const Core::CreateRunRequest &request);
+
+    RunListReply *listRuns(const QString &threadId, const ListParams &params = {});
+
+    RunReply *getRun(const QString &threadId, const QString &runId);
+
+    // Replace a run's metadata.
+    RunReply *updateRun(const QString &threadId, const QString &runId, const QJsonObject &metadata);
+
+    RunReply *cancelRun(const QString &threadId, const QString &runId);
+
+    // Answer the tool calls a `requires_action` run is waiting for; the run
+    // continues from there. The calls arrive as Run::requiredToolCalls(), so a
+    // ToolRegistry can produce these outputs directly.
+    RunReply *submitToolOutputs(const QString &threadId, const QString &runId,
+                                const QList<Core::ToolOutput> &outputs);
+
+    // The same, streamed: the run resumes as a Server-Sent-Events stream, so a
+    // streamed run that parked on `requires_action` can be followed to the end
+    // without falling back to polling.
+    RunStreamReply *submitToolOutputsStream(const QString &threadId, const QString &runId,
+                                            const QList<Core::ToolOutput> &outputs);
+
+    // Poll a run until it stops. Returns a RunPoller that emits
+    // progressed()/completed()/requiresAction(); call start() on it. It deletes
+    // itself once it stops unless setAutoDelete(false) is used.
+    RunPoller *pollRun(const QString &threadId, const QString &runId, int pollIntervalMs = 2000);
+
+    // The steps a run took — the message it wrote, the tools it called.
+    RunStepListReply *listRunSteps(const QString &threadId, const QString &runId,
+                                   const ListParams &params = {});
+
+    RunStepReply *getRunStep(const QString &threadId, const QString &runId, const QString &stepId);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.

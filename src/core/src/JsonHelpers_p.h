@@ -9,6 +9,8 @@
 #include <QtCore/QJsonValue>
 #include <QtCore/QString>
 
+#include <optional>
+
 namespace QtOpenAi {
 namespace Core {
 namespace detail {
@@ -41,6 +43,36 @@ inline qint64 int64Or(const QJsonObject &object, const QString &key, qint64 fall
 {
     const QJsonValue value = object.value(key);
     return value.isDouble() ? value.toVariant().toLongLong() : fallback;
+}
+
+// Insert a value that is only present when the caller set it (the std::optional
+// request/response parameters). An unset value leaves the field out entirely,
+// which is what OpenAI means by "not specified".
+template <typename T>
+inline void insertIfSet(QJsonObject &object, const QString &key, const std::optional<T> &value)
+{
+    if (value)
+        object.insert(key, QJsonValue(*value));
+}
+
+// Read a number that the API may report as null (or omit): a non-number decodes
+// to an unset optional rather than an invented 0.
+inline std::optional<double> optionalDouble(const QJsonObject &object, const QString &key)
+{
+    const QJsonValue value = object.value(key);
+    return value.isDouble() ? std::optional<double>(value.toDouble()) : std::nullopt;
+}
+
+inline std::optional<int> optionalInt(const QJsonObject &object, const QString &key)
+{
+    const QJsonValue value = object.value(key);
+    return value.isDouble() ? std::optional<int>(value.toInt()) : std::nullopt;
+}
+
+inline std::optional<bool> optionalBool(const QJsonObject &object, const QString &key)
+{
+    const QJsonValue value = object.value(key);
+    return value.isBool() ? std::optional<bool>(value.toBool()) : std::nullopt;
 }
 
 // Merge caller-supplied provider-specific fields into a request body, without
