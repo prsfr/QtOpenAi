@@ -371,6 +371,10 @@ constexpr QLatin1String kVoiceConsents("/audio/voice_consents");
 constexpr QLatin1String kModels("/models");
 constexpr QLatin1String kCompletions("/completions");
 constexpr QLatin1String kSkills("/skills");
+constexpr QLatin1String kChatKitSessions("/chatkit/sessions");
+constexpr QLatin1String kChatKitThreads("/chatkit/threads");
+// The sub-resource the item-bearing collections hang their entries off.
+constexpr QLatin1String kItems("/items");
 constexpr QLatin1String kVersions("/versions");
 // The sub-resource every downloadable object hangs its bytes off.
 constexpr QLatin1String kContent("/content");
@@ -378,6 +382,9 @@ constexpr QLatin1String kContent("/content");
 // The Assistants surface is still a beta of its own, and the API rejects a
 // request that does not say which version it speaks.
 constexpr auto kAssistantsBeta = "assistants=v2";
+
+// ChatKit is a beta of its own, with its own header value.
+constexpr auto kChatKitBeta = "chatkit_beta=v1";
 
 QString resourcePath(QLatin1String collection, const QString &id, const QString &suffix = {})
 {
@@ -670,8 +677,7 @@ ConversationItemsReply *Client::listResponseInputItems(const QString &responseId
 ConversationItemsReply *Client::listConversationItems(const QString &conversationId)
 {
     Q_D(Client);
-    return d->get<ConversationItemsReply>(
-            resourcePath(kConversations, conversationId, QStringLiteral("/items")));
+    return d->get<ConversationItemsReply>(resourcePath(kConversations, conversationId, kItems));
 }
 
 ConversationItemsReply *
@@ -681,9 +687,8 @@ Client::createConversationItems(const QString &conversationId,
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("items"), itemsToArray(items));
-    return d->post<ConversationItemsReply>(
-            resourcePath(kConversations, conversationId, QStringLiteral("/items")),
-            compactJson(bodyObject));
+    return d->post<ConversationItemsReply>(resourcePath(kConversations, conversationId, kItems),
+                                           compactJson(bodyObject));
 }
 
 ConversationItemsReply *Client::getConversationItem(const QString &conversationId,
@@ -1612,6 +1617,49 @@ RunStepReply *Client::getRunStep(const QString &threadId, const QString &runId,
     Q_D(Client);
     return d->get<RunStepReply>(threadRunPath(threadId, runId, resourcePath(kSteps, stepId)), {},
                                 kAssistantsBeta);
+}
+
+ChatKitSessionReply *Client::createChatKitSession(const Core::CreateChatKitSessionRequest &request)
+{
+    Q_D(Client);
+    return d->post<ChatKitSessionReply>(kChatKitSessions, compactJson(request.toJson()),
+                                        kChatKitBeta);
+}
+
+ChatKitSessionReply *Client::cancelChatKitSession(const QString &sessionId)
+{
+    Q_D(Client);
+    return d->post<ChatKitSessionReply>(
+            resourcePath(kChatKitSessions, sessionId, QStringLiteral("/cancel")), {}, kChatKitBeta);
+}
+
+ChatKitThreadListReply *Client::listChatKitThreads(const ListParams &params, const QString &user)
+{
+    Q_D(Client);
+    QUrlQuery query = params.toQuery();
+    if (!user.isEmpty())
+        query.addQueryItem(QStringLiteral("user"), user);
+    return d->get<ChatKitThreadListReply>(kChatKitThreads, query, kChatKitBeta);
+}
+
+ChatKitThreadReply *Client::getChatKitThread(const QString &threadId)
+{
+    Q_D(Client);
+    return d->get<ChatKitThreadReply>(resourcePath(kChatKitThreads, threadId), {}, kChatKitBeta);
+}
+
+ChatKitThreadReply *Client::deleteChatKitThread(const QString &threadId)
+{
+    Q_D(Client);
+    return d->remove<ChatKitThreadReply>(resourcePath(kChatKitThreads, threadId), kChatKitBeta);
+}
+
+ChatKitThreadItemListReply *Client::listChatKitThreadItems(const QString &threadId,
+                                                           const ListParams &params)
+{
+    Q_D(Client);
+    return d->get<ChatKitThreadItemListReply>(resourcePath(kChatKitThreads, threadId, kItems),
+                                              params.toQuery(), kChatKitBeta);
 }
 
 SkillReply *Client::createSkill(const Core::CreateSkillRequest &request)

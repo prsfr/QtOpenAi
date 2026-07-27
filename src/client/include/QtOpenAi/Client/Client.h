@@ -11,6 +11,10 @@
 #include <QtOpenAi/Client/ChatCompletionMessageListReply.h>
 #include <QtOpenAi/Client/ChatCompletionReply.h>
 #include <QtOpenAi/Client/ChatCompletionStreamReply.h>
+#include <QtOpenAi/Client/ChatKitSessionReply.h>
+#include <QtOpenAi/Client/ChatKitThreadItemListReply.h>
+#include <QtOpenAi/Client/ChatKitThreadListReply.h>
+#include <QtOpenAi/Client/ChatKitThreadReply.h>
 #include <QtOpenAi/Client/ChunkedUploader.h>
 #include <QtOpenAi/Client/CompletionReply.h>
 #include <QtOpenAi/Client/CompletionStreamReply.h>
@@ -82,6 +86,7 @@
 #include <QtOpenAi/Core/CompletionRequest.h>
 #include <QtOpenAi/Core/CreateAssistantRequest.h>
 #include <QtOpenAi/Core/CreateBatchRequest.h>
+#include <QtOpenAi/Core/CreateChatKitSessionRequest.h>
 #include <QtOpenAi/Core/CreateContainerRequest.h>
 #include <QtOpenAi/Core/CreateEvalRequest.h>
 #include <QtOpenAi/Core/CreateFineTuningJobRequest.h>
@@ -763,6 +768,34 @@ public:
                                    const ListParams &params = {});
 
     RunStepReply *getRunStep(const QString &threadId, const QString &runId, const QString &stepId);
+
+    // --- ChatKit (/chatkit) [beta] -----------------------------------------
+    // The ChatKit endpoints are a beta surface: every call below sends the
+    // `OpenAI-Beta: chatkit_beta=v1` header, which the API requires.
+    //
+    // Mint a session for one end user and one workflow. The reply's
+    // clientSecret() is what the browser gets, in place of the API key.
+    ChatKitSessionReply *createChatKitSession(const Core::CreateChatKitSessionRequest &request);
+
+    // Cancel a session, so its client secret stops authenticating requests.
+    ChatKitSessionReply *cancelChatKitSession(const QString &sessionId);
+
+    // List threads, optionally only those belonging to one end user. Threads
+    // are created by the ChatKit frontend as the user talks, not through this
+    // API, so there is nothing to create here.
+    ChatKitThreadListReply *listChatKitThreads(const ListParams &params = {},
+                                               const QString &user = {});
+
+    ChatKitThreadReply *getChatKitThread(const QString &threadId);
+
+    // Delete a thread with its items and stored attachments. On success the
+    // reply's thread() carries the deletion acknowledgement (object
+    // "chatkit.thread.deleted").
+    ChatKitThreadReply *deleteChatKitThread(const QString &threadId);
+
+    // The contents of a thread: messages, widgets, client tool calls and tasks.
+    ChatKitThreadItemListReply *listChatKitThreadItems(const QString &threadId,
+                                                       const ListParams &params = {});
 
     // --- Skills (/skills) --------------------------------------------------
     // Upload a skill bundle, either as a single zip or as one part per file of

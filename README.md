@@ -852,6 +852,53 @@ content parts nest their text differently from the chat ones, so
 carries. `listRunSteps()` and `getRunStep()` are the audit trail: which message
 the assistant wrote, which tools it called.
 
+## ChatKit (`/chatkit`) — beta
+
+ChatKit is OpenAI's hosted chat UI; this is the backend half of it. The point of
+a session is `clientSecret()`: a short-lived credential, scoped to one workflow
+and one end user, that the browser uses **instead of** the API key — which never
+leaves your server:
+
+```cpp
+Core::CreateChatKitSessionRequest request(workflowId, "user_789");
+request.setExpiresAfter(600);            // seconds; the API defaults to 10 min
+request.setMaxRequestsPerMinute(30);
+auto *session = client.createChatKitSession(request);
+// ... hand session->session().clientSecret() to the frontend
+client.cancelChatKitSession(sessionId);  // stops that secret working
+```
+
+Threads are created by the ChatKit frontend as the user talks, not through this
+API, so the REST surface only reads them — there is no create call and no
+request type for one:
+
+```cpp
+auto *threads = client.listChatKitThreads(params, "user_789");   // filter by user
+auto *items = client.listChatKitThreadItems(threadId);
+```
+
+A thread's `status` is the one status in the library that arrives as a tagged
+object rather than a bare string, so it is split into `status()` and
+`statusReason()` and reassembled on the way out.
+
+A thread item is a six-way union — user and assistant messages, widgets, client
+tool calls, tasks and task groups. They agree on an envelope and nothing else, so
+only the envelope and the message content are typed; everything else survives
+verbatim in `raw()` rather than being dropped:
+
+```cpp
+for (const Core::ChatKitThreadItem &item : items->list().data) {
+    if (item.isUserMessage() || item.isAssistantMessage())
+        qDebug() << item.text();
+    else
+        qDebug() << item.type() << item.raw();   // widget, tool call, task, ...
+}
+```
+
+ChatKit is a beta surface of its own: the client sends
+`OpenAI-Beta: chatkit_beta=v1` on every call, and as with Assistants a provider
+wanting another value can override it with `setDefaultHeader("OpenAI-Beta", ...)`.
+
 ## Skills (`/skills`)
 
 A skill is a named, reusable bundle of files a model can be pointed at. The
@@ -1003,6 +1050,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `evals`             | Evals: define → run → poll → items (`/evals`)        |
 | `assistant`         | Assistant + thread + tool-calling run (`/threads`)   |
 | `skills`            | Skill: publish → version → promote → zip (`/skills`) |
+| `chatkit`           | ChatKit session secret + thread transcript (`/chatkit`)|
 
 ## Building
 

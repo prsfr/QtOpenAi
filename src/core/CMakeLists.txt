@@ -73,6 +73,10 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/Skill.h
     include/QtOpenAi/Core/SkillVersion.h
     include/QtOpenAi/Core/CreateSkillRequest.h
+    include/QtOpenAi/Core/ChatKitSession.h
+    include/QtOpenAi/Core/ChatKitThread.h
+    include/QtOpenAi/Core/ChatKitThreadItem.h
+    include/QtOpenAi/Core/CreateChatKitSessionRequest.h
 )
 
 add_library(QtOpenAiCore
@@ -144,6 +148,10 @@ add_library(QtOpenAiCore
     src/Skill.cpp
     src/SkillVersion.cpp
     src/CreateSkillRequest.cpp
+    src/ChatKitSession.cpp
+    src/ChatKitThread.cpp
+    src/ChatKitThreadItem.cpp
+    src/CreateChatKitSessionRequest.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

@@ -28,6 +28,8 @@ private slots:
     void evalRunStatusRoundTripsEveryValue();
     void runStatusRoundTripsEveryValue();
     void runStepStatusRoundTripsEveryValue();
+    void chatKitSessionStatusRoundTripsEveryValue();
+    void chatKitThreadStatusRoundTripsEveryValue();
     void terminalStatesAreExactlyTheDocumentedOnes();
     void unknownStatusIsNeverTerminal();
     void unknownWireValueDecodesToTheDocumentedFallback();
@@ -127,6 +129,17 @@ void TestEnums::runStepStatusRoundTripsEveryValue()
     checkRoundTrip<RunStepStatus>(runStepStatusToString, runStepStatusFromString);
 }
 
+void TestEnums::chatKitSessionStatusRoundTripsEveryValue()
+{
+    checkRoundTrip<ChatKitSessionStatus>(chatKitSessionStatusToString,
+                                         chatKitSessionStatusFromString);
+}
+
+void TestEnums::chatKitThreadStatusRoundTripsEveryValue()
+{
+    checkRoundTrip<ChatKitThreadStatus>(chatKitThreadStatusToString, chatKitThreadStatusFromString);
+}
+
 void TestEnums::terminalStatesAreExactlyTheDocumentedOnes()
 {
     // Terminality now lives in the same table rows as the wire spelling, which
@@ -219,6 +232,10 @@ void TestEnums::unknownWireValueDecodesToTheDocumentedFallback()
     QCOMPARE(evalRunStatusFromString(unknown), EvalRunStatus::Queued);
     QCOMPARE(runStatusFromString(unknown), RunStatus::Queued);
     QCOMPARE(runStepStatusFromString(unknown), RunStepStatus::InProgress);
+    // Neither ChatKit status is polled, so their fallback is the state that
+    // keeps a UI usable rather than one that keeps a poller waiting.
+    QCOMPARE(chatKitSessionStatusFromString(unknown), ChatKitSessionStatus::Active);
+    QCOMPARE(chatKitThreadStatusFromString(unknown), ChatKitThreadStatus::Active);
 }
 
 void TestEnums::spellingsAreDistinct()

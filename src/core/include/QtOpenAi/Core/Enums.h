@@ -146,6 +146,26 @@ enum class RunStepStatus {
 };
 Q_ENUM_NS(RunStepStatus)
 
+// The lifecycle state of a ChatKit session. A cancelled or expired session
+// stops authenticating requests made with its client secret; nothing polls it,
+// so no state here is treated as terminal.
+enum class ChatKitSessionStatus {
+    Active,
+    Expired,
+    Cancelled,
+};
+Q_ENUM_NS(ChatKitSessionStatus)
+
+// The state of a ChatKit thread. Unlike every other status in this file it
+// arrives as a tagged object ({"type": "locked", "reason": ...}) rather than a
+// bare string; ChatKitThread splits it into this enum plus the reason.
+enum class ChatKitThreadStatus {
+    Active,
+    Locked,
+    Closed,
+};
+Q_ENUM_NS(ChatKitThreadStatus)
+
 // Convert a Role to/from its OpenAI wire representation.
 QTOPENAI_CORE_EXPORT QString roleToString(Role role);
 QTOPENAI_CORE_EXPORT Role roleFromString(const QString &value);
@@ -203,6 +223,18 @@ QTOPENAI_CORE_EXPORT RunStatus runStatusFromString(const QString &value);
 // unrecognised value decodes to InProgress (the initial, non-terminal state).
 QTOPENAI_CORE_EXPORT QString runStepStatusToString(RunStepStatus status);
 QTOPENAI_CORE_EXPORT RunStepStatus runStepStatusFromString(const QString &value);
+
+// Convert a ChatKitSessionStatus to/from its OpenAI wire representation. An
+// unrecognised value decodes to Active, so a status from a newer server never
+// reads as "this session is over".
+QTOPENAI_CORE_EXPORT QString chatKitSessionStatusToString(ChatKitSessionStatus status);
+QTOPENAI_CORE_EXPORT ChatKitSessionStatus chatKitSessionStatusFromString(const QString &value);
+
+// Convert a ChatKitThreadStatus to/from the `type` of its wire object. An
+// unrecognised value decodes to Active, so an unfamiliar state never reads as
+// "this thread refuses input".
+QTOPENAI_CORE_EXPORT QString chatKitThreadStatusToString(ChatKitThreadStatus status);
+QTOPENAI_CORE_EXPORT ChatKitThreadStatus chatKitThreadStatusFromString(const QString &value);
 
 // Whether a status is one its lifecycle will not leave, so a client polling the
 // job can stop. These answer for the status alone; the job types wrap them as
