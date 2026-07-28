@@ -57,7 +57,15 @@ public:
     QList<QJsonObject> received() const { return m_received; }
     // The handshake request the client opened the connection with.
     QUrl requestUrl() const { return m_requestUrl; }
-    QByteArray requestHeader(const QByteArray &name) const { return m_requestHeaders.value(name); }
+    // Looked up case-insensitively, which HTTP header names are -- and which
+    // matters here rather than being pedantry: up to Qt 6.7 the server side of
+    // the handshake kept the client's spelling, while 6.8+ routes it through
+    // QHttpHeaders, which lower-cases every name. Normalising both ends lets a
+    // test ask for "Authorization" whichever Qt it runs against.
+    QByteArray requestHeader(const QByteArray &name) const
+    {
+        return m_requestHeaders.value(name.toLower());
+    }
     bool hasClient() const { return m_socket != nullptr; }
 
     // Drop the connection from the server side.
@@ -74,7 +82,7 @@ private:
         const QNetworkRequest request = m_socket->request();
         m_requestUrl = request.url();
         for (const QByteArray &name : request.rawHeaderList())
-            m_requestHeaders.insert(name, request.rawHeader(name));
+            m_requestHeaders.insert(name.toLower(), request.rawHeader(name));
 
         connect(m_socket, &QWebSocket::textMessageReceived, this, [this](const QString &message) {
             m_received.append(QJsonDocument::fromJson(message.toUtf8()).object());
