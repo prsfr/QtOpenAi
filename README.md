@@ -1,8 +1,14 @@
 # QtOpenAi
 
-A modular **Qt 6** client library for **OpenAI-compatible** chat completion
-APIs, with first-class **tool calling** wired through Qt's meta-object system
-(signals/slots and `QMetaObject::invokeMethod`).
+A modular **Qt 6** client library for the **OpenAI API** and OpenAI-compatible
+endpoints, with first-class **tool calling** wired through Qt's meta-object
+system (signals/slots and `QMetaObject::invokeMethod`).
+
+It covers the API rather than a corner of it: chat completions and the
+Responses API, streaming, structured outputs, embeddings, images, speech and
+transcription, video, files, uploads, vector stores, containers, batch,
+fine-tuning, evals, the Assistants beta, ChatKit, Skills, and the Realtime
+WebSocket channel.
 
 The data model is derived from the official
 [OpenAI OpenAPI specification](https://github.com/openai/openai-openapi) and
@@ -17,7 +23,7 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
 
 | Namespace            | Library           | Responsibility                                             |
 |----------------------|-------------------|------------------------------------------------------------|
-| `QtOpenAi::Core`     | `QtOpenAiCore`    | Value types & JSON (de)serialisation for the chat API.     |
+| `QtOpenAi::Core`     | `QtOpenAiCore`    | Value types & JSON (de)serialisation for every endpoint.   |
 | `QtOpenAi::Client`   | `QtOpenAiClient`  | Async networking `Client`, replies, and the `ToolRegistry`.|
 | `QtOpenAi::Realtime` | `QtOpenAiRealtime`| The Realtime WebSocket channel (optional).                 |
 
@@ -41,7 +47,7 @@ built only when that component is found (`QTOPENAI_BUILD_REALTIME`).
   typed `finished(...)` signal, a getter named the way that endpoint names its
   payload, and the one line that fires the signal. The streaming replies, which
   carry real state, still derive from `RestReplyBase` directly.
-* **One request path** — the ~100 endpoint methods on `Client` are each a
+* **One request path** — the ~165 endpoint methods on `Client` are each a
   single call into one of four private helpers (`get`, `post`, `postMultipart`,
   `remove`). Building the request, merging the query, capturing a retry factory
   and attaching the `RetryPolicy` happen in exactly one place, so a change to
@@ -1151,6 +1157,10 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `skills`            | Skill: publish → version → promote → zip (`/skills`) |
 | `chatkit`           | ChatKit session secret + thread transcript (`/chatkit`)|
 | `realtime`          | Live Realtime session over a WebSocket (`/realtime`)  |
+
+`realtime` is the one example that needs the optional `QtOpenAi::Realtime`
+module, so it is built only when `Qt6::WebSockets` is available; the rest need
+nothing beyond `QtOpenAi::Client`.
 
 ## Building
 

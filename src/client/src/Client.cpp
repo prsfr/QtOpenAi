@@ -44,7 +44,7 @@ public:
     // returns. Every endpoint method below is one of these four calls: they hold
     // the plumbing -- build the request, apply the query, capture a retry
     // factory, hand it the configured RetryPolicy -- that is identical for all
-    // ~100 of them and easy to get subtly wrong when spelled out each time.
+    // ~165 of them and easy to get subtly wrong when spelled out each time.
     // Defined below the request helpers they use.
     //
     // `beta` is the value of the OpenAI-Beta header an endpoint family behind a

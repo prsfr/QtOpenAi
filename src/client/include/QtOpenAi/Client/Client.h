@@ -133,12 +133,16 @@ namespace Client {
 
 class ClientPrivate;
 
-// The entry point for talking to an OpenAI-compatible chat API.
+// The entry point for talking to the OpenAI API, or anything that speaks it.
 //
-// Configure a base URL and API key, then call createChatCompletion() to obtain
-// an asynchronous ChatCompletionReply. The client works with any endpoint that
-// speaks the OpenAI /chat/completions protocol (OpenAI, Azure OpenAI, Ollama,
-// vLLM, LM Studio, ...).
+// Configure a base URL and API key, then call one of the endpoint methods —
+// createChatCompletion() for the classic case — to obtain an asynchronous
+// reply. The whole REST surface hangs off this one object; only the Realtime
+// WebSocket channel lives elsewhere, in QtOpenAi::Realtime.
+//
+// A provider that implements a subset works just as well: nothing here assumes
+// more of the server than the endpoint being called (OpenAI, Azure OpenAI,
+// Ollama, vLLM, LM Studio, ...).
 class QTOPENAI_CLIENT_EXPORT Client : public QObject
 {
     Q_OBJECT
@@ -898,7 +902,7 @@ private:
     // Every reply type keeps its constructor private and names Client as its
     // only friend, so a reply cannot be created from outside the library. The
     // request helpers that build them live in ClientPrivate, which reaches the
-    // constructors through here instead of being befriended by all ~55 of them.
+    // constructors through here instead of being befriended by all ~70 of them.
     // Defined in Client.cpp; not part of the public API.
     template <typename Reply, typename... Args>
     static Reply *makeReply(Args &&...args)

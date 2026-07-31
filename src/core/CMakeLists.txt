@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# QtOpenAi::Core — value types and (de)serialisation for the chat API.
+# QtOpenAi::Core — value types and (de)serialisation for the OpenAI API.
 # ---------------------------------------------------------------------------
 
 set(QTOPENAI_CORE_PUBLIC_HEADERS

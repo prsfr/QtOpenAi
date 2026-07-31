@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(QtOpenAi
     VERSION 0.2.0
-    DESCRIPTION "Qt 6 client library for OpenAI-compatible chat completion APIs with tool calling"
+    DESCRIPTION "Qt 6 client library for the OpenAI API and compatible endpoints, with tool calling"
     HOMEPAGE_URL "https://github.com/prsfr/qtopenai"
     LANGUAGES CXX)
 
