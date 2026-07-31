@@ -251,8 +251,7 @@ QJsonObject ChatCompletionRequest::toJson() const
         json.insert(QStringLiteral("top_logprobs"), *d->topLogprobs);
     if (!d->streamOptions.isEmpty())
         json.insert(QStringLiteral("stream_options"), d->streamOptions);
-    if (!d->modalities.isEmpty())
-        json.insert(QStringLiteral("modalities"), QJsonArray::fromStringList(d->modalities));
+    detail::insertIfNotEmpty(json, QStringLiteral("modalities"), d->modalities);
     if (!d->prediction.isEmpty())
         json.insert(QStringLiteral("prediction"), d->prediction);
     if (d->parallelToolCalls)
@@ -319,9 +318,7 @@ ChatCompletionRequest ChatCompletionRequest::fromJson(const QJsonObject &json)
     if (json.contains(QStringLiteral("top_logprobs")))
         request.d->topLogprobs = json.value(QStringLiteral("top_logprobs")).toInt();
     request.d->streamOptions = json.value(QStringLiteral("stream_options")).toObject();
-    const QJsonArray modalities = json.value(QStringLiteral("modalities")).toArray();
-    for (const QJsonValue &value : modalities)
-        request.d->modalities.append(value.toString());
+    request.d->modalities = detail::stringListOr(json, QStringLiteral("modalities"));
     request.d->prediction = json.value(QStringLiteral("prediction")).toObject();
     if (json.contains(QStringLiteral("parallel_tool_calls")))
         request.d->parallelToolCalls = json.value(QStringLiteral("parallel_tool_calls")).toBool();

@@ -85,6 +85,9 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ matrix.qt_version }}
+          # QtOpenAi::Realtime needs Qt6::WebSockets, which is not part of the
+          # default install set. Without it that module is skipped silently.
+          modules: qtwebsockets
           cache: true
 
       - name: Configure
@@ -116,6 +119,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: "6.11.1"
+          modules: qtwebsockets
           cache: true
 
       - name: Build & install QtOpenAi

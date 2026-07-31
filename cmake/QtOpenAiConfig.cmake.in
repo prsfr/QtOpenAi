@@ -5,6 +5,12 @@ include(CMakeFindDependencyMacro)
 # QtOpenAi::Core needs Qt6::Core; QtOpenAi::Client also needs Qt6::Network.
 find_dependency(Qt6 REQUIRED COMPONENTS Core Network)
 
+# QtOpenAi::Realtime additionally needs Qt6::WebSockets. It is only in the
+# export set when it was built, so the dependency is asked for only then.
+if(@QTOPENAI_BUILD_REALTIME@)
+    find_dependency(Qt6 REQUIRED COMPONENTS WebSockets)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/QtOpenAiTargets.cmake")
 
 check_required_components(QtOpenAi)

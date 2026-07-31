@@ -11,6 +11,10 @@
 #include <QtOpenAi/Client/ChatCompletionMessageListReply.h>
 #include <QtOpenAi/Client/ChatCompletionReply.h>
 #include <QtOpenAi/Client/ChatCompletionStreamReply.h>
+#include <QtOpenAi/Client/ChatKitSessionReply.h>
+#include <QtOpenAi/Client/ChatKitThreadItemListReply.h>
+#include <QtOpenAi/Client/ChatKitThreadListReply.h>
+#include <QtOpenAi/Client/ChatKitThreadReply.h>
 #include <QtOpenAi/Client/ChunkedUploader.h>
 #include <QtOpenAi/Client/CompletionReply.h>
 #include <QtOpenAi/Client/CompletionStreamReply.h>
@@ -44,6 +48,9 @@
 #include <QtOpenAi/Client/ModelListReply.h>
 #include <QtOpenAi/Client/ModelReply.h>
 #include <QtOpenAi/Client/ModerationReply.h>
+#include <QtOpenAi/Client/RealtimeCallReply.h>
+#include <QtOpenAi/Client/RealtimeClientSecretReply.h>
+#include <QtOpenAi/Client/RealtimeSessionReply.h>
 #include <QtOpenAi/Client/ResponseReply.h>
 #include <QtOpenAi/Client/ResponseStreamReply.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
@@ -53,6 +60,10 @@
 #include <QtOpenAi/Client/RunStepListReply.h>
 #include <QtOpenAi/Client/RunStepReply.h>
 #include <QtOpenAi/Client/RunStreamReply.h>
+#include <QtOpenAi/Client/SkillListReply.h>
+#include <QtOpenAi/Client/SkillReply.h>
+#include <QtOpenAi/Client/SkillVersionListReply.h>
+#include <QtOpenAi/Client/SkillVersionReply.h>
 #include <QtOpenAi/Client/SpeechReply.h>
 #include <QtOpenAi/Client/ThreadMessageListReply.h>
 #include <QtOpenAi/Client/ThreadMessageReply.h>
@@ -78,10 +89,12 @@
 #include <QtOpenAi/Core/CompletionRequest.h>
 #include <QtOpenAi/Core/CreateAssistantRequest.h>
 #include <QtOpenAi/Core/CreateBatchRequest.h>
+#include <QtOpenAi/Core/CreateChatKitSessionRequest.h>
 #include <QtOpenAi/Core/CreateContainerRequest.h>
 #include <QtOpenAi/Core/CreateEvalRequest.h>
 #include <QtOpenAi/Core/CreateFineTuningJobRequest.h>
 #include <QtOpenAi/Core/CreateRunRequest.h>
+#include <QtOpenAi/Core/CreateSkillRequest.h>
 #include <QtOpenAi/Core/CreateThreadRequest.h>
 #include <QtOpenAi/Core/CreateUploadRequest.h>
 #include <QtOpenAi/Core/CreateVectorStoreRequest.h>
@@ -93,6 +106,7 @@
 #include <QtOpenAi/Core/ImageGenerationRequest.h>
 #include <QtOpenAi/Core/ImageVariationRequest.h>
 #include <QtOpenAi/Core/ModerationRequest.h>
+#include <QtOpenAi/Core/RealtimeSessionConfig.h>
 #include <QtOpenAi/Core/ResponseOutputItem.h>
 #include <QtOpenAi/Core/ResponseRequest.h>
 #include <QtOpenAi/Core/SpeechRequest.h>
@@ -758,6 +772,112 @@ public:
                                    const ListParams &params = {});
 
     RunStepReply *getRunStep(const QString &threadId, const QString &runId, const QString &stepId);
+
+    // --- Realtime (/realtime) ----------------------------------------------
+    // The REST half of the Realtime API. The channel itself is a WebSocket and
+    // lives in the QtOpenAi::Realtime module; these endpoints mint the
+    // credential it connects with and control SIP calls bridged into it.
+    //
+    // Mint an ephemeral client secret for a browser or mobile client, so the
+    // API key never leaves this process. `expiresAfterSeconds` (10–7200)
+    // overrides the API's default of 600; 0 leaves it alone.
+    RealtimeClientSecretReply *
+    createRealtimeClientSecret(const Core::RealtimeSessionConfig &session,
+                               qint64 expiresAfterSeconds = 0);
+
+    // The same, for a realtime *translation* session.
+    RealtimeClientSecretReply *
+    createRealtimeTranslationClientSecret(const Core::RealtimeSessionConfig &session,
+                                          qint64 expiresAfterSeconds = 0);
+
+    // Create a session and get the configuration the server resolved for it.
+    RealtimeSessionReply *createRealtimeSession(const Core::RealtimeSessionConfig &session);
+
+    // The pre-GA transcription-session endpoint. It answers with the key nested
+    // under `client_secret`, which the value type accepts; new code should
+    // prefer createRealtimeClientSecret() with a transcription session.
+    RealtimeClientSecretReply *
+    createRealtimeTranscriptionSession(const Core::RealtimeSessionConfig &session);
+
+    // --- Realtime SIP calls (/realtime/calls) ------------------------------
+    // Answer a `realtime.call.incoming` webhook: accept the call and configure
+    // the session that will handle it.
+    RealtimeCallReply *acceptRealtimeCall(const QString &callId,
+                                          const Core::RealtimeSessionConfig &session);
+
+    // Decline an incoming call. `statusCode` is the SIP response to send back;
+    // 0 leaves it to the API, which answers 603 (Decline).
+    RealtimeCallReply *rejectRealtimeCall(const QString &callId, int statusCode = 0);
+
+    // End an active call, whether it arrived over SIP or WebRTC.
+    RealtimeCallReply *hangupRealtimeCall(const QString &callId);
+
+    // Transfer a SIP call, e.g. to "tel:+14155550123" or "sip:agent@example.com".
+    RealtimeCallReply *referRealtimeCall(const QString &callId, const QString &targetUri);
+
+    // --- ChatKit (/chatkit) [beta] -----------------------------------------
+    // The ChatKit endpoints are a beta surface: every call below sends the
+    // `OpenAI-Beta: chatkit_beta=v1` header, which the API requires.
+    //
+    // Mint a session for one end user and one workflow. The reply's
+    // clientSecret() is what the browser gets, in place of the API key.
+    ChatKitSessionReply *createChatKitSession(const Core::CreateChatKitSessionRequest &request);
+
+    // Cancel a session, so its client secret stops authenticating requests.
+    ChatKitSessionReply *cancelChatKitSession(const QString &sessionId);
+
+    // List threads, optionally only those belonging to one end user. Threads
+    // are created by the ChatKit frontend as the user talks, not through this
+    // API, so there is nothing to create here.
+    ChatKitThreadListReply *listChatKitThreads(const ListParams &params = {},
+                                               const QString &user = {});
+
+    ChatKitThreadReply *getChatKitThread(const QString &threadId);
+
+    // Delete a thread with its items and stored attachments. On success the
+    // reply's thread() carries the deletion acknowledgement (object
+    // "chatkit.thread.deleted").
+    ChatKitThreadReply *deleteChatKitThread(const QString &threadId);
+
+    // The contents of a thread: messages, widgets, client tool calls and tasks.
+    ChatKitThreadItemListReply *listChatKitThreadItems(const QString &threadId,
+                                                       const ListParams &params = {});
+
+    // --- Skills (/skills) --------------------------------------------------
+    // Upload a skill bundle, either as a single zip or as one part per file of
+    // a directory; the upload becomes the skill's first version.
+    SkillReply *createSkill(const Core::CreateSkillRequest &request);
+
+    SkillListReply *listSkills(const ListParams &params = {});
+
+    SkillReply *getSkill(const QString &skillId);
+
+    // Promote a published version to the skill's default (POST /skills/{id}).
+    // Publishing a version does not do this on its own.
+    SkillReply *setDefaultSkillVersion(const QString &skillId, const QString &version);
+
+    // Delete a skill. On success the reply's skill() carries the deletion
+    // acknowledgement (object "skill.deleted").
+    SkillReply *deleteSkill(const QString &skillId);
+
+    // Download the default version's bundle as a zip.
+    BinaryReply *downloadSkillContent(const QString &skillId);
+
+    // Publish a new immutable version of a skill from another bundle. Set the
+    // request's makeDefault() to promote it in the same call.
+    SkillVersionReply *createSkillVersion(const QString &skillId,
+                                          const Core::CreateSkillRequest &request);
+
+    SkillVersionListReply *listSkillVersions(const QString &skillId, const ListParams &params = {});
+
+    SkillVersionReply *getSkillVersion(const QString &skillId, const QString &version);
+
+    // Delete one version. On success the reply's version() carries the deletion
+    // acknowledgement (object "skill.version.deleted").
+    SkillVersionReply *deleteSkillVersion(const QString &skillId, const QString &version);
+
+    // Download one version's bundle as a zip.
+    BinaryReply *downloadSkillVersionContent(const QString &skillId, const QString &version);
 
     // --- Models (/models) --------------------------------------------------
     // List the available models.

@@ -187,8 +187,7 @@ QJsonObject FineTuningJob::toJson() const
     detail::insertIfNotEmpty(json, QStringLiteral("organization_id"), d->organizationId);
     detail::insertIfNotEmpty(json, QStringLiteral("training_file"), d->trainingFile);
     detail::insertIfNotEmpty(json, QStringLiteral("validation_file"), d->validationFile);
-    if (!d->resultFiles.isEmpty())
-        json.insert(QStringLiteral("result_files"), QJsonArray::fromStringList(d->resultFiles));
+    detail::insertIfNotEmpty(json, QStringLiteral("result_files"), d->resultFiles);
     json.insert(QStringLiteral("status"), fineTuningJobStatusToString(d->status));
     detail::insertIfNonZero(json, QStringLiteral("trained_tokens"), d->trainedTokens);
     if (d->seed != 0)
@@ -219,9 +218,7 @@ FineTuningJob FineTuningJob::fromJson(const QJsonObject &json)
     job.d->organizationId = detail::stringOr(json, QStringLiteral("organization_id"));
     job.d->trainingFile = detail::stringOr(json, QStringLiteral("training_file"));
     job.d->validationFile = detail::stringOr(json, QStringLiteral("validation_file"));
-    const QJsonArray resultFiles = json.value(QStringLiteral("result_files")).toArray();
-    for (const QJsonValue &value : resultFiles)
-        job.d->resultFiles.append(value.toString());
+    job.d->resultFiles = detail::stringListOr(json, QStringLiteral("result_files"));
     job.d->status = fineTuningJobStatusFromString(detail::stringOr(json, QStringLiteral("status")));
     job.d->trainedTokens = detail::int64Or(json, QStringLiteral("trained_tokens"));
     job.d->seed = json.value(QStringLiteral("seed")).toInt();

@@ -157,6 +157,20 @@ constexpr WireName<RunStepStatus> kRunStepStatuses[] = {
         {RunStepStatus::Expired, "expired", true},
 };
 
+// Nothing polls a ChatKit session or thread, so neither table claims a terminal
+// state — the column stays at its default, like Role and FinishReason.
+constexpr WireName<ChatKitSessionStatus> kChatKitSessionStatuses[] = {
+        {ChatKitSessionStatus::Active, "active"},
+        {ChatKitSessionStatus::Expired, "expired"},
+        {ChatKitSessionStatus::Cancelled, "cancelled"},
+};
+
+constexpr WireName<ChatKitThreadStatus> kChatKitThreadStatuses[] = {
+        {ChatKitThreadStatus::Active, "active"},
+        {ChatKitThreadStatus::Locked, "locked"},
+        {ChatKitThreadStatus::Closed, "closed"},
+};
+
 } // namespace
 
 // Define one enum's pair of public conversions. Both directions name the same
@@ -189,6 +203,11 @@ QTOPENAI_WIRE_CONVERSIONS(runStatusToString, runStatusFromString, RunStatus, kRu
                           RunStatus::Queued)
 QTOPENAI_WIRE_CONVERSIONS(runStepStatusToString, runStepStatusFromString, RunStepStatus,
                           kRunStepStatuses, RunStepStatus::InProgress)
+QTOPENAI_WIRE_CONVERSIONS(chatKitSessionStatusToString, chatKitSessionStatusFromString,
+                          ChatKitSessionStatus, kChatKitSessionStatuses,
+                          ChatKitSessionStatus::Active)
+QTOPENAI_WIRE_CONVERSIONS(chatKitThreadStatusToString, chatKitThreadStatusFromString,
+                          ChatKitThreadStatus, kChatKitThreadStatuses, ChatKitThreadStatus::Active)
 
 #undef QTOPENAI_WIRE_CONVERSIONS
 

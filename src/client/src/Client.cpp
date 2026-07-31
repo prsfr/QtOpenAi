@@ -370,10 +370,24 @@ constexpr QLatin1String kSteps("/steps");
 constexpr QLatin1String kVoiceConsents("/audio/voice_consents");
 constexpr QLatin1String kModels("/models");
 constexpr QLatin1String kCompletions("/completions");
+constexpr QLatin1String kSkills("/skills");
+constexpr QLatin1String kRealtime("/realtime");
+constexpr QLatin1String kRealtimeCalls("/realtime/calls");
+constexpr QLatin1String kRealtimeClientSecrets("/realtime/client_secrets");
+constexpr QLatin1String kChatKitSessions("/chatkit/sessions");
+constexpr QLatin1String kChatKitThreads("/chatkit/threads");
+// The sub-resource the item-bearing collections hang their entries off.
+constexpr QLatin1String kItems("/items");
+constexpr QLatin1String kVersions("/versions");
+// The sub-resource every downloadable object hangs its bytes off.
+constexpr QLatin1String kContent("/content");
 
 // The Assistants surface is still a beta of its own, and the API rejects a
 // request that does not say which version it speaks.
 constexpr auto kAssistantsBeta = "assistants=v2";
+
+// ChatKit is a beta of its own, with its own header value.
+constexpr auto kChatKitBeta = "chatkit_beta=v1";
 
 QString resourcePath(QLatin1String collection, const QString &id, const QString &suffix = {})
 {
@@ -393,6 +407,32 @@ QString evalRunPath(const QString &evalId, const QString &runId, const QString &
 QString threadRunPath(const QString &threadId, const QString &runId, const QString &suffix = {})
 {
     return resourcePath(kThreads, threadId, resourcePath(kRuns, runId, suffix));
+}
+
+// Skill versions nest below a skill. The version is a number the API spells as
+// a path segment, not an object id, but it composes exactly the same way.
+QString skillVersionPath(const QString &skillId, const QString &version, const QString &suffix = {})
+{
+    return resourcePath(kSkills, skillId, resourcePath(kVersions, version, suffix));
+}
+
+// Realtime SIP call control hangs four verbs off one call.
+QString realtimeCallPath(const QString &callId, const QString &suffix)
+{
+    return resourcePath(kRealtimeCalls, callId, suffix);
+}
+
+// The file parts of a skill upload. A bundle is either a single zip or one part
+// per file of a directory; both travel under the same `files` field name, which
+// is what makes the two forms one request rather than two.
+QList<detail::FormFilePart> skillFileParts(const Core::CreateSkillRequest &request)
+{
+    QList<detail::FormFilePart> parts;
+    const QList<Core::CreateSkillRequest::SkillFile> files = request.files();
+    parts.reserve(files.size());
+    for (const auto &file : files)
+        parts.append({"files", file.first, file.second});
+    return parts;
 }
 
 // The body of a submit_tool_outputs call. Both the blocking and the streamed
@@ -446,6 +486,21 @@ QByteArray metadataBody(const QJsonObject &metadata)
 {
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("metadata"), metadata);
+    return compactJson(bodyObject);
+}
+
+// The body both client-secret endpoints take: the session to start from, plus
+// an optional lifetime for the secret itself. The anchor is a constant in the
+// API, so it travels with the seconds rather than being a second argument.
+QByteArray clientSecretBody(const Core::RealtimeSessionConfig &session, qint64 expiresAfterSeconds)
+{
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("session"), session.toJson());
+    if (expiresAfterSeconds > 0) {
+        bodyObject.insert(QStringLiteral("expires_after"),
+                          QJsonObject {{QStringLiteral("anchor"), QStringLiteral("created_at")},
+                                       {QStringLiteral("seconds"), expiresAfterSeconds}});
+    }
     return compactJson(bodyObject);
 }
 
@@ -646,8 +701,7 @@ ConversationItemsReply *Client::listResponseInputItems(const QString &responseId
 ConversationItemsReply *Client::listConversationItems(const QString &conversationId)
 {
     Q_D(Client);
-    return d->get<ConversationItemsReply>(
-            resourcePath(kConversations, conversationId, QStringLiteral("/items")));
+    return d->get<ConversationItemsReply>(resourcePath(kConversations, conversationId, kItems));
 }
 
 ConversationItemsReply *
@@ -657,9 +711,8 @@ Client::createConversationItems(const QString &conversationId,
     Q_D(Client);
     QJsonObject bodyObject;
     bodyObject.insert(QStringLiteral("items"), itemsToArray(items));
-    return d->post<ConversationItemsReply>(
-            resourcePath(kConversations, conversationId, QStringLiteral("/items")),
-            compactJson(bodyObject));
+    return d->post<ConversationItemsReply>(resourcePath(kConversations, conversationId, kItems),
+                                           compactJson(bodyObject));
 }
 
 ConversationItemsReply *Client::getConversationItem(const QString &conversationId,
@@ -852,7 +905,7 @@ VideoReply *Client::remixVideo(const QString &videoId, const QString &prompt)
 VideoContentReply *Client::downloadVideoContent(const QString &videoId)
 {
     Q_D(Client);
-    return d->get<VideoContentReply>(resourcePath(kVideos, videoId, QStringLiteral("/content")));
+    return d->get<VideoContentReply>(resourcePath(kVideos, videoId, kContent));
 }
 
 VideoPoller *Client::pollVideo(const QString &videoId, int pollIntervalMs)
@@ -897,7 +950,7 @@ FileReply *Client::deleteFile(const QString &fileId)
 BinaryReply *Client::downloadFileContent(const QString &fileId)
 {
     Q_D(Client);
-    return d->get<BinaryReply>(resourcePath(kFiles, fileId, QStringLiteral("/content")));
+    return d->get<BinaryReply>(resourcePath(kFiles, fileId, kContent));
 }
 
 UploadReply *Client::createUpload(const Core::CreateUploadRequest &request)
@@ -1046,8 +1099,7 @@ VectorStoreFileContentReply *Client::getVectorStoreFileContent(const QString &ve
 {
     Q_D(Client);
     return d->get<VectorStoreFileContentReply>(
-            resourcePath(kVectorStores, vectorStoreId,
-                         resourcePath(kFiles, fileId, QStringLiteral("/content"))));
+            resourcePath(kVectorStores, vectorStoreId, resourcePath(kFiles, fileId, kContent)));
 }
 
 VectorStoreFileBatchReply *Client::createVectorStoreFileBatch(const QString &vectorStoreId,
@@ -1177,8 +1229,8 @@ ContainerFileReply *Client::deleteContainerFile(const QString &containerId, cons
 BinaryReply *Client::downloadContainerFileContent(const QString &containerId, const QString &fileId)
 {
     Q_D(Client);
-    return d->get<BinaryReply>(resourcePath(
-            kContainers, containerId, resourcePath(kFiles, fileId, QStringLiteral("/content"))));
+    return d->get<BinaryReply>(
+            resourcePath(kContainers, containerId, resourcePath(kFiles, fileId, kContent)));
 }
 
 BatchReply *Client::createBatch(const Core::CreateBatchRequest &request)
@@ -1589,6 +1641,189 @@ RunStepReply *Client::getRunStep(const QString &threadId, const QString &runId,
     Q_D(Client);
     return d->get<RunStepReply>(threadRunPath(threadId, runId, resourcePath(kSteps, stepId)), {},
                                 kAssistantsBeta);
+}
+
+RealtimeClientSecretReply *
+Client::createRealtimeClientSecret(const Core::RealtimeSessionConfig &session,
+                                   qint64 expiresAfterSeconds)
+{
+    Q_D(Client);
+    return d->post<RealtimeClientSecretReply>(kRealtimeClientSecrets,
+                                              clientSecretBody(session, expiresAfterSeconds));
+}
+
+RealtimeClientSecretReply *
+Client::createRealtimeTranslationClientSecret(const Core::RealtimeSessionConfig &session,
+                                              qint64 expiresAfterSeconds)
+{
+    Q_D(Client);
+    return d->post<RealtimeClientSecretReply>(
+            QString(kRealtime) + QStringLiteral("/translations/client_secrets"),
+            clientSecretBody(session, expiresAfterSeconds));
+}
+
+RealtimeSessionReply *Client::createRealtimeSession(const Core::RealtimeSessionConfig &session)
+{
+    Q_D(Client);
+    return d->post<RealtimeSessionReply>(QString(kRealtime) + QStringLiteral("/sessions"),
+                                         compactJson(session.toJson()));
+}
+
+RealtimeClientSecretReply *
+Client::createRealtimeTranscriptionSession(const Core::RealtimeSessionConfig &session)
+{
+    Q_D(Client);
+    return d->post<RealtimeClientSecretReply>(QString(kRealtime)
+                                                      + QStringLiteral("/transcription_sessions"),
+                                              compactJson(session.toJson()));
+}
+
+RealtimeCallReply *Client::acceptRealtimeCall(const QString &callId,
+                                              const Core::RealtimeSessionConfig &session)
+{
+    Q_D(Client);
+    return d->post<RealtimeCallReply>(realtimeCallPath(callId, QStringLiteral("/accept")),
+                                      compactJson(session.toJson()));
+}
+
+RealtimeCallReply *Client::rejectRealtimeCall(const QString &callId, int statusCode)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    // Omitting the code lets the API answer its documented default, 603.
+    if (statusCode > 0)
+        bodyObject.insert(QStringLiteral("status_code"), statusCode);
+    return d->post<RealtimeCallReply>(realtimeCallPath(callId, QStringLiteral("/reject")),
+                                      compactJson(bodyObject));
+}
+
+RealtimeCallReply *Client::hangupRealtimeCall(const QString &callId)
+{
+    Q_D(Client);
+    return d->post<RealtimeCallReply>(realtimeCallPath(callId, QStringLiteral("/hangup")));
+}
+
+RealtimeCallReply *Client::referRealtimeCall(const QString &callId, const QString &targetUri)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("target_uri"), targetUri);
+    return d->post<RealtimeCallReply>(realtimeCallPath(callId, QStringLiteral("/refer")),
+                                      compactJson(bodyObject));
+}
+
+ChatKitSessionReply *Client::createChatKitSession(const Core::CreateChatKitSessionRequest &request)
+{
+    Q_D(Client);
+    return d->post<ChatKitSessionReply>(kChatKitSessions, compactJson(request.toJson()),
+                                        kChatKitBeta);
+}
+
+ChatKitSessionReply *Client::cancelChatKitSession(const QString &sessionId)
+{
+    Q_D(Client);
+    return d->post<ChatKitSessionReply>(
+            resourcePath(kChatKitSessions, sessionId, QStringLiteral("/cancel")), {}, kChatKitBeta);
+}
+
+ChatKitThreadListReply *Client::listChatKitThreads(const ListParams &params, const QString &user)
+{
+    Q_D(Client);
+    QUrlQuery query = params.toQuery();
+    if (!user.isEmpty())
+        query.addQueryItem(QStringLiteral("user"), user);
+    return d->get<ChatKitThreadListReply>(kChatKitThreads, query, kChatKitBeta);
+}
+
+ChatKitThreadReply *Client::getChatKitThread(const QString &threadId)
+{
+    Q_D(Client);
+    return d->get<ChatKitThreadReply>(resourcePath(kChatKitThreads, threadId), {}, kChatKitBeta);
+}
+
+ChatKitThreadReply *Client::deleteChatKitThread(const QString &threadId)
+{
+    Q_D(Client);
+    return d->remove<ChatKitThreadReply>(resourcePath(kChatKitThreads, threadId), kChatKitBeta);
+}
+
+ChatKitThreadItemListReply *Client::listChatKitThreadItems(const QString &threadId,
+                                                           const ListParams &params)
+{
+    Q_D(Client);
+    return d->get<ChatKitThreadItemListReply>(resourcePath(kChatKitThreads, threadId, kItems),
+                                              params.toQuery(), kChatKitBeta);
+}
+
+SkillReply *Client::createSkill(const Core::CreateSkillRequest &request)
+{
+    Q_D(Client);
+    return d->postMultipart<SkillReply>(kSkills, request.formFields(), skillFileParts(request));
+}
+
+SkillListReply *Client::listSkills(const ListParams &params)
+{
+    Q_D(Client);
+    return d->get<SkillListReply>(kSkills, params.toQuery());
+}
+
+SkillReply *Client::getSkill(const QString &skillId)
+{
+    Q_D(Client);
+    return d->get<SkillReply>(resourcePath(kSkills, skillId));
+}
+
+SkillReply *Client::setDefaultSkillVersion(const QString &skillId, const QString &version)
+{
+    Q_D(Client);
+    QJsonObject bodyObject;
+    bodyObject.insert(QStringLiteral("default_version"), version);
+    return d->post<SkillReply>(resourcePath(kSkills, skillId), compactJson(bodyObject));
+}
+
+SkillReply *Client::deleteSkill(const QString &skillId)
+{
+    Q_D(Client);
+    return d->remove<SkillReply>(resourcePath(kSkills, skillId));
+}
+
+BinaryReply *Client::downloadSkillContent(const QString &skillId)
+{
+    Q_D(Client);
+    return d->get<BinaryReply>(resourcePath(kSkills, skillId, kContent));
+}
+
+SkillVersionReply *Client::createSkillVersion(const QString &skillId,
+                                              const Core::CreateSkillRequest &request)
+{
+    Q_D(Client);
+    return d->postMultipart<SkillVersionReply>(resourcePath(kSkills, skillId, kVersions),
+                                               request.formFields(), skillFileParts(request));
+}
+
+SkillVersionListReply *Client::listSkillVersions(const QString &skillId, const ListParams &params)
+{
+    Q_D(Client);
+    return d->get<SkillVersionListReply>(resourcePath(kSkills, skillId, kVersions),
+                                         params.toQuery());
+}
+
+SkillVersionReply *Client::getSkillVersion(const QString &skillId, const QString &version)
+{
+    Q_D(Client);
+    return d->get<SkillVersionReply>(skillVersionPath(skillId, version));
+}
+
+SkillVersionReply *Client::deleteSkillVersion(const QString &skillId, const QString &version)
+{
+    Q_D(Client);
+    return d->remove<SkillVersionReply>(skillVersionPath(skillId, version));
+}
+
+BinaryReply *Client::downloadSkillVersionContent(const QString &skillId, const QString &version)
+{
+    Q_D(Client);
+    return d->get<BinaryReply>(skillVersionPath(skillId, version, kContent));
 }
 
 ModelListReply *Client::listModels()
