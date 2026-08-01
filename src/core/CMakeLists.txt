@@ -80,6 +80,8 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/RealtimeSessionConfig.h
     include/QtOpenAi/Core/RealtimeClientSecret.h
     include/QtOpenAi/Core/RealtimeEvent.h
+    include/QtOpenAi/Core/MetaSchema.h
+    include/QtOpenAi/Core/SchemaValidator.h
 )
 
 add_library(QtOpenAiCore
@@ -158,6 +160,8 @@ add_library(QtOpenAiCore
     src/RealtimeSessionConfig.cpp
     src/RealtimeClientSecret.cpp
     src/RealtimeEvent.cpp
+    src/MetaSchema.cpp
+    src/SchemaValidator.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

@@ -11,6 +11,7 @@ qtopenai_add_example(pagination pagination.cpp)
 
 # --- Chat & core inference ---
 qtopenai_add_example(chat_tool_loop tool_loop.cpp)
+qtopenai_add_example(meta_tools meta_tools.cpp)
 qtopenai_add_example(streaming streaming.cpp)
 qtopenai_add_example(responses responses.cpp)
 qtopenai_add_example(structured_output structured_output.cpp)

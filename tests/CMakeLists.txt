@@ -141,6 +141,14 @@ qtopenai_add_test(tst_core_realtime
     SOURCES core/tst_realtime.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_metaschema
+    SOURCES core/tst_metaschema.cpp
+    LIBS QtOpenAi::Core)
+
+qtopenai_add_test(tst_core_schemavalidator
+    SOURCES core/tst_schemavalidator.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp

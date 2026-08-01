@@ -23,7 +23,7 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
 
 | Namespace            | Library           | Responsibility                                             |
 |----------------------|-------------------|------------------------------------------------------------|
-| `QtOpenAi::Core`     | `QtOpenAiCore`    | Value types & JSON (de)serialisation for every endpoint.   |
+| `QtOpenAi::Core`     | `QtOpenAiCore`    | Value types, JSON (de)serialisation, and JSON-Schema.      |
 | `QtOpenAi::Client`   | `QtOpenAiClient`  | Async networking `Client`, replies, and the `ToolRegistry`.|
 | `QtOpenAi::Realtime` | `QtOpenAiRealtime`| The Realtime WebSocket channel (optional).                 |
 
@@ -60,7 +60,7 @@ built only when that component is found (`QTOPENAI_BUILD_REALTIME`).
 ## Tool calling via the Qt meta-object system
 
 `QtOpenAi::Client::ToolRegistry` maps a model's tool calls back onto local C++
-code in two interchangeable ways:
+code in three interchangeable ways:
 
 ```cpp
 using namespace QtOpenAi;
@@ -88,6 +88,9 @@ registry.registerFunction("add", "Add two integers", addSchema,
 // 2) A QObject slot dispatched by name through QMetaObject::invokeMethod
 registry.registerMethod(weatherTool, weatherProvider, "getWeather");
 
+// 3) An invokable method whose definition is derived from its own signature
+registry.registerMethod(weatherProvider, "forecast");
+
 // React to execution via signals
 connect(&registry, &Client::ToolRegistry::toolInvoked,
         this, [](const QString &id, const QString &name, const QString &result) {
@@ -95,9 +98,67 @@ connect(&registry, &Client::ToolRegistry::toolInvoked,
         });
 ```
 
-> Hand-writing the schema is only needed until #39 lands — it will derive the
-> `parameters` schema straight from a `Q_GADGET`/QObject via the meta-object
-> system, so the property names can't drift from the handler.
+### Schema without hand-writing
+
+The third form needs no schema at all. `Core::MetaSchema` derives one from the
+meta-object, so the names and types the model is told about are the names and
+types the method actually has — rename an argument and the advertised schema
+follows:
+
+```cpp
+class WeatherService : public QObject
+{
+    Q_OBJECT
+    // The one thing the meta-object system does not know: what things mean.
+    // Addressed by path — "doc:<method>", then "doc:<method>:<argument>".
+    Q_CLASSINFO("doc:forecast", "Get the weather forecast for a city.")
+    Q_CLASSINFO("doc:forecast:location", "City name, e.g. Berlin")
+public:
+    Q_INVOKABLE QJsonObject forecast(const QString &location, int days);
+};
+
+registry.registerMethod(&service, "forecast");
+// parameters: {"type":"object",
+//              "properties":{"location":{"type":"string","description":"City name, e.g. Berlin"},
+//                            "days":{"type":"integer"}},
+//              "required":["location","days"],"additionalProperties":false}
+```
+
+The method is called with its parameters filled in from the model's JSON by
+name — a `QString` stays a `QString`, an `int` an `int`, a `Q_ENUM` is matched
+against its keys — and a `QJsonObject` return value is serialised into the tool
+result. A method taking the whole arguments object (`QString(const QJsonObject
+&)` or a `QVariantMap`) still receives it verbatim, so form 2 is unchanged.
+
+`MetaSchema::fromType<T>()` does the same for a `Q_GADGET` or QObject, mapping
+its `Q_PROPERTY`s to an object schema — usable anywhere a schema is, including
+`Core::ResponseFormat::jsonSchema()`.
+
+### Validating what the model sent
+
+Models can emit arguments that do not fit the schema they were given. Turn on
+validation and a bad call never reaches the handler; it comes back as a tool
+result naming what was wrong, which is what the model needs to correct itself:
+
+```cpp
+registry.setValidateArguments(true);   // off by default
+
+connect(&registry, &Client::ToolRegistry::argumentsRejected,
+        this, [](const QString &id, const QString &name, const QStringList &errors) {
+            qInfo() << name << "rejected:" << errors;   // "/days: expected integer, got string"
+        });
+```
+
+The check is `Core::SchemaValidator`, a small implementation of the JSON-Schema
+keywords that describe data — `type` (with `integer` as a whole number), `enum`,
+`const`, `required`, `properties`, `additionalProperties`, `items`, the numeric
+bounds, `minLength`/`maxLength`/`pattern` and `minItems`/`maxItems`. Keywords it
+does not implement constrain nothing, so a schema it only partly understands
+never rejects valid data. It is public API, usable on its own:
+
+```cpp
+const QStringList errors = Core::SchemaValidator::validate(schema, value);
+```
 
 Advertise the tools in a request and dispatch the model's calls:
 
@@ -118,7 +179,9 @@ connect(reply, &Client::ChatCompletionReply::finished, this,
     });
 ```
 
-A complete, runnable version lives in [`examples/tool_loop.cpp`](examples/tool_loop.cpp).
+A complete, runnable version lives in [`examples/tool_loop.cpp`](examples/tool_loop.cpp),
+and the derived-schema variant in [`examples/meta_tools.cpp`](examples/meta_tools.cpp)
+(`./meta_tools --schema` prints the generated definition without calling the API).
 
 ## Multimodal input
 
@@ -1135,6 +1198,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 |---------------------|------------------------------------------------------|
 | `pagination`        | Iterate every page of a list endpoint (`PageWalker`) |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
+| `meta_tools`        | Tool calling with a schema derived from a Q_INVOKABLE |
 | `streaming`         | Streamed chat completion (SSE), token by token       |
 | `responses`         | Responses API (`/responses`)                         |
 | `structured_output` | Structured Outputs (`response_format` json_schema)   |

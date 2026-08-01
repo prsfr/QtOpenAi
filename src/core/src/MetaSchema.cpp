@@ -1,0 +1,223 @@
+// SPDX-License-Identifier: MIT
+#include "QtOpenAi/Core/MetaSchema.h"
+
+#include <QtCore/QJsonArray>
+#include <QtCore/QMetaEnum>
+#include <QtCore/QMetaMethod>
+#include <QtCore/QMetaProperty>
+#include <QtCore/QStringList>
+
+namespace QtOpenAi {
+namespace Core {
+namespace MetaSchema {
+
+namespace {
+
+constexpr QLatin1String kType("type");
+constexpr QLatin1String kItems("items");
+constexpr QLatin1String kProperties("properties");
+constexpr QLatin1String kRequired("required");
+constexpr QLatin1String kDescription("description");
+constexpr QLatin1String kAdditionalProperties("additionalProperties");
+
+// The Q_CLASSINFO key a description lives under. "doc" for the object itself,
+// "doc:member" for one of its properties, "doc:method:argument" for one
+// argument -- so an annotation reads as the path to what it describes.
+QString docKey(const QString &path = {})
+{
+    return path.isEmpty() ? QStringLiteral("doc") : QStringLiteral("doc:") + path;
+}
+
+QString classInfo(const QMetaObject *meta, const QString &key)
+{
+    if (!meta)
+        return {};
+    const int index = meta->indexOfClassInfo(key.toUtf8().constData());
+    return index < 0 ? QString() : QString::fromUtf8(meta->classInfo(index).value());
+}
+
+QJsonObject typed(QLatin1String type)
+{
+    QJsonObject schema;
+    schema.insert(kType, QString(type));
+    return schema;
+}
+
+QJsonObject arrayOf(const QJsonObject &items)
+{
+    QJsonObject schema = typed(QLatin1String("array"));
+    if (!items.isEmpty())
+        schema.insert(kItems, items);
+    return schema;
+}
+
+// An enum is a closed set of names. Describing it as a string with an `enum`
+// constraint tells the model which values exist, where a bare integer would
+// not.
+QJsonObject fromEnum(const QMetaEnum &metaEnum)
+{
+    QJsonArray keys;
+    for (int i = 0; i < metaEnum.keyCount(); ++i)
+        keys.append(QString::fromUtf8(metaEnum.key(i)));
+
+    QJsonObject schema = typed(QLatin1String("string"));
+    if (!keys.isEmpty())
+        schema.insert(QStringLiteral("enum"), keys);
+    return schema;
+}
+
+// Assemble an object schema from name/schema pairs, in declaration order.
+// Everything is required and nothing else is accepted -- see the header for why.
+QJsonObject objectOf(const QList<QPair<QString, QJsonObject>> &members)
+{
+    QJsonObject properties;
+    QJsonArray required;
+    for (const auto &member : members) {
+        properties.insert(member.first, member.second);
+        required.append(member.first);
+    }
+
+    QJsonObject schema = typed(QLatin1String("object"));
+    schema.insert(kProperties, properties);
+    if (!required.isEmpty())
+        schema.insert(kRequired, required);
+    schema.insert(kAdditionalProperties, false);
+    return schema;
+}
+
+void describe(QJsonObject &schema, const QString &description)
+{
+    if (!description.isEmpty())
+        schema.insert(kDescription, description);
+}
+
+} // namespace
+
+QJsonObject fromMetaType(QMetaType type)
+{
+    switch (type.id()) {
+    case QMetaType::QString:
+    case QMetaType::QByteArray:
+    case QMetaType::Char:
+    case QMetaType::QChar:
+        return typed(QLatin1String("string"));
+    case QMetaType::Bool:
+        return typed(QLatin1String("boolean"));
+    case QMetaType::Int:
+    case QMetaType::UInt:
+    case QMetaType::Long:
+    case QMetaType::ULong:
+    case QMetaType::LongLong:
+    case QMetaType::ULongLong:
+    case QMetaType::Short:
+    case QMetaType::UShort:
+        return typed(QLatin1String("integer"));
+    case QMetaType::Double:
+    case QMetaType::Float:
+        return typed(QLatin1String("number"));
+    case QMetaType::QStringList:
+        return arrayOf(typed(QLatin1String("string")));
+    case QMetaType::QVariantList:
+    case QMetaType::QJsonArray:
+        return arrayOf({});
+    case QMetaType::QVariantMap:
+    case QMetaType::QVariantHash:
+    case QMetaType::QJsonObject:
+        return typed(QLatin1String("object"));
+    case QMetaType::QDate:
+        return [] {
+            QJsonObject schema = typed(QLatin1String("string"));
+            schema.insert(QStringLiteral("format"), QStringLiteral("date"));
+            return schema;
+        }();
+    case QMetaType::QDateTime:
+        return [] {
+            QJsonObject schema = typed(QLatin1String("string"));
+            schema.insert(QStringLiteral("format"), QStringLiteral("date-time"));
+            return schema;
+        }();
+    default:
+        break;
+    }
+
+    // Enums and gadgets are only knowable through the type's own meta-object.
+    if (type.flags().testFlag(QMetaType::IsEnumeration)) {
+        const QMetaObject *meta = type.metaObject();
+        if (meta) {
+            const QByteArray name = QByteArray(type.name()).split(':').last();
+            const int index = meta->indexOfEnumerator(name.constData());
+            if (index >= 0)
+                return fromEnum(meta->enumerator(index));
+        }
+        // A registered enum whose enumerator cannot be located is still an
+        // integer on the wire.
+        return typed(QLatin1String("integer"));
+    }
+
+    if (const QMetaObject *meta = type.metaObject())
+        return fromMetaObject(meta);
+
+    // Not a type this mapping describes: an empty schema constrains nothing,
+    // which beats guessing.
+    return {};
+}
+
+QJsonObject fromMetaObject(const QMetaObject *meta)
+{
+    if (!meta)
+        return {};
+
+    QList<QPair<QString, QJsonObject>> members;
+    // propertyOffset() skips QObject's own `objectName`, which is never part of
+    // what the caller means to describe.
+    for (int i = meta->propertyOffset(); i < meta->propertyCount(); ++i) {
+        const QMetaProperty property = meta->property(i);
+        if (!property.isReadable())
+            continue;
+
+        QJsonObject schema = property.isEnumType() ? fromEnum(property.enumerator())
+                                                   : fromMetaType(property.metaType());
+        const QString name = QString::fromUtf8(property.name());
+        describe(schema, classInfo(meta, docKey(name)));
+        members.append({name, schema});
+    }
+
+    QJsonObject schema = objectOf(members);
+    describe(schema, classInfo(meta, docKey()));
+    return schema;
+}
+
+QJsonObject fromMethod(const QMetaObject *meta, const QString &method)
+{
+    if (!meta)
+        return {};
+
+    const QByteArray wanted = method.toUtf8();
+    for (int i = 0; i < meta->methodCount(); ++i) {
+        const QMetaMethod signature = meta->method(i);
+        if (signature.name() != wanted)
+            continue;
+
+        const QList<QByteArray> names = signature.parameterNames();
+        QList<QPair<QString, QJsonObject>> members;
+        for (int p = 0; p < signature.parameterCount(); ++p) {
+            QJsonObject schema = fromMetaType(signature.parameterMetaType(p));
+            // moc keeps the parameter names from the declaration; a signature
+            // written without them still needs something addressable.
+            const QString name = names.value(p).isEmpty() ? QStringLiteral("arg%1").arg(p)
+                                                          : QString::fromUtf8(names.at(p));
+            describe(schema, classInfo(meta, docKey(method + QLatin1Char(':') + name)));
+            members.append({name, schema});
+        }
+
+        QJsonObject schema = objectOf(members);
+        describe(schema, classInfo(meta, docKey(method)));
+        return schema;
+    }
+
+    return {};
+}
+
+} // namespace MetaSchema
+} // namespace Core
+} // namespace QtOpenAi
