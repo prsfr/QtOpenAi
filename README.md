@@ -1305,6 +1305,54 @@ is kept exactly as the API spells it. Deleting a skill or a version answers with
 the same value types, reporting `object()` as `skill.deleted` /
 `skill.version.deleted`.
 
+## Metrics & observability
+
+`Client::MetricsCollector` records what the client is costing and how it is
+behaving. Attach one and every request is timed and counted — duration,
+outcome, HTTP status, retries, and the rate-limit headroom the provider
+reported — without any of the calling code knowing it is there:
+
+```cpp
+Client::MetricsCollector metrics;
+metrics.attach(&client);
+
+connect(&metrics, &Client::MetricsCollector::requestRecorded, this,
+    [](const Client::RequestMetrics &r) {
+        qInfo() << r.durationMs << "ms" << (r.ok ? "ok" : "failed")
+                << r.rateLimit.remainingRequests << "requests left";
+    });
+
+const auto snapshot = metrics.snapshot();
+snapshot.averageDurationMs();
+snapshot.failuresByStatus.value(429);   // status 0 is "no response at all"
+snapshot.cost();                        // USD, from the catalog's prices
+```
+
+Tokens and cost need one thing more. A reply is generic; only the *typed*
+response knows which model answered and what it spent, so `observe()` wraps the
+call:
+
+```cpp
+metrics.observe(client.createChatCompletion(request));
+```
+
+It compiles for any reply whose response reports `model()` and `usage()`, and
+fails to compile for one that does not — which is the right answer for a file
+upload. Cost comes from [`ModelCatalog`](#model-capabilities-pricing--token-counting)
+at the moment each request is recorded; a model with no price contributes zero,
+an honest "unknown" rather than "free". `setCatalog()` takes a corrected table.
+
+**Time to first token** — what a user perceives as latency — is measured for
+streams. The collector finds the streaming reply's `contentDelta` signal through
+the meta-object rather than naming each streaming type, so an endpoint added
+later is measured on the day it is added. Ask for `stream_options:
+{include_usage: true}` if you want a streamed response to report tokens too.
+
+Nothing is paid for when nothing is attached: `Client` announces each reply
+through an ordinary signal, and an unconnected signal costs a comparison.
+
+See [`examples/metrics.cpp`](examples/metrics.cpp).
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -1387,6 +1435,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `pagination`        | Iterate every page of a list endpoint (`PageWalker`) |
 | `token_budget`      | Model capabilities, pricing and token counting, offline |
 | `conversation`      | Conversation history, branching and trimming (`Chat`) |
+| `metrics`           | Token usage, cost, latency and time-to-first-token   |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
 | `meta_tools`        | Tool calling with a schema derived from a Q_INVOKABLE |
 | `streaming`         | Streamed chat completion (SSE), token by token       |

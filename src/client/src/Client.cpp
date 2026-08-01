@@ -533,7 +533,7 @@ Reply *ClientPrivate::get(const QString &path, const QUrlQuery &query, const cha
 {
     QNetworkRequest request = apiRequest(this, path, beta);
     applyQuery(request, query);
-    return Client::makeReply<Reply>(getFactory(q->networkAccessManager(), std::move(request)),
+    return Client::makeReply<Reply>(q, getFactory(q->networkAccessManager(), std::move(request)),
                                     retryPolicy);
 }
 
@@ -541,7 +541,7 @@ template <typename Reply>
 Reply *ClientPrivate::post(const QString &path, const QByteArray &body, const char *beta) const
 {
     return Client::makeReply<Reply>(
-            postFactory(this, q->networkAccessManager(), apiRequest(this, path, beta), body),
+            q, postFactory(this, q->networkAccessManager(), apiRequest(this, path, beta), body),
             retryPolicy);
 }
 
@@ -549,7 +549,8 @@ template <typename Reply>
 Reply *ClientPrivate::postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
                                     QList<detail::FormFilePart> files, const char *beta) const
 {
-    return Client::makeReply<Reply>(multipartPostFactory(this, q->networkAccessManager(),
+    return Client::makeReply<Reply>(q,
+                                    multipartPostFactory(this, q->networkAccessManager(),
                                                          apiRequest(this, path, beta),
                                                          std::move(fields), std::move(files)),
                                     retryPolicy);
@@ -559,7 +560,7 @@ template <typename Reply>
 Reply *ClientPrivate::remove(const QString &path, const char *beta) const
 {
     return Client::makeReply<Reply>(
-            deleteFactory(q->networkAccessManager(), apiRequest(this, path, beta)), retryPolicy);
+            q, deleteFactory(q->networkAccessManager(), apiRequest(this, path, beta)), retryPolicy);
 }
 
 // The streaming endpoints deliberately sit outside the retry machinery: an SSE
@@ -573,7 +574,7 @@ Reply *ClientPrivate::postStream(const QString &path, Request request, const cha
     QNetworkRequest networkRequest = apiRequest(this, path, beta);
     networkRequest.setRawHeader("Accept", "text/event-stream");
     return Client::makeReply<Reply>(
-            q->networkAccessManager()->post(networkRequest, compactJson(request.toJson())));
+            q, q->networkAccessManager()->post(networkRequest, compactJson(request.toJson())));
 }
 
 ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequest &request)

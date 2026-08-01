@@ -895,6 +895,17 @@ Q_SIGNALS:
     void apiKeyChanged();
     void organizationChanged();
 
+    // Every reply this client creates, announced the moment it exists and
+    // before it can have finished. It is the hook an observer such as
+    // MetricsCollector attaches to, which is why it lives here rather than the
+    // observer reaching into the request path: nothing below this line knows
+    // what is watching, and an unconnected signal costs a comparison.
+    //
+    // QObject rather than RestReplyBase because the streaming replies are not
+    // one -- they sit outside the retry machinery -- and they are exactly the
+    // ones worth timing.
+    void replyCreated(QObject *reply);
+
 private:
     // cancel/pause/resume differ only in the path segment they POST to.
     FineTuningJobReply *postFineTuningJobAction(const QString &jobId, const QString &action);
@@ -905,9 +916,11 @@ private:
     // constructors through here instead of being befriended by all ~70 of them.
     // Defined in Client.cpp; not part of the public API.
     template <typename Reply, typename... Args>
-    static Reply *makeReply(Args &&...args)
+    static Reply *makeReply(Client *client, Args &&...args)
     {
-        return new Reply(std::forward<Args>(args)...);
+        Reply *reply = new Reply(std::forward<Args>(args)...);
+        Q_EMIT client->replyCreated(reply);
+        return reply;
     }
 
     Q_DECLARE_PRIVATE(Client)

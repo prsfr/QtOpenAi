@@ -9,6 +9,7 @@ endfunction()
 # --- Infrastructure ---
 qtopenai_add_example(pagination pagination.cpp)
 qtopenai_add_example(token_budget token_budget.cpp)
+qtopenai_add_example(metrics metrics.cpp)
 
 # --- Chat & core inference ---
 qtopenai_add_example(conversation conversation.cpp)
