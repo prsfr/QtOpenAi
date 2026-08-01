@@ -1,5 +1,6 @@
 add_subdirectory(core)
 add_subdirectory(client)
+add_subdirectory(chat)
 if(QTOPENAI_BUILD_REALTIME)
     add_subdirectory(realtime)
 endif()

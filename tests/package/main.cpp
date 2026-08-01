@@ -4,6 +4,7 @@
 // the namespaced imported targets to prove headers, libraries and the config
 // package all resolve.
 
+#include <QtOpenAi/Chat/Transcript.h>
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/ToolRegistry.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
@@ -43,9 +44,15 @@ int main(int argc, char **argv)
                               [](const QJsonObject &) { return QString(); });
     request.setTools(registry.tools());
 
+    // The Chat module, which builds a request without any networking.
+    Chat::Transcript transcript;
+    transcript.setSystemPrompt(QStringLiteral("be terse"));
+    transcript.addUserMessage(QStringLiteral("hi"));
+
     // Round-trip a request through JSON to touch the Core serialisation path.
     const bool ok
             = request.toJson().value(QStringLiteral("model")).toString() == QStringLiteral("gpt-4o")
-              && registry.tools().size() == 1;
+              && registry.tools().size() == 1
+              && transcript.buildRequest(QStringLiteral("gpt-4o")).messages().size() == 2;
     return ok ? 0 : 1;
 }

@@ -25,12 +25,15 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
 |----------------------|-------------------|------------------------------------------------------------|
 | `QtOpenAi::Core`     | `QtOpenAiCore`    | Value types, JSON (de)serialisation, and JSON-Schema.      |
 | `QtOpenAi::Client`   | `QtOpenAiClient`  | Async networking `Client`, replies, and the `ToolRegistry`.|
+| `QtOpenAi::Chat`     | `QtOpenAiChat`    | Client-side conversation history, branching and trimming.  |
 | `QtOpenAi::Realtime` | `QtOpenAiRealtime`| The Realtime WebSocket channel (optional).                 |
 
 `QtOpenAi::Client` depends on `QtOpenAi::Core`; `Core` has no dependency beyond
-`Qt6::Core`. `QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets` — the
-one dependency nothing else needs, which is why it is a module of its own and is
-built only when that component is found (`QTOPENAI_BUILD_REALTIME`).
+`Qt6::Core`. `QtOpenAi::Chat` also depends on `Core` alone — building the next
+request needs no networking, so history can be managed without linking `Client`.
+`QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets` — the one dependency
+nothing else needs, which is why it is a module of its own and is built only when
+that component is found (`QTOPENAI_BUILD_REALTIME`).
 
 ## Design
 
@@ -442,6 +445,91 @@ connect(models, &Client::ModelListReply::finished, this,
 
 `Core::ModelList` is `ListPage<Model>`, the same page type the other list
 endpoints return.
+
+## Conversation history (`QtOpenAi::Chat`)
+
+Every endpoint above takes a request and returns a reply. Keeping the running
+conversation — appending turns, building the next request from them, staying
+inside the window, letting the user edit a past question — is the application's
+job, and `QtOpenAi::Chat` is the part of it that is the same in every
+application.
+
+Not to be confused with the server-side [Conversations API](#conversations-api-conversations),
+which persists state at the provider. This is local, and works against any
+OpenAI-compatible endpoint.
+
+```cpp
+using namespace QtOpenAi;
+
+Chat::Transcript transcript;
+transcript.setSystemPrompt("You are terse.");
+transcript.setTrimPolicy(Chat::TrimPolicy::forModel("gpt-4o-mini"));
+
+transcript.addUserMessage("Why is the sky blue?");
+auto *reply = client.createChatCompletion(transcript.buildRequest("gpt-4o-mini"));
+connect(reply, &Client::ChatCompletionReply::finished, this,
+    [&](const Core::ChatCompletionResponse &response) {
+        transcript.addMessage(response.firstMessage());   // and the next request
+    });                                                   // is a conversation
+```
+
+### It is a tree, and linear use is the tree that never branched
+
+Editing a past message does not overwrite it. `fork()` gives it a sibling and
+makes the new one active, so both answers stay reachable — the behaviour behind
+every chat UI's `‹ 2/3 ›` control:
+
+```cpp
+auto question = transcript.addUserMessage("Why is the sky blue?");
+transcript.addMessage(answer);
+
+transcript.fork(question, Core::Message::user("Why are sunsets red?"));
+transcript.siblings(question);        // both versions
+transcript.setActiveLeaf(previous);   // the first answer is still there
+```
+
+`messages()` is the path root → active leaf, with the system prompt in front and
+the trim policy applied; that path is the conversation as far as the model is
+concerned, and the rest of the tree is history to navigate back to. A transcript
+that is only ever appended to has one child per node and reads as a plain list —
+which is why there is one type here and not two.
+
+`toJson()`/`fromJson()` round-trip the whole tree, node ids included, so
+anything stored alongside an id still points at the right message.
+
+### Trimming
+
+A conversation grows; a context window does not. `Chat::TrimPolicy` takes a
+message limit, a token budget or both, and drops from the oldest end — with
+three invariants it will not break:
+
+* **The system prompt survives.** Dropping it changes how the model behaves
+  rather than merely shortening what it remembers.
+* **A tool result never leads.** Dropping the assistant turn that requested the
+  tools would leave its results answering nothing, which some providers reject.
+* **The newest turn survives.** A single message over budget is sent anyway:
+  being told it is too long beats silently sending nothing.
+
+`TrimPolicy::forModel()` takes the budget from `ModelCatalog` — the window less
+the room the reply needs — and counts with that model's tokenizer.
+`setSummariser()` replaces what was dropped with one message of your making,
+which is where a running summary belongs.
+
+### Driving a UI
+
+`Chat::ConversationModel` is the same transcript as a QObject, for when a view
+needs to know that something changed:
+
+```cpp
+connect(model, &Chat::ConversationModel::messageAdded, view, &View::appendRow);
+connect(model, &Chat::ConversationModel::activeBranchChanged, view, &View::reload);
+```
+
+It stays a thin wrapper: `transcript()` hands back the value, so persistence and
+threading work as they do for any other value type here.
+
+See [`examples/conversation.cpp`](examples/conversation.cpp) — interactive with
+a key, and an offline walk-through of branching and trimming without one.
 
 ## Model capabilities, pricing & token counting
 
@@ -1298,6 +1386,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 |---------------------|------------------------------------------------------|
 | `pagination`        | Iterate every page of a list endpoint (`PageWalker`) |
 | `token_budget`      | Model capabilities, pricing and token counting, offline |
+| `conversation`      | Conversation history, branching and trimming (`Chat`) |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
 | `meta_tools`        | Tool calling with a schema derived from a Q_INVOKABLE |
 | `streaming`         | Streamed chat completion (SSE), token by token       |

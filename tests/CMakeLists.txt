@@ -282,6 +282,19 @@ qtopenai_add_test(tst_client_realtime
     SOURCES client/tst_realtime.cpp
     LIBS QtOpenAi::Client)
 
+# --- Chat module tests ---
+qtopenai_add_test(tst_chat_transcript
+    SOURCES chat/tst_transcript.cpp
+    LIBS QtOpenAi::Chat)
+
+qtopenai_add_test(tst_chat_trimpolicy
+    SOURCES chat/tst_trimpolicy.cpp
+    LIBS QtOpenAi::Chat)
+
+qtopenai_add_test(tst_chat_conversationmodel
+    SOURCES chat/tst_conversationmodel.cpp
+    LIBS QtOpenAi::Chat)
+
 # --- Realtime module tests (built with the module) ---
 if(QTOPENAI_BUILD_REALTIME)
     qtopenai_add_test(tst_realtime_connection
