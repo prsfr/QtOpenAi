@@ -299,6 +299,10 @@ qtopenai_add_test(tst_chat_conversationmodel
     SOURCES chat/tst_conversationmodel.cpp
     LIBS QtOpenAi::Chat)
 
+qtopenai_add_test(tst_chat_agent
+    SOURCES chat/tst_agent.cpp
+    LIBS QtOpenAi::Chat)
+
 # --- Realtime module tests (built with the module) ---
 if(QTOPENAI_BUILD_REALTIME)
     qtopenai_add_test(tst_realtime_connection

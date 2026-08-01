@@ -14,6 +14,8 @@ qtopenai_add_example(metrics metrics.cpp)
 # --- Chat & core inference ---
 qtopenai_add_example(conversation conversation.cpp)
 target_link_libraries(conversation PRIVATE QtOpenAi::Chat)
+qtopenai_add_example(agent agent.cpp)
+target_link_libraries(agent PRIVATE QtOpenAi::Chat)
 qtopenai_add_example(chat_tool_loop tool_loop.cpp)
 qtopenai_add_example(meta_tools meta_tools.cpp)
 qtopenai_add_example(streaming streaming.cpp)

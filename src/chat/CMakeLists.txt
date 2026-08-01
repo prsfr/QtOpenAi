@@ -3,8 +3,10 @@
 #
 # Its own module because it is orchestration, not data: Core stays a pure
 # value-type and serialisation layer, and this is the part that decides what
-# goes into the next request. Depends on Core only — building a request needs
-# no networking, so a caller can manage history without ever linking Client.
+# goes into the next request — and, in Agent's case, drives the whole
+# chat/tool/chat loop, which is why the module links Client. Transcript and
+# TrimPolicy themselves touch no networking: history can be built, trimmed and
+# persisted without a Client ever existing.
 # ---------------------------------------------------------------------------
 
 set(QTOPENAI_CHAT_PUBLIC_HEADERS
@@ -12,6 +14,7 @@ set(QTOPENAI_CHAT_PUBLIC_HEADERS
     include/QtOpenAi/Chat/TrimPolicy.h
     include/QtOpenAi/Chat/Transcript.h
     include/QtOpenAi/Chat/ConversationModel.h
+    include/QtOpenAi/Chat/Agent.h
 )
 
 add_library(QtOpenAiChat
@@ -19,12 +22,14 @@ add_library(QtOpenAiChat
     src/TrimPolicy.cpp
     src/Transcript.cpp
     src/ConversationModel.cpp
+    src/Agent.cpp
 )
 
 add_library(QtOpenAi::Chat ALIAS QtOpenAiChat)
 
 target_link_libraries(QtOpenAiChat
     PUBLIC
+        QtOpenAi::Client
         QtOpenAi::Core
         Qt6::Core
 )

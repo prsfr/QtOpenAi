@@ -25,13 +25,14 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
 |----------------------|-------------------|------------------------------------------------------------|
 | `QtOpenAi::Core`     | `QtOpenAiCore`    | Value types, JSON (de)serialisation, and JSON-Schema.      |
 | `QtOpenAi::Client`   | `QtOpenAiClient`  | Async networking `Client`, replies, and the `ToolRegistry`.|
-| `QtOpenAi::Chat`     | `QtOpenAiChat`    | Client-side conversation history, branching and trimming.  |
+| `QtOpenAi::Chat`     | `QtOpenAiChat`    | Conversation history, branching, trimming, and the agent loop. |
 | `QtOpenAi::Realtime` | `QtOpenAiRealtime`| The Realtime WebSocket channel (optional).                 |
 
 `QtOpenAi::Client` depends on `QtOpenAi::Core`; `Core` has no dependency beyond
-`Qt6::Core`. `QtOpenAi::Chat` also depends on `Core` alone — building the next
-request needs no networking, so history can be managed without linking `Client`.
-`QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets` — the one dependency
+`Qt6::Core`. `QtOpenAi::Chat` sits on top of both, because `Agent` drives the
+request loop — though `Transcript` and `TrimPolicy` themselves touch no
+networking, so history can be built, trimmed and persisted with no `Client` in
+sight. `QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets` — the one dependency
 nothing else needs, which is why it is a module of its own and is built only when
 that component is found (`QTOPENAI_BUILD_REALTIME`).
 
@@ -530,6 +531,41 @@ threading work as they do for any other value type here.
 
 See [`examples/conversation.cpp`](examples/conversation.cpp) — interactive with
 a key, and an offline walk-through of branching and trimming without one.
+
+### The tool loop, driven for you
+
+`Chat::Agent` owns the chat → `tool_calls` → tool results → chat loop that
+[`examples/tool_loop.cpp`](examples/tool_loop.cpp) writes out by hand:
+
+```cpp
+Chat::Agent agent(&client, &registry);
+agent.setModel("gpt-4o-mini");
+agent.setStreaming(true);
+
+connect(&agent, &Chat::Agent::contentDelta, this, &Ui::append);
+connect(&agent, &Chat::Agent::finished, this, &Ui::showAnswer);
+
+agent.run("What is the weather in Berlin and Hamburg?");
+```
+
+The conversation accumulates in the agent's `Transcript`, so a second `run()`
+continues where the first ended, and the trim policy applies throughout.
+
+**The guards are not optional extras.** A loop that talks to a model needs all
+three:
+
+```cpp
+agent.setMaxIterations(5);   // a model that keeps calling tools instead of answering
+agent.setTimeoutMs(60000);   // a run that stops making progress at all
+agent.setApprovalCallback([](const Core::ToolCall &call) {
+    return confirmWithUser(call);       // refusing is reported to the model as
+});                                     // the tool's result, so it can say so
+```
+
+`cancel()` abandons a run. Every turn is announced — `assistantMessage`,
+`toolInvoked`, `toolRejected`, `finished`, `failed` — so a UI can show the loop
+rather than wait for it. See [`examples/agent.cpp`](examples/agent.cpp)
+(`--ask` confirms each tool call on the terminal).
 
 ## Model capabilities, pricing & token counting
 
@@ -1435,6 +1471,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `pagination`        | Iterate every page of a list endpoint (`PageWalker`) |
 | `token_budget`      | Model capabilities, pricing and token counting, offline |
 | `conversation`      | Conversation history, branching and trimming (`Chat`) |
+| `agent`             | The tool loop driven by `Chat::Agent`, with guards    |
 | `metrics`           | Token usage, cost, latency and time-to-first-token   |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
 | `meta_tools`        | Tool calling with a schema derived from a Q_INVOKABLE |
