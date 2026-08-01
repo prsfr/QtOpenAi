@@ -153,6 +153,14 @@ qtopenai_add_test(tst_core_metajson
     SOURCES core/tst_metajson.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_modelcatalog
+    SOURCES core/tst_modelcatalog.cpp
+    LIBS QtOpenAi::Core)
+
+qtopenai_add_test(tst_core_tokencounter
+    SOURCES core/tst_tokencounter.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp

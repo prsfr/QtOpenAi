@@ -443,6 +443,65 @@ connect(models, &Client::ModelListReply::finished, this,
 `Core::ModelList` is `ListPage<Model>`, the same page type the other list
 endpoints return.
 
+## Model capabilities, pricing & token counting
+
+`GET /models` says which models exist. `Core::ModelCatalog` says what they can
+do and what they cost — knowledge the API does not return, held locally so it is
+available before a request goes out:
+
+```cpp
+const Core::ModelInfo info = Core::ModelCatalog::shared().model("gpt-4o-mini-2024-07-18");
+
+info.isKnown();                                  // true — resolved by prefix
+info.contextWindow();                            // 128000
+info.encoding();                                 // "o200k_base"
+info.supports(Core::ModelCapability::Vision);    // true
+info.inputPrice();                               // 0.15, USD per 1M tokens
+```
+
+Two properties matter more than the table itself:
+
+* **Lookup never fails.** An unknown id first resolves to the longest known id
+  that is a prefix of it — which is what turns `gpt-4o-mini-2024-07-18` into the
+  entry for `gpt-4o-mini` — and otherwise returns a conservative fallback whose
+  `isKnown()` is `false`. Callers do not have to guard the lookup, and one that
+  cares can still tell a fact from a guess.
+* **The table ages.** Prices change and models appear; the bundled defaults are
+  a snapshot. `merge()` takes a JSON table of `{ "<id>": { … } }` and overwrites
+  only what it mentions, so a corrected price is a data file rather than a
+  release:
+
+```cpp
+Core::ModelCatalog::shared().merge(QJsonDocument::fromJson(file.readAll()).object());
+```
+
+`Core::TokenCounter` answers the other half — how much of that window a prompt
+uses:
+
+```cpp
+Core::TokenCounter counter = Core::TokenCounter::forModel("gpt-4o-mini");
+counter.count(messages);   // framing overhead included
+```
+
+**Vocabulary is not bundled.** The OpenAI encodings are megabytes of table each
+and belong to a project with its own release cadence, so this ships the
+algorithm and takes the data:
+
+```cpp
+Core::TokenCounter::loadEncodingFile("o200k_base", "/path/to/o200k_base.tiktoken");
+```
+
+Byte-pair merging then follows tiktoken's algorithm over the UTF-8 bytes of each
+piece the encoding's pre-tokenizer produces, so counts match the server's.
+Without the file, `count()` still answers using the customary
+one-token-per-four-characters estimate, and `isExact()` says which of the two
+you got — enough for a progress bar, not enough to fill a context window to the
+brim. A counter built before its vocabulary is loaded becomes exact the moment
+it arrives.
+
+See [`examples/token_budget.cpp`](examples/token_budget.cpp), which runs
+entirely offline.
+
 ## Speech-to-text (`/audio/transcriptions`, `/audio/translations`)
 
 Transcribe audio in its source language, or translate it into English. Both
@@ -1238,6 +1297,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | Program             | Endpoint / feature                                   |
 |---------------------|------------------------------------------------------|
 | `pagination`        | Iterate every page of a list endpoint (`PageWalker`) |
+| `token_budget`      | Model capabilities, pricing and token counting, offline |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
 | `meta_tools`        | Tool calling with a schema derived from a Q_INVOKABLE |
 | `streaming`         | Streamed chat completion (SSE), token by token       |

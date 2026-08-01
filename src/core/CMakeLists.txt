@@ -82,6 +82,9 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/RealtimeEvent.h
     include/QtOpenAi/Core/MetaSchema.h
     include/QtOpenAi/Core/MetaJson.h
+    include/QtOpenAi/Core/ModelInfo.h
+    include/QtOpenAi/Core/ModelCatalog.h
+    include/QtOpenAi/Core/TokenCounter.h
     include/QtOpenAi/Core/SchemaValidator.h
 )
 
@@ -163,6 +166,9 @@ add_library(QtOpenAiCore
     src/RealtimeEvent.cpp
     src/MetaSchema.cpp
     src/MetaJson.cpp
+    src/ModelInfo.cpp
+    src/ModelCatalog.cpp
+    src/TokenCounter.cpp
     src/SchemaValidator.cpp
 )
 
