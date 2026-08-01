@@ -131,8 +131,8 @@ result. A method taking the whole arguments object (`QString(const QJsonObject
 &)` or a `QVariantMap`) still receives it verbatim, so form 2 is unchanged.
 
 `MetaSchema::fromType<T>()` does the same for a `Q_GADGET` or QObject, mapping
-its `Q_PROPERTY`s to an object schema — usable anywhere a schema is, including
-`Core::ResponseFormat::jsonSchema()`.
+its `Q_PROPERTY`s to an object schema — which is also what
+[typed structured outputs](#typed-structured-outputs) are built on.
 
 ### Validating what the model sent
 
@@ -239,6 +239,47 @@ response.setTextFormat(ResponseFormat::jsonSchema("person", schema));
 
 `ResponseFormat::text()` and `ResponseFormat::jsonObject()` cover the simpler
 modes.
+
+### Typed structured outputs
+
+The schema above describes a shape the C++ code has to reproduce by hand at
+both ends — once to ask for it, once to read it back. A `Q_GADGET` can be both:
+
+```cpp
+class Person
+{
+    Q_GADGET
+    Q_CLASSINFO("doc", "A person mentioned in the text")
+    Q_CLASSINFO("doc:age", "Age in whole years")
+    Q_PROPERTY(QString name MEMBER name)
+    Q_PROPERTY(int age MEMBER age)
+public:
+    QString name;
+    int age = 0;
+};
+
+request.setResponseFormat(ResponseFormat::forType<Person>());
+// ... and when the reply arrives:
+const Person person = MetaJson::parse<Person>(response.firstMessage().content());
+```
+
+`forType<T>()` derives the schema from the properties (via `MetaSchema`), takes
+the name from the class and the description from `Q_CLASSINFO("doc")`, and asks
+for strict mode — which `MetaSchema` already satisfies, since it marks every
+property required and closes the object.
+
+`Core::MetaJson` is the other direction: `parse<T>()` / `fromJson<T>()` populate
+the properties from the model's JSON, and `write()` / `toJson()` go back out.
+Nested gadgets, `QStringList`s and `Q_ENUM`s (matched against their keys, as the
+schema advertised them) all round-trip. A value that does not fit its property
+is not written and the read reports `false`, so one malformed field does not
+cost the whole object.
+
+Both work on a QObject too — `MetaJson::readInto(object, json)` — with
+`objectName` left out, since it is Qt's property and not the model's business.
+
+See [`examples/typed_output.cpp`](examples/typed_output.cpp) (`--schema` prints
+the generated `response_format` without calling the API).
 
 ## Streaming (Server-Sent Events)
 
@@ -1202,6 +1243,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `streaming`         | Streamed chat completion (SSE), token by token       |
 | `responses`         | Responses API (`/responses`)                         |
 | `structured_output` | Structured Outputs (`response_format` json_schema)   |
+| `typed_output`      | Structured Outputs bound to a Q_GADGET, both ways    |
 | `vision`            | Multimodal input (text + image content parts)        |
 | `embeddings`        | Embeddings (`/embeddings`)                            |
 | `moderations`       | Moderation (`/moderations`)                           |

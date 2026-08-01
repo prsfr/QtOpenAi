@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/ToolRegistry.h"
 
+#include <QtOpenAi/Core/MetaJson.h>
 #include <QtOpenAi/Core/MetaSchema.h>
 #include <QtOpenAi/Core/SchemaValidator.h>
 
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
-#include <QtCore/QMetaEnum>
 #include <QtCore/QMetaMethod>
 #include <QtCore/QMetaObject>
 #include <QtCore/QPointer>
@@ -17,10 +17,6 @@ namespace QtOpenAi {
 namespace Client {
 
 namespace {
-
-// QMetaMethod::invoke takes at most ten arguments, which is the ceiling on a
-// method usable as a tool.
-constexpr int kMaxArguments = 10;
 
 // Serialise a small JSON error object for use as a tool-result payload. The
 // details list carries one entry per rejected constraint, so a model reading
@@ -57,40 +53,6 @@ bool takesWholeArguments(const QMetaMethod &method)
     return id == QMetaType::QJsonObject || id == QMetaType::QVariantMap;
 }
 
-// Turn one JSON value into the C++ type a parameter declares. Enums arrive as
-// their key, because that is how MetaSchema advertises them.
-bool coerce(const QJsonValue &value, QMetaType type, QVariant *out)
-{
-    if (type.flags().testFlag(QMetaType::IsEnumeration) && value.isString()) {
-        const QMetaObject *meta = type.metaObject();
-        if (!meta)
-            return false;
-        const QByteArray enumerator = QByteArray(type.name()).split(':').last();
-        const int index = meta->indexOfEnumerator(enumerator.constData());
-        if (index < 0)
-            return false;
-        bool ok = false;
-        const int key
-                = meta->enumerator(index).keyToValue(value.toString().toUtf8().constData(), &ok);
-        // An enum is its underlying integer; copying one in only works while
-        // that is the plain `int` the meta-object system assumes.
-        if (!ok || type.sizeOf() != qsizetype(sizeof(int)))
-            return false;
-        *out = QVariant(type, &key);
-        return true;
-    }
-
-    QVariant variant = value.toVariant();
-    if (variant.metaType() == type) {
-        *out = variant;
-        return true;
-    }
-    if (!variant.convert(type))
-        return false;
-    *out = variant;
-    return true;
-}
-
 // A return value as the tool result the model receives. Structured returns are
 // serialised rather than stringified, so a method can answer with JSON.
 QString stringify(const QVariant &value)
@@ -119,13 +81,9 @@ QString dispatch(QObject *receiver, const QMetaMethod &method, const QJsonObject
                  QString *result)
 {
     const QString name = QString::fromUtf8(method.name());
-    if (method.parameterCount() > kMaxArguments) {
-        return QStringLiteral("method '%1' takes more than %2 arguments")
-                .arg(name, QString::number(kMaxArguments));
-    }
 
-    // The values must outlive the call: a QGenericArgument only points at them.
-    QVarLengthArray<QVariant, kMaxArguments> values;
+    // The values must outlive the call: what is handed over are pointers.
+    QVarLengthArray<QVariant, 8> values;
     if (takesWholeArguments(method)) {
         values.append(method.parameterMetaType(0).id() == QMetaType::QJsonObject
                               ? QVariant::fromValue(arguments)
@@ -137,9 +95,11 @@ QString dispatch(QObject *receiver, const QMetaMethod &method, const QJsonObject
             if (!arguments.contains(parameter)) {
                 return QStringLiteral("method '%1' is missing argument '%2'").arg(name, parameter);
             }
-            QVariant value;
+            // Same conversion the model was promised by the schema: an enum
+            // named by its key, a nested object built from its properties.
             const QMetaType type = method.parameterMetaType(i);
-            if (!coerce(arguments.value(parameter), type, &value)) {
+            const QVariant value = Core::MetaJson::convert(arguments.value(parameter), type);
+            if (!value.isValid()) {
                 return QStringLiteral("argument '%1' of method '%2' is not a %3")
                         .arg(parameter, name, QString::fromUtf8(type.name()));
             }
@@ -147,25 +107,28 @@ QString dispatch(QObject *receiver, const QMetaMethod &method, const QJsonObject
         }
     }
 
-    QVarLengthArray<QGenericArgument, kMaxArguments> generic;
-    for (QVariant &value : values)
-        generic.append(QGenericArgument(value.metaType().name(), value.constData()));
-    generic.resize(kMaxArguments); // Unused slots stay default-constructed.
-
     // Receiving the return value in its own type keeps methods answering with
     // something other than QString usable.
     const QMetaType returnType = method.returnMetaType();
     const bool returns = returnType.isValid() && returnType.id() != QMetaType::Void;
     QVariant returned = returns ? QVariant(returnType, nullptr) : QVariant();
-    const QGenericReturnArgument slot
-            = returns ? QGenericReturnArgument(returnType.name(), returned.data())
-                      : QGenericReturnArgument();
 
-    const bool ok = method.invoke(receiver, Qt::DirectConnection, slot, generic[0], generic[1],
-                                  generic[2], generic[3], generic[4], generic[5], generic[6],
-                                  generic[7], generic[8], generic[9]);
-    if (!ok)
+    // QMetaMethod::invoke() would re-derive each argument's type from a type
+    // *name*, which an enum declared with Q_ENUM is not reliably registered
+    // under -- Qt 6.11 rejects the call that Qt 6.4 accepted. Every value here
+    // was already converted to the QMetaType the meta-object itself reports for
+    // that parameter, so the call goes straight to the metacall invoke() would
+    // reach after its own checks.
+    QVarLengthArray<void *, 9> argv;
+    argv.append(returns ? returned.data() : nullptr);
+    for (QVariant &value : values)
+        argv.append(value.data());
+
+    if (QMetaObject::metacall(receiver, QMetaObject::InvokeMetaMethod, method.methodIndex(),
+                              argv.data())
+        >= 0) {
         return QStringLiteral("failed to invoke method '%1'").arg(name);
+    }
 
     *result = returns ? stringify(returned) : QString();
     return {};

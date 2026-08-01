@@ -81,6 +81,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/RealtimeClientSecret.h
     include/QtOpenAi/Core/RealtimeEvent.h
     include/QtOpenAi/Core/MetaSchema.h
+    include/QtOpenAi/Core/MetaJson.h
     include/QtOpenAi/Core/SchemaValidator.h
 )
 
@@ -161,6 +162,7 @@ add_library(QtOpenAiCore
     src/RealtimeClientSecret.cpp
     src/RealtimeEvent.cpp
     src/MetaSchema.cpp
+    src/MetaJson.cpp
     src/SchemaValidator.cpp
 )
 
