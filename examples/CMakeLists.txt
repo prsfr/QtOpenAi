@@ -27,6 +27,7 @@ qtopenai_add_example(structured_output structured_output.cpp)
 qtopenai_add_example(typed_output typed_output.cpp)
 qtopenai_add_example(vision vision.cpp)
 qtopenai_add_example(embeddings embeddings.cpp)
+qtopenai_add_example(semantic_search semantic_search.cpp)
 qtopenai_add_example(moderations moderations.cpp)
 qtopenai_add_example(guardrails guardrails.cpp)
 

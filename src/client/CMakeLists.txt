@@ -15,6 +15,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/RateLimiter.h
     include/QtOpenAi/Client/Guardrail.h
     include/QtOpenAi/Client/ChatMap.h
+    include/QtOpenAi/Client/SemanticIndex.h
     include/QtOpenAi/Client/ToolRegistry.h
     include/QtOpenAi/Client/RetryPolicy.h
     include/QtOpenAi/Client/RestReplyBase.h
@@ -126,6 +127,7 @@ add_library(QtOpenAiClient
     src/RateLimiter.cpp
     src/Guardrail.cpp
     src/ChatMap.cpp
+    src/SemanticIndex.cpp
     src/ToolRegistry.cpp
     src/ClientError.cpp
     src/RetryPolicy.cpp

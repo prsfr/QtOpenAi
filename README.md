@@ -1715,6 +1715,59 @@ the one who gave up.
 
 See [`examples/parallel_map.cpp`](examples/parallel_map.cpp).
 
+## Local vector search
+
+`Core::VectorIndex` is a small in-memory vector index — the local,
+dependency-free half of retrieval-augmented generation — and
+`Client::SemanticIndex` attaches the embedding step to it:
+
+```cpp
+Client::SemanticIndex index(&client);
+index.add(paragraphs);                       // one request for the whole batch
+
+auto *hits = index.query("how do I cancel?", 3);
+connect(hits, &Client::SemanticQueryReply::finished, this, &Ui::showPassages);
+```
+
+Everything `SemanticIndex` does is two steps a caller could have written: embed
+the text, then search the vectors. It exists because those two steps have to
+agree about the model — vectors from two different embedding models rank
+against each other as convincing nonsense — and keeping the model next to the
+index is how they cannot drift apart. `VectorIndex::add()` refuses a vector
+whose length differs from the rest for the same reason; a model change
+mid-corpus is exactly how that happens, and refusing is the only way a caller
+finds out.
+
+Ranking is **brute force, deliberately**. An approximate-nearest-neighbour
+structure earns its complexity somewhere past a hundred thousand vectors; below
+that a scan over a few thousand embeddings is a few milliseconds, and it is
+exact, has no index to rebuild and no parameters to tune wrongly. Past that
+point the answer is a real vector database — or OpenAI's own server-side vector
+stores — not a worse one here.
+
+Three metrics, all reported so that **higher is better**: `Cosine` (the
+default — embedding models encode meaning in direction, and magnitude mostly
+encodes how long the text was), `DotProduct`, and `Euclidean`, whose score is
+the negated distance so ranking code never has to ask which metric produced it.
+`search(query, k, minScore)`'s floor is the difference between "the five
+closest documents" and "the five closest documents that are actually about
+this", which for a retrieval prompt is the difference between context and
+noise.
+
+The index is a plain serialisable value, so a corpus survives a restart:
+
+```cpp
+saveJson(index.index().toJson());
+index.setIndex(Core::VectorIndex::fromJson(loadJson()));  // no re-embedding
+```
+
+The raw arithmetic is available on its own in the `Core::Vector` namespace —
+`dot()`, `norm()`, `cosineSimilarity()`, `euclideanDistance()`,
+`normalized()` — where mismatched lengths return 0 rather than reading past the
+shorter vector.
+
+See [`examples/semantic_search.cpp`](examples/semantic_search.cpp).
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -1810,6 +1863,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `typed_output`      | Structured Outputs bound to a Q_GADGET, both ways    |
 | `vision`            | Multimodal input (text + image content parts)        |
 | `embeddings`        | Embeddings (`/embeddings`)                            |
+| `semantic_search`   | Index a corpus locally and answer from what it finds |
 | `moderations`       | Moderation (`/moderations`)                           |
 | `guardrails`        | Screen input and output against a per-category policy |
 | `tts`               | Text-to-speech (`/audio/speech`)                      |

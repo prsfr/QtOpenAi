@@ -157,6 +157,10 @@ qtopenai_add_test(tst_core_modelcatalog
     SOURCES core/tst_modelcatalog.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_vectorindex
+    SOURCES core/tst_vectorindex.cpp
+    LIBS QtOpenAi::Core)
+
 qtopenai_add_test(tst_core_tokencounter
     SOURCES core/tst_tokencounter.cpp
     LIBS QtOpenAi::Core)
@@ -188,6 +192,10 @@ qtopenai_add_test(tst_client_guardrail
 
 qtopenai_add_test(tst_client_chatmap
     SOURCES client/tst_chatmap.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_semanticindex
+    SOURCES client/tst_semanticindex.cpp
     LIBS QtOpenAi::Client)
 
 qtopenai_add_test(tst_client_providerprofile

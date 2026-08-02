@@ -85,6 +85,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/ModelInfo.h
     include/QtOpenAi/Core/ModelCatalog.h
     include/QtOpenAi/Core/TokenCounter.h
+    include/QtOpenAi/Core/VectorIndex.h
     include/QtOpenAi/Core/SchemaValidator.h
 )
 
@@ -169,6 +170,7 @@ add_library(QtOpenAiCore
     src/ModelInfo.cpp
     src/ModelCatalog.cpp
     src/TokenCounter.cpp
+    src/VectorIndex.cpp
     src/SchemaValidator.cpp
 )
 
