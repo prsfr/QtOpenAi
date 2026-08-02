@@ -8,6 +8,10 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ProviderProfile.h
     include/QtOpenAi/Client/Metrics.h
     include/QtOpenAi/Client/MetricsCollector.h
+    include/QtOpenAi/Client/Interceptor.h
+    include/QtOpenAi/Client/LoggingInterceptor.h
+    include/QtOpenAi/Client/ResponseCache.h
+    include/QtOpenAi/Client/CachingInterceptor.h
     include/QtOpenAi/Client/ToolRegistry.h
     include/QtOpenAi/Client/RetryPolicy.h
     include/QtOpenAi/Client/RestReplyBase.h
@@ -102,6 +106,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
 
 add_library(QtOpenAiClient
     ${QTOPENAI_CLIENT_PUBLIC_HEADERS}
+    src/CannedReply_p.h
     src/HttpSupport_p.h
     src/RestReply_p.h
     src/RestReplyBase_p.h
@@ -111,6 +116,10 @@ add_library(QtOpenAiClient
     src/ProviderProfile.cpp
     src/Metrics.cpp
     src/MetricsCollector.cpp
+    src/Interceptor.cpp
+    src/LoggingInterceptor.cpp
+    src/ResponseCache.cpp
+    src/CachingInterceptor.cpp
     src/ToolRegistry.cpp
     src/ClientError.cpp
     src/RetryPolicy.cpp

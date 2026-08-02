@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/Client.h"
 
+#include "QtOpenAi/Client/Interceptor.h"
 #include "QtOpenAi/Client/ProviderProfile.h"
 
+#include "CannedReply_p.h"
 #include "Multipart_p.h"
 
 #include <QtCore/QBuffer>
+#include <QtCore/QElapsedTimer>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QUrlQuery>
@@ -14,6 +17,8 @@
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
+
+#include <memory>
 
 namespace QtOpenAi {
 namespace Client {
@@ -40,6 +45,7 @@ public:
     int requestTimeoutMs = 0;
     QString userAgent;
     QHash<QByteArray, QByteArray> defaultHeaders;
+    QList<Interceptor *> interceptors;
     QNetworkAccessManager *manager = nullptr;
 
     // Issue a request against `path` and wrap it in the reply type the endpoint
@@ -64,6 +70,21 @@ public:
     Reply *remove(const QString &path, const char *beta = nullptr) const;
     template <typename Reply, typename Request>
     Reply *postStream(const QString &path, Request request, const char *beta = nullptr) const;
+
+    // The interceptor round trip for one non-streaming call, and the single
+    // place it happens: run the outgoing chain, take either the network or an
+    // interceptor's answer, and hook the returning chain to the reply.
+    // `makeFactory` turns the request the chain left behind into the retry
+    // factory for the verb in question -- the only part that differs.
+    template <typename Reply, typename MakeFactory>
+    Reply *issue(const QByteArray &method, QNetworkRequest request, const QByteArray &body,
+                 MakeFactory makeFactory) const;
+
+    // The outgoing half on its own, for the streaming path.
+    std::optional<InterceptedResponse> runBeforeRequest(InterceptedRequest &request) const;
+    // The returning half, hung off the reply that is about to run.
+    void runAfterResponse(RestReplyBase *reply, const InterceptedRequest &sent,
+                          bool fromCache) const;
 
     // Join the base URL with an endpoint path (tolerating trailing slashes) and
     // append the Azure api-version query parameter when configured.
@@ -225,6 +246,32 @@ void Client::setUserAgent(const QString &userAgent)
 {
     Q_D(Client);
     d->userAgent = userAgent;
+}
+
+void Client::addInterceptor(Interceptor *interceptor)
+{
+    Q_D(Client);
+    if (!interceptor || d->interceptors.contains(interceptor))
+        return;
+    d->interceptors.append(interceptor);
+    // The caller keeps ownership, so the client has to survive the interceptor
+    // outliving its usefulness -- a dangling entry here would be called on the
+    // next request.
+    connect(interceptor, &QObject::destroyed, this,
+            [this, interceptor]() { d_func()->interceptors.removeOne(interceptor); });
+}
+
+void Client::removeInterceptor(Interceptor *interceptor)
+{
+    Q_D(Client);
+    if (d->interceptors.removeOne(interceptor))
+        disconnect(interceptor, &QObject::destroyed, this, nullptr);
+}
+
+QList<Interceptor *> Client::interceptors() const
+{
+    Q_D(const Client);
+    return d->interceptors;
 }
 
 void Client::setDefaultHeader(const QByteArray &name, const QByteArray &value)
@@ -537,39 +584,123 @@ std::function<QNetworkReply *()> postFactory(const ClientPrivate *d, QNetworkAcc
 
 } // namespace
 
+std::optional<InterceptedResponse> ClientPrivate::runBeforeRequest(InterceptedRequest &request) const
+{
+    // The one check an installed-nothing client pays for.
+    for (Interceptor *interceptor : interceptors) {
+        if (std::optional<InterceptedResponse> answer = interceptor->beforeRequest(request)) {
+            // An interceptor that answers without saying how is saying "200":
+            // the alternative is a reply that decodes a body while reporting
+            // that no response arrived.
+            if (answer->httpStatus == 0)
+                answer->httpStatus = 200;
+            answer->request = request;
+            return answer;
+        }
+    }
+    return std::nullopt;
+}
+
+void ClientPrivate::runAfterResponse(RestReplyBase *reply, const InterceptedRequest &sent,
+                                     bool fromCache) const
+{
+    if (interceptors.isEmpty())
+        return;
+
+    // The exchange is assembled across two signals because neither carries all
+    // of it: responseReceived() has the raw body, and by done() the error is
+    // recorded. Shared state rather than a member, because a Client has many
+    // requests in flight and each owns its own timing.
+    auto exchange = std::make_shared<InterceptedResponse>();
+    exchange->request = sent;
+    exchange->fromCache = fromCache;
+    auto elapsed = std::make_shared<QElapsedTimer>();
+    elapsed->start();
+
+    QObject::connect(reply, &RestReplyBase::responseReceived, q,
+                     [exchange](const QByteArray &body, int httpStatus) {
+                         exchange->body = body;
+                         exchange->httpStatus = httpStatus;
+                     });
+    QObject::connect(reply, &RestReplyBase::done, q, [this, reply, exchange, elapsed]() {
+        exchange->elapsedMs = elapsed->elapsed();
+        exchange->error = reply->error();
+        // Reverse order, so a chain nests around the exchange: the first
+        // interceptor installed is the outermost and sees it last.
+        for (auto it = interceptors.crbegin(); it != interceptors.crend(); ++it)
+            (*it)->afterResponse(*exchange);
+    });
+}
+
+template <typename Reply, typename MakeFactory>
+Reply *ClientPrivate::issue(const QByteArray &method, QNetworkRequest request,
+                            const QByteArray &body, MakeFactory makeFactory) const
+{
+    InterceptedRequest outgoing {method, std::move(request), body};
+    const std::optional<InterceptedResponse> answer = runBeforeRequest(outgoing);
+
+    std::function<QNetworkReply *()> factory;
+    if (answer) {
+        // Answered locally. It still becomes a QNetworkReply, so everything
+        // below -- retry engine, rate-limit parsing, typed decoding -- runs
+        // exactly as it does for a real response instead of via a second path
+        // that would have to be kept in step with the first.
+        factory = [sent = outgoing.request, answered = *answer]() {
+            return new CannedReply(sent, answered.body, answered.httpStatus, "application/json");
+        };
+    } else {
+        factory = makeFactory(outgoing.request);
+    }
+
+    Reply *reply = Client::makeReply<Reply>(q, std::move(factory), retryPolicy);
+    runAfterResponse(reply, outgoing, answer.has_value());
+    return reply;
+}
+
 template <typename Reply>
 Reply *ClientPrivate::get(const QString &path, const QUrlQuery &query, const char *beta) const
 {
     QNetworkRequest request = apiRequest(this, path, beta);
     applyQuery(request, query);
-    return Client::makeReply<Reply>(q, getFactory(q->networkAccessManager(), std::move(request)),
-                                    retryPolicy);
+    QNetworkAccessManager *manager = q->networkAccessManager();
+    return issue<Reply>("GET", std::move(request), {}, [manager](QNetworkRequest sent) {
+        return getFactory(manager, std::move(sent));
+    });
 }
 
 template <typename Reply>
 Reply *ClientPrivate::post(const QString &path, const QByteArray &body, const char *beta) const
 {
-    return Client::makeReply<Reply>(
-            q, postFactory(this, q->networkAccessManager(), apiRequest(this, path, beta), body),
-            retryPolicy);
+    QNetworkAccessManager *manager = q->networkAccessManager();
+    return issue<Reply>("POST", apiRequest(this, path, beta), body,
+                        [this, manager, body](QNetworkRequest sent) {
+                            return postFactory(this, manager, std::move(sent), body);
+                        });
 }
 
 template <typename Reply>
 Reply *ClientPrivate::postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
                                     QList<detail::FormFilePart> files, const char *beta) const
 {
-    return Client::makeReply<Reply>(q,
-                                    multipartPostFactory(this, q->networkAccessManager(),
-                                                         apiRequest(this, path, beta),
-                                                         std::move(fields), std::move(files)),
-                                    retryPolicy);
+    QNetworkAccessManager *manager = q->networkAccessManager();
+    // The body is not offered to the chain here: it is rebuilt per attempt and
+    // can be a whole file, so handing it over would mean holding an upload in
+    // memory for the benefit of a logger.
+    return issue<Reply>("POST", apiRequest(this, path, beta), {},
+                        [this, manager, fields = std::move(fields),
+                         files = std::move(files)](QNetworkRequest sent) mutable {
+                            return multipartPostFactory(this, manager, std::move(sent),
+                                                        std::move(fields), std::move(files));
+                        });
 }
 
 template <typename Reply>
 Reply *ClientPrivate::remove(const QString &path, const char *beta) const
 {
-    return Client::makeReply<Reply>(
-            q, deleteFactory(q->networkAccessManager(), apiRequest(this, path, beta)), retryPolicy);
+    QNetworkAccessManager *manager = q->networkAccessManager();
+    return issue<Reply>("DELETE", apiRequest(this, path, beta), {}, [manager](QNetworkRequest sent) {
+        return deleteFactory(manager, std::move(sent));
+    });
 }
 
 // The streaming endpoints deliberately sit outside the retry machinery: an SSE
@@ -582,8 +713,18 @@ Reply *ClientPrivate::postStream(const QString &path, Request request, const cha
     request.setStream(true);
     QNetworkRequest networkRequest = apiRequest(this, path, beta);
     networkRequest.setRawHeader("Accept", "text/event-stream");
-    return Client::makeReply<Reply>(
-            q, q->networkAccessManager()->post(networkRequest, compactJson(request.toJson())));
+    const QByteArray body = compactJson(request.toJson());
+
+    // Only the outgoing half of the chain runs here, so header injection and
+    // logging cover streams too. There is deliberately no returning half and no
+    // short-circuit: a stream has no single response body to hand an
+    // interceptor, and serving one from a cache would mean fabricating a
+    // sequence of events that never happened. An answer returned here is
+    // ignored rather than quietly changing what a stream is.
+    InterceptedRequest outgoing {"POST", std::move(networkRequest), body};
+    runBeforeRequest(outgoing);
+
+    return Client::makeReply<Reply>(q, q->networkAccessManager()->post(outgoing.request, body));
 }
 
 ChatCompletionReply *Client::createChatCompletion(const Core::ChatCompletionRequest &request)

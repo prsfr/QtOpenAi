@@ -170,6 +170,14 @@ qtopenai_add_test(tst_client_metrics
     SOURCES client/tst_metrics.cpp
     LIBS QtOpenAi::Client)
 
+qtopenai_add_test(tst_client_interceptor
+    SOURCES client/tst_interceptor.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_responsecache
+    SOURCES client/tst_responsecache.cpp
+    LIBS QtOpenAi::Client)
+
 qtopenai_add_test(tst_client_providerprofile
     SOURCES client/tst_providerprofile.cpp
     LIBS QtOpenAi::Client)

@@ -39,6 +39,11 @@ public:
     void abort();
 
 Q_SIGNALS:
+    // Emitted once per settled request whatever the outcome -- 2xx, HTTP error
+    // or transport failure -- immediately before succeeded()/failed(), so an
+    // observer sees the raw exchange without having to reassemble it from two
+    // signals. `httpStatus` is 0 when no response arrived at all.
+    void settled(const QByteArray &body, int httpStatus);
     // Emitted once on a 2xx response with the raw body and status code.
     void succeeded(const QByteArray &body, int httpStatus);
     // Emitted once on a terminal transport/HTTP failure.

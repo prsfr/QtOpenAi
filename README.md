@@ -1441,6 +1441,124 @@ through an ordinary signal, and an unconnected signal costs a comparison.
 
 See [`examples/metrics.cpp`](examples/metrics.cpp).
 
+## Interceptors
+
+`Client::Interceptor` is a hook around every request the client makes. Subclass
+it, override one or both halves, and install it:
+
+```cpp
+Client::LoggingInterceptor logger;
+client.addInterceptor(&logger);
+```
+
+```cpp
+std::optional<Client::InterceptedResponse>
+beforeRequest(Client::InterceptedRequest &request) override;   // on the way out
+void afterResponse(const Client::InterceptedResponse &response) override;
+```
+
+Interceptors exist for what has to happen on *every* call and cannot be written
+at the call sites: structured logging with the credentials taken out, a header
+whose value differs per request, serving a repeat from a cache. A header with a
+**constant** value is not one of them — that is `setDefaultHeader()`, and
+routing it through an interceptor would only make it harder to find.
+
+Ordering nests the way middleware conventionally does: `beforeRequest()` runs in
+installation order, `afterResponse()` in reverse, so the first installed is the
+outermost. The exchange carries the request that caused it
+(`response.request`), so the two halves correlate without an interceptor
+keeping state across requests that overlap.
+
+The client does not take ownership, but it does keep track: a destroyed
+interceptor removes itself, so it cannot be called after it is gone. Nothing is
+paid for when nothing is installed — the chain is one empty-list check.
+
+Two scope limits, both deliberate:
+
+* `afterResponse()` does not fire for the **streaming** endpoints. A stream's
+  body arrives as a sequence of events and never exists as one object.
+  `beforeRequest()` does fire for them, so header injection and logging still
+  cover streams.
+* The **multipart uploads** do not offer their body to the chain. It is rebuilt
+  per attempt and can be a whole file; handing it over would mean holding an
+  upload in memory for the benefit of a logger.
+
+### Logging, redacted
+
+`LoggingInterceptor` writes one line per request and one per response to the
+`qtopenai.http` category:
+
+```
+--> POST https://api.openai.com/v1/chat/completions
+    Authorization: <redacted>
+<-- 200 POST https://api.openai.com/v1/chat/completions (412 ms)
+```
+
+The redaction is the point. An API key is a bearer credential: once it is in a
+log file it is in every backup, bug report and pasted terminal buffer that file
+reaches. So the header values that can carry one are replaced before anything is
+written, as are query parameters whose name looks like a secret — and the
+*default* is to redact, so forgetting to configure it is the safe outcome rather
+than the leak. `setRedactedHeaders()` replaces the list;
+`defaultRedactedHeaders()` is what it starts as.
+
+Bodies are off by default for a related reason: they hold the user's prompts.
+`setLogBodies(true)` turns them on, truncated to `maxBodyLength()`. The category
+itself defaults to off; turn it on without a rebuild with
+
+```sh
+QT_LOGGING_RULES="qtopenai.http.debug=true"
+```
+
+or connect to `logged()` to route the same lines into a UI or a test.
+
+### Response caching
+
+`CachingInterceptor` answers an identical request from a store instead of the
+network — worth having for deterministic calls (`temperature: 0`), for a prompt
+a UI re-issues as the user navigates back and forth, and for tests. Each hit is
+a round trip and a bill that did not happen:
+
+```cpp
+Client::CachingInterceptor cache;
+client.addInterceptor(&cache);                     // installing it is the opt-in
+```
+
+The store is pluggable. `MemoryResponseCache` is the default — an LRU with a
+size ceiling and a time limit, both because both failure modes are real: without
+a size limit a long-running process grows without bound, and without a time
+limit a cached answer outlives the question.
+
+```cpp
+Client::MemoryResponseCache store(512);
+store.setTtlSeconds(60);                           // 0 disables expiry
+cache.setCache(&store);                            // not owned; nullptr restores the default
+```
+
+**What is cached is an allow-list, and that is the whole safety story.** A POST
+is not idempotent in general: replaying `POST /files` from a cache would hand
+back the id of a file the caller believes it just created, and replaying `POST
+/fine_tuning/jobs` would hide a job that was never started. So only the
+endpoints that compute an answer from their input and change nothing are
+cacheable by default — `/chat/completions`, `/completions`, `/embeddings`,
+`/moderations` — and `setCacheablePaths()` is the caller's to extend if their
+provider has others. GET and DELETE are never cached: a listing that cannot
+change is not a listing, and a cached DELETE is a lie.
+
+Three more rules that follow from the same reasoning:
+
+* The key hashes the verb, the URL, the body **and the credential**, so a cache
+  shared between two accounts cannot serve one account's answer to the other.
+  The credential is hashed, never stored.
+* Only 2xx responses are stored. An error describes the provider at a moment,
+  not the request; caching one turns a blip into a sticky failure.
+* Streams are bypassed on their own — there is no single body to store.
+
+`hit()`, `missed()` and `stored()` report what happened, which is enough to
+measure a hit rate without the cache keeping counters nobody reads.
+
+See [`examples/interceptors.cpp`](examples/interceptors.cpp).
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -1525,6 +1643,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `conversation`      | Conversation history, branching and trimming (`Chat`) |
 | `agent`             | The tool loop driven by `Chat::Agent`, with guards    |
 | `metrics`           | Token usage, cost, latency and time-to-first-token   |
+| `interceptors`      | Redacting log, per-request trace header, response cache |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
 | `meta_tools`        | Tool calling with a schema derived from a Q_INVOKABLE |
 | `streaming`         | Streamed chat completion (SSE), token by token       |

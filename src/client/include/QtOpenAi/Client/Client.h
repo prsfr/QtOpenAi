@@ -132,6 +132,7 @@ namespace QtOpenAi {
 namespace Client {
 
 class ClientPrivate;
+class Interceptor;
 class ProviderProfile;
 
 // The entry point for talking to the OpenAI API, or anything that speaks it.
@@ -215,6 +216,19 @@ public:
     void setDefaultHeader(const QByteArray &name, const QByteArray &value);
     void removeDefaultHeader(const QByteArray &name);
     QHash<QByteArray, QByteArray> defaultHeaders() const;
+
+    // Install a hook around every request this client makes: redacting logs,
+    // per-request headers, a response cache. Interceptors run in installation
+    // order on the way out and in reverse on the way back, so the first one
+    // installed is the outermost.
+    //
+    // The client does not take ownership -- an interceptor is usually shared or
+    // lives on the stack of a test -- but it does keep track: a destroyed
+    // interceptor removes itself, so it can never be called after it is gone.
+    // Installing the same one twice does nothing the second time.
+    void addInterceptor(Interceptor *interceptor);
+    void removeInterceptor(Interceptor *interceptor);
+    QList<Interceptor *> interceptors() const;
 
     // Inject a custom QNetworkAccessManager (e.g. for proxies or test doubles).
     // The client does not take ownership.

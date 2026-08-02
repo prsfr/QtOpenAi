@@ -62,6 +62,7 @@ void RestReply::start()
         }
 
         if (networkError) {
+            Q_EMIT settled(body, status);
             Q_EMIT failed(ClientError(ClientError::Kind::Network, reply->errorString(), status));
             return;
         }
@@ -79,11 +80,13 @@ void RestReply::start()
                     err.setCode(errorObject.value(QStringLiteral("code")).toString());
                 }
             }
+            Q_EMIT settled(body, status);
             Q_EMIT failed(err);
             return;
         }
 
         m_contentType = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
+        Q_EMIT settled(body, status);
         Q_EMIT succeeded(body, status);
     });
 }
