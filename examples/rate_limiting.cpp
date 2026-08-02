@@ -87,7 +87,8 @@ int main(int argc, char **argv)
         QObject::connect(reply, &Client::ChatCompletionReply::done, [&]() {
             if (++settled < count)
                 return;
-            out << "\n" << count << " requests in " << elapsed.elapsed() << " ms, never more than "
+            out << "\n"
+                << count << " requests in " << elapsed.elapsed() << " ms, never more than "
                 << limiter.maxConcurrent() << " at once.\n";
             app.quit();
         });
