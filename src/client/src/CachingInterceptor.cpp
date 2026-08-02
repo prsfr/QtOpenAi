@@ -14,8 +14,8 @@ namespace {
 // cache must not see each other's answers, and the account is only visible in
 // the credential -- so the credential is part of the identity of the request.
 // It is hashed with everything else and never stored.
-const char *const kIdentityHeaders[] = {"Authorization", "api-key", "OpenAI-Organization",
-                                        "OpenAI-Project"};
+const char *const kIdentityHeaders[]
+        = {"Authorization", "api-key", "OpenAI-Organization", "OpenAI-Project"};
 
 } // namespace
 
@@ -67,10 +67,7 @@ void CachingInterceptor::setCache(ResponseCache *cache) { d->cache = cache; }
 
 QStringList CachingInterceptor::cacheablePaths() const { return d->cacheablePaths; }
 
-void CachingInterceptor::setCacheablePaths(const QStringList &paths)
-{
-    d->cacheablePaths = paths;
-}
+void CachingInterceptor::setCacheablePaths(const QStringList &paths) { d->cacheablePaths = paths; }
 
 QByteArray CachingInterceptor::cacheKey(const InterceptedRequest &request)
 {

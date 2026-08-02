@@ -158,9 +158,8 @@ void TestInterceptor::hooksNestAroundARequest()
 
     // Out in installation order, back in reverse: the first installed is the
     // outermost, so its afterResponse() wraps everything the others did.
-    QCOMPARE(log,
-             QStringList({QStringLiteral("outer.before"), QStringLiteral("inner.before"),
-                          QStringLiteral("inner.after"), QStringLiteral("outer.after")}));
+    QCOMPARE(log, QStringList({QStringLiteral("outer.before"), QStringLiteral("inner.before"),
+                               QStringLiteral("inner.after"), QStringLiteral("outer.after")}));
 
     // What each hook was handed.
     QCOMPARE(outer.m_method, QByteArray("POST"));
@@ -367,18 +366,16 @@ void TestInterceptor::theLoggerKeepsBodiesOutOfTheLogUnlessAsked()
 
     // Prompts are the user's data, so they stay out of the log by default.
     QVERIFY(!logger.logBodies());
-    QVERIFY(awaited(client.createChatCompletion(
-            ChatCompletionRequest(QStringLiteral("m"),
-                                  {Message::user(QStringLiteral("a private prompt"))}))));
+    QVERIFY(awaited(client.createChatCompletion(ChatCompletionRequest(
+            QStringLiteral("m"), {Message::user(QStringLiteral("a private prompt"))}))));
     QVERIFY2(!lines.join(QLatin1Char('\n')).contains(QStringLiteral("a private prompt")),
              qPrintable(lines.join(QLatin1Char('\n'))));
 
     lines.clear();
     logger.setLogBodies(true);
     logger.setMaxBodyLength(20);
-    QVERIFY(awaited(client.createChatCompletion(
-            ChatCompletionRequest(QStringLiteral("m"),
-                                  {Message::user(QStringLiteral("a private prompt"))}))));
+    QVERIFY(awaited(client.createChatCompletion(ChatCompletionRequest(
+            QStringLiteral("m"), {Message::user(QStringLiteral("a private prompt"))}))));
 
     const QString written = lines.join(QLatin1Char('\n'));
     // Asked for, and truncated: one large upload must not fill a disk.

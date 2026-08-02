@@ -45,8 +45,8 @@ public:
     std::optional<Client::InterceptedResponse>
     beforeRequest(Client::InterceptedRequest &request) override
     {
-        request.request.setRawHeader(
-                "X-Trace-Id", QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8());
+        request.request.setRawHeader("X-Trace-Id",
+                                     QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8());
         return std::nullopt;
     }
 };
@@ -102,7 +102,8 @@ int main(int argc, char **argv)
         Client::ChatCompletionReply *reply = client.createChatCompletion(request);
         QObject::connect(reply, &Client::ChatCompletionReply::finished,
                          [&out, &self, remaining](const Core::ChatCompletionResponse &response) {
-                             out << "\n" << response.choices().value(0).message().content() << "\n\n";
+                             out << "\n"
+                                 << response.choices().value(0).message().content() << "\n\n";
                              if (remaining > 1)
                                  self(self, remaining - 1);
                              else

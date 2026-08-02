@@ -584,7 +584,8 @@ std::function<QNetworkReply *()> postFactory(const ClientPrivate *d, QNetworkAcc
 
 } // namespace
 
-std::optional<InterceptedResponse> ClientPrivate::runBeforeRequest(InterceptedRequest &request) const
+std::optional<InterceptedResponse>
+ClientPrivate::runBeforeRequest(InterceptedRequest &request) const
 {
     // The one check an installed-nothing client pays for.
     for (Interceptor *interceptor : interceptors) {
@@ -698,9 +699,9 @@ template <typename Reply>
 Reply *ClientPrivate::remove(const QString &path, const char *beta) const
 {
     QNetworkAccessManager *manager = q->networkAccessManager();
-    return issue<Reply>("DELETE", apiRequest(this, path, beta), {}, [manager](QNetworkRequest sent) {
-        return deleteFactory(manager, std::move(sent));
-    });
+    return issue<Reply>(
+            "DELETE", apiRequest(this, path, beta), {},
+            [manager](QNetworkRequest sent) { return deleteFactory(manager, std::move(sent)); });
 }
 
 // The streaming endpoints deliberately sit outside the retry machinery: an SSE

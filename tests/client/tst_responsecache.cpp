@@ -337,8 +337,8 @@ void TestResponseCache::keysDistinguishRequestsThatDifferAnywhere()
         return CachingInterceptor::cacheKey(request);
     };
 
-    const QByteArray base = keyFor("POST", QStringLiteral("https://h/v1/embeddings"), "{\"a\":1}",
-                                   "Bearer one");
+    const QByteArray base
+            = keyFor("POST", QStringLiteral("https://h/v1/embeddings"), "{\"a\":1}", "Bearer one");
     QCOMPARE(base,
              keyFor("POST", QStringLiteral("https://h/v1/embeddings"), "{\"a\":1}", "Bearer one"));
 
@@ -348,9 +348,11 @@ void TestResponseCache::keysDistinguishRequestsThatDifferAnywhere()
             != keyFor("POST", QStringLiteral("https://h/v1/moderations"), "{\"a\":1}",
                       "Bearer one"));
     QVERIFY(base
-            != keyFor("POST", QStringLiteral("https://h/v1/embeddings"), "{\"a\":2}", "Bearer one"));
+            != keyFor("POST", QStringLiteral("https://h/v1/embeddings"), "{\"a\":2}",
+                      "Bearer one"));
     QVERIFY(base
-            != keyFor("POST", QStringLiteral("https://h/v1/embeddings"), "{\"a\":1}", "Bearer two"));
+            != keyFor("POST", QStringLiteral("https://h/v1/embeddings"), "{\"a\":1}",
+                      "Bearer two"));
 
     // Length-prefixed, so parts cannot run together into a collision: "ab" + ""
     // and "a" + "b" are different requests and must be different keys.

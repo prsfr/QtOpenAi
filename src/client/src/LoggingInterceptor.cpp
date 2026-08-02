@@ -22,9 +22,9 @@ constexpr QLatin1String kRedacted("<redacted>");
 // under-redacting one costs a credential.
 bool isSecretParameter(const QString &name)
 {
-    static const QStringList needles = {QStringLiteral("key"),    QStringLiteral("token"),
-                                        QStringLiteral("secret"), QStringLiteral("password"),
-                                        QStringLiteral("sig"),    QStringLiteral("auth")};
+    static const QStringList needles
+            = {QStringLiteral("key"),      QStringLiteral("token"), QStringLiteral("secret"),
+               QStringLiteral("password"), QStringLiteral("sig"),   QStringLiteral("auth")};
     for (const QString &needle : needles) {
         if (name.contains(needle, Qt::CaseInsensitive))
             return true;
@@ -58,7 +58,7 @@ QString excerpt(const QByteArray &body, int limit)
     if (limit <= 0 || body.size() <= limit)
         return QString::fromUtf8(body);
     return QString::fromUtf8(body.left(limit))
-            + QStringLiteral(" ... (%1 bytes total)").arg(body.size());
+           + QStringLiteral(" ... (%1 bytes total)").arg(body.size());
 }
 
 } // namespace
@@ -85,8 +85,8 @@ QList<QByteArray> LoggingInterceptor::defaultRedactedHeaders()
     // in. `api-key` is Azure's, `x-api-key` and `x-goog-api-key` belong to
     // OpenAI-compatible providers, and `cookie` is here because a proxy in
     // front of any of them can turn a session into one.
-    return {"authorization",       "api-key",  "x-api-key",  "x-goog-api-key",
-            "proxy-authorization", "cookie",   "set-cookie", "openai-organization",
+    return {"authorization",       "api-key", "x-api-key",  "x-goog-api-key",
+            "proxy-authorization", "cookie",  "set-cookie", "openai-organization",
             "openai-project"};
 }
 
@@ -182,8 +182,8 @@ void LoggingInterceptor::afterResponse(const InterceptedResponse &response)
     QStringList lines;
     // A transport failure has no status to report, so it reports what it has.
     const QString outcome = response.httpStatus > 0
-            ? QString::number(response.httpStatus)
-            : QStringLiteral("failed: %1").arg(response.error.message());
+                                    ? QString::number(response.httpStatus)
+                                    : QStringLiteral("failed: %1").arg(response.error.message());
     lines << QStringLiteral("<-- %1 %2 %3 (%4 ms%5)")
                      .arg(outcome, QString::fromUtf8(response.request.method),
                           safeUrl(response.url()), QString::number(response.elapsedMs),
