@@ -1350,6 +1350,49 @@ is kept exactly as the API spells it. Deleting a skill or a version answers with
 the same value types, reporting `object()` as `skill.deleted` /
 `skill.version.deleted`.
 
+## Provider profiles
+
+The endpoints are the same across OpenAI-compatible providers; the way in is
+not. `Client::ProviderProfile` bundles the four things that differ — base URL,
+auth scheme, Azure's `api-version`, any headers — under the provider's name:
+
+```cpp
+client.setProfile(Client::ProviderProfile::groq());
+client.setApiKey(key);
+```
+
+Built in: `openAi()`, `azure(resource, apiVersion = {})`, `ollama()`,
+`lmStudio()`, `vllm()`, `groq()`, `openRouter()`. `builtIn()` returns the
+argument-free ones for a combo box, and `fromName()` looks one up
+case-insensitively for a config file.
+
+A profile is a value, so a built-in is a starting point rather than a fixed
+menu — and a provider this library has never heard of is the same type with its
+fields set:
+
+```cpp
+ProviderProfile profile = ProviderProfile::openRouter();
+profile.setHeader("HTTP-Referer", "https://example.test");
+
+ProviderProfile house;                                    // nothing privileged
+house.setBaseUrl(QUrl("https://llm.internal/v1"));        // about the built-ins
+house.setAuthScheme(Client::AuthScheme::AzureApiKey);
+```
+
+Two deliberate limits:
+
+* **The API key is not part of a profile.** A profile says which provider; a key
+  says who you are. `setProfile()` leaves the key untouched — putting a secret
+  in a value type that gets copied, compared and logged is how secrets escape.
+* **`requiresApiKey()`** is `false` for the local servers, so a UI knows not to
+  prompt for something the user does not have.
+
+`azure()` configures the key header and the `api-version` parameter, which is
+what an Azure endpoint speaking the OpenAI-compatible path shape needs. It does
+**not** rewrite paths into the older `/openai/deployments/<deployment>/…` form —
+that is a different path grammar, not a different profile, and faking it with a
+base URL would produce requests that quietly 404.
+
 ## Metrics & observability
 
 `Client::MetricsCollector` records what the client is costing and how it is

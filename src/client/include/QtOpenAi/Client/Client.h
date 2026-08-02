@@ -132,6 +132,7 @@ namespace QtOpenAi {
 namespace Client {
 
 class ClientPrivate;
+class ProviderProfile;
 
 // The entry point for talking to the OpenAI API, or anything that speaks it.
 //
@@ -182,6 +183,13 @@ public:
     // non-empty). Ignored by standard OpenAI endpoints.
     QString apiVersion() const;
     void setApiVersion(const QString &apiVersion);
+
+    // Point this client at a provider in one call: base URL, auth scheme,
+    // api-version and any headers it wants. The key is not part of a profile
+    // and is left alone -- see ProviderProfile. Declared on a forward
+    // declaration so Client.h stays free of the profile header, which needs
+    // AuthScheme from here.
+    void setProfile(const ProviderProfile &profile);
 
     // Automatic-retry policy for transient failures (429/5xx/network).
     RetryPolicy retryPolicy() const;

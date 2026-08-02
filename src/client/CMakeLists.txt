@@ -5,6 +5,7 @@
 set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/GlobalClient.h
     include/QtOpenAi/Client/ClientError.h
+    include/QtOpenAi/Client/ProviderProfile.h
     include/QtOpenAi/Client/Metrics.h
     include/QtOpenAi/Client/MetricsCollector.h
     include/QtOpenAi/Client/ToolRegistry.h
@@ -107,6 +108,7 @@ add_library(QtOpenAiClient
     src/SseParser_p.h
     src/Multipart_p.h
     src/JobPoller_p.h
+    src/ProviderProfile.cpp
     src/Metrics.cpp
     src/MetricsCollector.cpp
     src/ToolRegistry.cpp

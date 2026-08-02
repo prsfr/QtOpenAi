@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/Client.h"
 
+#include "QtOpenAi/Client/ProviderProfile.h"
+
 #include "Multipart_p.h"
 
 #include <QtCore/QBuffer>
@@ -168,6 +170,13 @@ void Client::setApiVersion(const QString &apiVersion)
 {
     Q_D(Client);
     d->apiVersion = apiVersion;
+}
+
+void Client::setProfile(const ProviderProfile &profile)
+{
+    // The profile knows what it configures; this is the same call from the
+    // side the caller is more likely to be holding.
+    profile.applyTo(this);
 }
 
 RetryPolicy Client::retryPolicy() const
