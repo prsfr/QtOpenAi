@@ -26,7 +26,17 @@ ChatCompletionRequest sampleRequest()
 // Apply a profile, then point it at the stub so the request is observable --
 // the URL is checked separately, since redirecting it is the only way to see
 // what the rest of the profile did.
-QByteArray requestThrough(ProviderProfile profile, StubServer &server, QByteArray *line = nullptr)
+//
+// The headers come back lower-cased, as everywhere else in these tests: header
+// names are case-insensitive (RFC 9110 5.1) and Qt normalises the casing it
+// puts on the wire, so asserting on it would test Qt's spelling rather than
+// this library's behaviour.
+//
+// A request that never settled would otherwise look exactly like a header that
+// never arrived, so this says which one it was instead of leaving the caller to
+// misread an empty result.
+void requestThrough(const ProviderProfile &profile, StubServer &server, QByteArray *headers,
+                    QByteArray *line = nullptr)
 {
     Client client;
     client.setProfile(profile);
@@ -34,12 +44,21 @@ QByteArray requestThrough(ProviderProfile profile, StubServer &server, QByteArra
     client.setApiKey(QStringLiteral("k"));
 
     const auto reply = awaited(client.createChatCompletion(sampleRequest()));
-    if (!reply)
-        return {};
+    QVERIFY2(reply, "the request never settled");
+    QVERIFY2(reply->isSuccess(), qPrintable(reply->error().message()));
+
     if (line)
         *line = server.requestLine();
-    return server.requestHeaders();
+    *headers = server.requestHeaders().toLower();
 }
+
+// Assert a header is present, and say what actually arrived when it is not --
+// the whole point of these tests is the bytes on the wire, so a bare "false"
+// throws away the only information that would explain it.
+#define VERIFY_HEADER(headers, expected)                                                           \
+    QVERIFY2((headers).contains(expected),                                                         \
+             qPrintable(QStringLiteral("expected \"%1\" among:\n%2")                               \
+                                .arg(QString::fromUtf8(expected), QString::fromUtf8(headers))))
 
 } // namespace
 
@@ -68,8 +87,9 @@ void TestProviderProfile::openAiSendsABearerToken()
     QVERIFY(!profile.defaultModel().isEmpty());
 
     StubServer server(kCompletion);
-    const QByteArray headers = requestThrough(profile, server);
-    QVERIFY(headers.contains("Authorization: Bearer k"));
+    QByteArray headers;
+    requestThrough(profile, server, &headers);
+    VERIFY_HEADER(headers, "authorization: bearer k");
     QVERIFY(!headers.contains("api-key:"));
 }
 
@@ -80,12 +100,13 @@ void TestProviderProfile::azureSendsTheKeyHeaderAndApiVersion()
     QVERIFY(!profile.apiVersion().isEmpty());
 
     StubServer server(kCompletion);
+    QByteArray headers;
     QByteArray line;
-    const QByteArray headers = requestThrough(profile, server, &line);
+    requestThrough(profile, server, &headers, &line);
 
     // Azure presents the key in its own header, not as a bearer token ...
-    QVERIFY(headers.contains("api-key: k"));
-    QVERIFY(!headers.contains("Authorization: Bearer"));
+    VERIFY_HEADER(headers, "api-key: k");
+    QVERIFY(!headers.contains("authorization: bearer"));
     // ... and needs the api-version parameter on every request.
     QVERIFY(line.contains("api-version=" + profile.apiVersion().toUtf8()));
 
@@ -116,10 +137,11 @@ void TestProviderProfile::profileHeadersReachTheRequest()
     profile.setHeader("X-Title", "QtOpenAi");
 
     StubServer server(kCompletion);
-    const QByteArray headers = requestThrough(profile, server);
+    QByteArray headers;
+    requestThrough(profile, server, &headers);
 
-    QVERIFY(headers.contains("HTTP-Referer: https://example.test"));
-    QVERIFY(headers.contains("X-Title: QtOpenAi"));
+    VERIFY_HEADER(headers, "http-referer: https://example.test");
+    VERIFY_HEADER(headers, "x-title: qtopenai");
 }
 
 void TestProviderProfile::aCustomProfileIsJustAProfile()
@@ -137,9 +159,10 @@ void TestProviderProfile::aCustomProfileIsJustAProfile()
     QVERIFY(!profile.isNull());
 
     StubServer server(kCompletion);
-    const QByteArray headers = requestThrough(profile, server);
-    QVERIFY(headers.contains("api-key: k"));
-    QVERIFY(headers.contains("X-Tenant: acme"));
+    QByteArray headers;
+    requestThrough(profile, server, &headers);
+    VERIFY_HEADER(headers, "api-key: k");
+    VERIFY_HEADER(headers, "x-tenant: acme");
 
     // A value type: copies compare equal and stay independent.
     ProviderProfile copy = profile;
