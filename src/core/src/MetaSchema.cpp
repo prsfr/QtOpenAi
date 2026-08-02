@@ -187,6 +187,65 @@ QJsonObject fromMetaObject(const QMetaObject *meta)
     return schema;
 }
 
+QStringList danglingAnnotations(const QMetaObject *meta)
+{
+    if (!meta)
+        return {};
+
+    // What fromMetaObject() would emit -- inherited properties are not in it,
+    // so an annotation for one describes nothing this ever produces.
+    QStringList properties;
+    for (int i = meta->propertyOffset(); i < meta->propertyCount(); ++i)
+        properties.append(QString::fromUtf8(meta->property(i).name()));
+
+    const QString prefix = docKey() + QLatin1Char(':');
+    QStringList dangling;
+    for (int i = 0; i < meta->classInfoCount(); ++i) {
+        const QString key = QString::fromUtf8(meta->classInfo(i).name());
+        // "doc" describes the class, and always exists.
+        if (!key.startsWith(prefix))
+            continue;
+
+        const QStringList path = key.mid(prefix.size()).split(QLatin1Char(':'));
+        const QString member = path.value(0);
+
+        QMetaMethod method;
+        for (int m = 0; m < meta->methodCount(); ++m) {
+            if (meta->method(m).name() == member.toUtf8()) {
+                method = meta->method(m);
+                break;
+            }
+        }
+
+        if (path.size() == 1) {
+            if (!properties.contains(member) && !method.isValid())
+                dangling.append(key);
+            continue;
+        }
+
+        // doc:<method>:<argument> -- the method has to exist and to have that
+        // parameter, under the name moc recorded or the arg%1 fallback.
+        if (path.size() > 2 || !method.isValid()) {
+            dangling.append(key);
+            continue;
+        }
+
+        const QList<QByteArray> names = method.parameterNames();
+        bool found = false;
+        for (int p = 0; p < method.parameterCount(); ++p) {
+            const QString name = names.value(p).isEmpty() ? QStringLiteral("arg%1").arg(p)
+                                                          : QString::fromUtf8(names.at(p));
+            if (name == path.at(1)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            dangling.append(key);
+    }
+    return dangling;
+}
+
 QJsonObject fromMethod(const QMetaObject *meta, const QString &method)
 {
     if (!meta)

@@ -34,8 +34,8 @@ public:
 class Recipe
 {
     Q_GADGET
-    Q_CLASSINFO("doc", "A cooking recipe")
-    Q_CLASSINFO("doc:minutes", "Total time in minutes")
+    QTOPENAI_DOC("A cooking recipe")
+    QTOPENAI_DOC_PROPERTY(minutes, "Total time in minutes")
     Q_PROPERTY(QString title MEMBER title)
     Q_PROPERTY(int minutes MEMBER minutes)
     Q_PROPERTY(QStringList steps MEMBER steps)

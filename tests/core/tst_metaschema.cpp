@@ -31,10 +31,10 @@ public:
 class Person
 {
     Q_GADGET
-    // The class-level description, and one per property, through the `doc`
-    // convention.
-    Q_CLASSINFO("doc", "Someone to greet")
-    Q_CLASSINFO("doc:age", "Whole years")
+    // The class-level description, and one per property. The macros assemble
+    // the Q_CLASSINFO key, so the path convention is never spelled out here.
+    QTOPENAI_DOC("Someone to greet")
+    QTOPENAI_DOC_PROPERTY(age, "Whole years")
     Q_PROPERTY(QString name MEMBER name)
     Q_PROPERTY(int age MEMBER age)
     Q_PROPERTY(double height MEMBER height)
@@ -62,13 +62,35 @@ public:
 class Weather : public QObject
 {
     Q_OBJECT
-    Q_CLASSINFO("doc:forecast:location", "City name")
+    QTOPENAI_DOC_ARGUMENT(forecast, location, "City name")
 public:
     Q_INVOKABLE QString forecast(const QString &location, int days)
     {
         return QStringLiteral("%1/%2").arg(location).arg(days);
     }
     Q_INVOKABLE QString noArguments() { return {}; }
+};
+
+// Every way a `doc` key can name something that is not there.
+class Misannotated : public QObject
+{
+    Q_OBJECT
+    QTOPENAI_DOC("fine -- the class always exists")
+    QTOPENAI_DOC_PROPERTY(title, "fine")
+    QTOPENAI_DOC_METHOD(rename, "fine")
+    QTOPENAI_DOC_ARGUMENT(rename, title, "fine")
+    QTOPENAI_DOC_PROPERTY(subtitle, "no such property")
+    QTOPENAI_DOC_METHOD(remove, "no such method")
+    QTOPENAI_DOC_ARGUMENT(rename, name, "no such argument")
+    QTOPENAI_DOC_ARGUMENT(remove, title, "no such method either")
+    // objectName is QObject's, so fromMetaObject never emits it.
+    QTOPENAI_DOC_PROPERTY(objectName, "inherited, so never described")
+    Q_PROPERTY(QString title MEMBER title)
+public:
+    using QObject::QObject;
+    Q_INVOKABLE void rename(const QString &title) { this->title = title; }
+
+    QString title;
 };
 
 QJsonObject propertyOf(const QJsonObject &schema, const QString &name)
@@ -103,6 +125,8 @@ private slots:
     void describesMethodArguments();
     void describesAMethodWithoutArguments();
     void unknownTypesStayUnconstrained();
+    void theMacrosBuildTheSameKeysAsHandWrittenOnes();
+    void findsAnnotationsThatDescribeNothing();
 };
 
 void TestMetaSchema::mapsScalarProperties()
@@ -221,6 +245,39 @@ void TestMetaSchema::unknownTypesStayUnconstrained()
     QVERIFY(MetaSchema::fromMetaType(QMetaType::fromType<QVariant>()).isEmpty());
     // ... and a method naming one still produces a usable object schema.
     QVERIFY(MetaSchema::fromMethod(nullptr, QStringLiteral("nope")).isEmpty());
+}
+
+void TestMetaSchema::theMacrosBuildTheSameKeysAsHandWrittenOnes()
+{
+    // The macros are only a spelling: what reaches the meta-object has to be
+    // the same key a hand-written Q_CLASSINFO would have produced, or the
+    // convention has silently forked in two.
+    const QMetaObject &person = Person::staticMetaObject;
+    QVERIFY(person.indexOfClassInfo("doc") >= 0);
+    QVERIFY(person.indexOfClassInfo("doc:age") >= 0);
+    QCOMPARE(person.classInfo(person.indexOfClassInfo("doc:age")).value(), "Whole years");
+
+    // moc concatenates the three literals of the argument form into one key.
+    const QMetaObject &weather = Weather::staticMetaObject;
+    const int index = weather.indexOfClassInfo("doc:forecast:location");
+    QVERIFY(index >= 0);
+    QCOMPARE(weather.classInfo(index).value(), "City name");
+}
+
+void TestMetaSchema::findsAnnotationsThatDescribeNothing()
+{
+    // A description that matches nothing never appears in a schema, so nothing
+    // about the output says it was wrong. This is what says so.
+    QCOMPARE(MetaSchema::danglingAnnotations<Person>(), QStringList());
+    QCOMPARE(MetaSchema::danglingAnnotations<Weather>(), QStringList());
+
+    const QStringList dangling = MetaSchema::danglingAnnotations<Misannotated>();
+    QCOMPARE(dangling,
+             QStringList({QStringLiteral("doc:subtitle"), QStringLiteral("doc:remove"),
+                          QStringLiteral("doc:rename:name"), QStringLiteral("doc:remove:title"),
+                          QStringLiteral("doc:objectName")}));
+
+    QCOMPARE(MetaSchema::danglingAnnotations(nullptr), QStringList());
 }
 
 QTEST_MAIN(TestMetaSchema)

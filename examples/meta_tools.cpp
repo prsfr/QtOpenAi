@@ -33,16 +33,16 @@
 
 using namespace QtOpenAi;
 
-// The tool, as plain C++. The Q_CLASSINFO annotations are the one thing the
+// The tool, as plain C++. The QTOPENAI_DOC macros carry the one thing the
 // meta-object system does not already know: what the method and its arguments
-// mean. Each is addressed by its path -- "doc:<method>", then
-// "doc:<method>:<argument>".
+// mean. They name the method and the argument as identifiers, and assemble the
+// Q_CLASSINFO key from them.
 class WeatherService : public QObject
 {
     Q_OBJECT
-    Q_CLASSINFO("doc:forecast", "Get the weather forecast for a city.")
-    Q_CLASSINFO("doc:forecast:location", "City name, e.g. Berlin")
-    Q_CLASSINFO("doc:forecast:days", "How many days ahead to forecast, 1 to 7")
+    QTOPENAI_DOC_METHOD(forecast, "Get the weather forecast for a city.")
+    QTOPENAI_DOC_ARGUMENT(forecast, location, "City name, e.g. Berlin")
+    QTOPENAI_DOC_ARGUMENT(forecast, days, "How many days ahead to forecast, 1 to 7")
 public:
     using QObject::QObject;
 

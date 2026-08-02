@@ -19,6 +19,7 @@
 
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Core/MetaJson.h>
+#include <QtOpenAi/Core/MetaSchema.h>
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QJsonDocument>
@@ -27,14 +28,14 @@
 
 using namespace QtOpenAi;
 
-// The shape of the answer, as a type. Q_CLASSINFO carries the descriptions the
-// meta-object system has no room for: "doc" for the type, "doc:<property>" for
-// one of its properties.
+// The shape of the answer, as a type. The QTOPENAI_DOC macros carry the
+// descriptions the meta-object system has no room for; they expand to the
+// Q_CLASSINFO keys MetaSchema reads, without spelling the paths out here.
 class Person
 {
     Q_GADGET
-    Q_CLASSINFO("doc", "A person mentioned in the text")
-    Q_CLASSINFO("doc:age", "Age in whole years")
+    QTOPENAI_DOC("A person mentioned in the text")
+    QTOPENAI_DOC_PROPERTY(age, "Age in whole years")
     Q_PROPERTY(QString name MEMBER name)
     Q_PROPERTY(int age MEMBER age)
     Q_PROPERTY(QString city MEMBER city)

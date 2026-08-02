@@ -2,7 +2,10 @@
 #pragma once
 
 #include <QtOpenAi/Client/GlobalClient.h>
+// For the QTOPENAI_DOC macros: a class registered here is a class annotated
+// for the schema, so the two belong within one include of each other.
 #include <QtOpenAi/Core/Message.h>
+#include <QtOpenAi/Core/MetaSchema.h>
 #include <QtOpenAi/Core/Tool.h>
 #include <QtOpenAi/Core/ToolCall.h>
 

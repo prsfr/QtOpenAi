@@ -7,6 +7,7 @@
 #include <QtCore/QMetaObject>
 #include <QtCore/QMetaType>
 #include <QtCore/QString>
+#include <QtCore/QStringList>
 
 namespace QtOpenAi {
 namespace Core {
@@ -40,12 +41,13 @@ namespace Core {
 // absent parameters.
 //
 // Descriptions — the one thing the meta-object system does not carry — come
-// from `Q_CLASSINFO` under a `doc` prefix, so they live next to the member they
-// describe:
+// from `Q_CLASSINFO`, keyed by the path to what they describe. Write them with
+// the macros below rather than by hand:
 //
-//     Q_CLASSINFO("doc", "Someone to greet")            // the object itself
-//     Q_CLASSINFO("doc:age", "Whole years")             // a property
-//     Q_CLASSINFO("doc:forecast:location", "City name") // a method argument
+//     QTOPENAI_DOC("Someone to greet")                        // the object
+//     QTOPENAI_DOC_PROPERTY(age, "Whole years")               // a property
+//     QTOPENAI_DOC_METHOD(forecast, "Tomorrow's weather")     // a method
+//     QTOPENAI_DOC_ARGUMENT(forecast, location, "City name")  // its argument
 namespace MetaSchema {
 
 // The schema for a Q_GADGET/QObject, built from its Q_PROPERTYs.
@@ -67,7 +69,59 @@ QTOPENAI_CORE_EXPORT QJsonObject fromMethod(const QMetaObject *meta, const QStri
 // mapping describes.
 QTOPENAI_CORE_EXPORT QJsonObject fromMetaType(QMetaType type);
 
+// The `doc` annotations on this class that describe nothing: a key naming a
+// property, method or argument the class does not have. Such a key is always a
+// mistake -- a typo, or a rename that left its annotation behind -- and it is
+// silent, because a description that matches nothing simply never appears in
+// the schema. Assert on this in a test and a renamed argument stops being able
+// to quietly lose its documentation.
+//
+// Only annotations MetaSchema itself would read are considered, so a `doc:` key
+// for an inherited property (which fromMetaObject does not emit) is reported.
+QTOPENAI_CORE_EXPORT QStringList danglingAnnotations(const QMetaObject *meta);
+
+template <typename T>
+QStringList danglingAnnotations()
+{
+    return danglingAnnotations(&T::staticMetaObject);
+}
+
 } // namespace MetaSchema
 
 } // namespace Core
 } // namespace QtOpenAi
+
+// --- Describing a class to the model ---------------------------------------
+//
+// Q_CLASSINFO takes a key and a value, and the key is a path this library
+// assembles conventions into: a `doc` prefix, then the member, then the
+// argument. Written out by hand that is three chances to be wrong -- a missing
+// prefix, a stray colon, a misspelt name -- and every one of them fails
+// silently, because an annotation that matches nothing is simply never read.
+//
+// These macros build the key from identifiers instead. They expand to exactly
+// the Q_CLASSINFO you would have written, and moc concatenates the literals
+// before it ever sees a key, so nothing here costs anything at runtime. The
+// same trick Qt uses for QML_NAMED_ELEMENT.
+//
+// A typo is still a typo -- `QTOPENAI_DOC_PROPERTY(agee, ...)` compiles -- but
+// it is now a *lone* mistake rather than one hidden among the punctuation, and
+// MetaSchema::danglingAnnotations() finds it.
+
+// The class itself: what this object or tool is.
+#define QTOPENAI_DOC(description) Q_CLASSINFO("doc", description)
+
+// One Q_PROPERTY, by name.
+#define QTOPENAI_DOC_PROPERTY(property, description) Q_CLASSINFO("doc:" #property, description)
+
+// One Q_INVOKABLE method, by name. Expands the same as QTOPENAI_DOC_PROPERTY
+// because properties and methods share the key space -- a class with a property
+// and a method of the same name gives them one description between them, which
+// is worth knowing and has never yet been worth separating.
+#define QTOPENAI_DOC_METHOD(method, description) Q_CLASSINFO("doc:" #method, description)
+
+// One argument of one method. `argument` is the parameter name as the signature
+// spells it -- the name moc recorded, which is the same name the generated
+// schema advertises.
+#define QTOPENAI_DOC_ARGUMENT(method, argument, description)                                       \
+    Q_CLASSINFO("doc:" #method ":" #argument, description)

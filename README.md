@@ -114,9 +114,10 @@ class WeatherService : public QObject
 {
     Q_OBJECT
     // The one thing the meta-object system does not know: what things mean.
-    // Addressed by path — "doc:<method>", then "doc:<method>:<argument>".
-    Q_CLASSINFO("doc:forecast", "Get the weather forecast for a city.")
-    Q_CLASSINFO("doc:forecast:location", "City name, e.g. Berlin")
+    // The macros assemble the Q_CLASSINFO key from the names, so the `doc:`
+    // path convention is never written out by hand.
+    QTOPENAI_DOC_METHOD(forecast, "Get the weather forecast for a city.")
+    QTOPENAI_DOC_ARGUMENT(forecast, location, "City name, e.g. Berlin")
 public:
     Q_INVOKABLE QJsonObject forecast(const QString &location, int days);
 };
@@ -127,6 +128,14 @@ registry.registerMethod(&service, "forecast");
 //                            "days":{"type":"integer"}},
 //              "required":["location","days"],"additionalProperties":false}
 ```
+
+The `QTOPENAI_DOC*` macros are the only hand-written part, and they take
+identifiers rather than a path: they expand to the `Q_CLASSINFO` the schema
+reads (`"doc"`, `"doc:<member>"`, `"doc:<method>:<argument>"`), with moc joining
+the literals, so there is no prefix to forget and no colon to misplace. A name
+that matches nothing is still legal C++ and still silent — for that,
+`MetaSchema::danglingAnnotations<T>()` lists every annotation describing
+something the class does not have, which is worth an assertion in a test.
 
 The method is called with its parameters filled in from the model's JSON by
 name — a `QString` stays a `QString`, an `int` an `int`, a `Q_ENUM` is matched
@@ -253,8 +262,8 @@ both ends — once to ask for it, once to read it back. A `Q_GADGET` can be both
 class Person
 {
     Q_GADGET
-    Q_CLASSINFO("doc", "A person mentioned in the text")
-    Q_CLASSINFO("doc:age", "Age in whole years")
+    QTOPENAI_DOC("A person mentioned in the text")
+    QTOPENAI_DOC_PROPERTY(age, "Age in whole years")
     Q_PROPERTY(QString name MEMBER name)
     Q_PROPERTY(int age MEMBER age)
 public:
@@ -268,7 +277,7 @@ const Person person = MetaJson::parse<Person>(response.firstMessage().content())
 ```
 
 `forType<T>()` derives the schema from the properties (via `MetaSchema`), takes
-the name from the class and the description from `Q_CLASSINFO("doc")`, and asks
+the name from the class and the description from `QTOPENAI_DOC`, and asks
 for strict mode — which `MetaSchema` already satisfies, since it marks every
 property required and closes the object.
 
