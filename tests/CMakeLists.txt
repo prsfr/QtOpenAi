@@ -186,6 +186,10 @@ qtopenai_add_test(tst_client_guardrail
     SOURCES client/tst_guardrail.cpp
     LIBS QtOpenAi::Client)
 
+qtopenai_add_test(tst_client_chatmap
+    SOURCES client/tst_chatmap.cpp
+    LIBS QtOpenAi::Client)
+
 qtopenai_add_test(tst_client_providerprofile
     SOURCES client/tst_providerprofile.cpp
     LIBS QtOpenAi::Client)

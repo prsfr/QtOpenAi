@@ -1671,6 +1671,50 @@ way, so there is one decision procedure rather than two that can drift.
 
 See [`examples/guardrails.cpp`](examples/guardrails.cpp).
 
+## Mapping many prompts
+
+`Client::ChatMap` runs many prompts and collects the answers in order — the
+shape of classification over a dataset, fan-out summarisation and offline
+evals: N requests that have nothing to do with each other, which should go out
+together but not all at once.
+
+```cpp
+Client::ChatMap map(&client);
+map.setConcurrency(4);
+
+auto *run = map.map(QStringLiteral("gpt-4o-mini"), prompts);
+connect(run, &Client::ChatMapReply::progress, this, &Ui::setProgress);
+connect(run, &Client::ChatMapReply::allFinished, this, [run]() { use(run->contents()); });
+```
+
+Results are **index-aligned with the input from the first moment**, before
+anything has answered. Classifying a thousand rows is only useful if row 837's
+answer can still be found at 837 after two of its neighbours failed, so
+`results()` keeps successes and failures side by side in input order and
+`contents()` leaves a hole rather than closing it.
+
+**A failed item does not fail the run.** One row hitting a content filter is not
+a reason to throw away the rest; the error is recorded against its index and the
+run carries on. `setMaxFailures()` is for the case where it *is* a reason — a
+wrong API key fails every item, and burning a thousand requests to discover that
+is a waste worth stopping.
+
+`concurrency()` is what this run keeps in flight, and it **composes with rather
+than replaces** [`RateLimiter`](#rate-limiting): a limiter governs everything
+the client does, a `ChatMap` governs one run, and with both, whichever is
+stricter decides. It is a cap and not a batch size — a slow item does not hold
+back the ones behind it.
+
+This is the client-side counterpart to the server-side Batch API, and the trade
+is latency against cost: a batch job is cheaper and answers in hours, this
+answers in seconds at full price.
+
+`abort()` stops issuing and abandons what is in flight; `allFinished()` still
+fires, because a caller waiting on it must not be left waiting because it was
+the one who gave up.
+
+See [`examples/parallel_map.cpp`](examples/parallel_map.cpp).
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -1757,6 +1801,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `metrics`           | Token usage, cost, latency and time-to-first-token   |
 | `interceptors`      | Redacting log, per-request trace header, response cache |
 | `rate_limiting`     | Concurrency cap, RPM/TPM budgets and a request queue |
+| `parallel_map`      | Map many prompts to answers, N at a time, in order   |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
 | `meta_tools`        | Tool calling with a schema derived from a Q_INVOKABLE |
 | `streaming`         | Streamed chat completion (SSE), token by token       |

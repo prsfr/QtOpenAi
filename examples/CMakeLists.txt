@@ -12,6 +12,7 @@ qtopenai_add_example(token_budget token_budget.cpp)
 qtopenai_add_example(metrics metrics.cpp)
 qtopenai_add_example(interceptors interceptors.cpp)
 qtopenai_add_example(rate_limiting rate_limiting.cpp)
+qtopenai_add_example(parallel_map parallel_map.cpp)
 
 # --- Chat & core inference ---
 qtopenai_add_example(conversation conversation.cpp)

@@ -57,7 +57,10 @@ void RestReply::start()
 
     connect(m_networkReply, &QNetworkReply::finished, this, [this]() {
         QNetworkReply *reply = m_networkReply;
-        const QByteArray body = reply->readAll();
+        // An aborted reply is closed by the time it finishes, and reading a
+        // closed device is a warning on the console rather than an error worth
+        // reporting -- there is simply no body, which is what abort() means.
+        const QByteArray body = reply->isOpen() ? reply->readAll() : QByteArray();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         m_rateLimit = detail::parseRateLimit(reply);
 
