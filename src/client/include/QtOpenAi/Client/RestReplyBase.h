@@ -87,6 +87,11 @@ protected:
     QScopedPointer<RestReplyBasePrivate> d_ptr;
 
 private:
+    // Installs the rate limiter's dispatch gate on the transport engine before
+    // its first attempt runs. The engine is deliberately not reachable any
+    // other way -- it is the library's, not the caller's.
+    friend class ClientPrivate;
+
     Q_DECLARE_PRIVATE(RestReplyBase)
 };
 

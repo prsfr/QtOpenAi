@@ -3,14 +3,19 @@
 
 #include "QtOpenAi/Client/Interceptor.h"
 #include "QtOpenAi/Client/ProviderProfile.h"
+#include "QtOpenAi/Client/RateLimiter.h"
+#include "QtOpenAi/Core/TokenCounter.h"
 
 #include "CannedReply_p.h"
 #include "Multipart_p.h"
+#include "RestReplyBase_p.h"
+#include "RestReply_p.h"
 
 #include <QtCore/QBuffer>
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
+#include <QtCore/QPointer>
 #include <QtCore/QUrlQuery>
 #include <QtCore/QUuid>
 #include <QtNetwork/QHttpMultiPart>
@@ -46,6 +51,7 @@ public:
     QString userAgent;
     QHash<QByteArray, QByteArray> defaultHeaders;
     QList<Interceptor *> interceptors;
+    QPointer<RateLimiter> limiter;
     QNetworkAccessManager *manager = nullptr;
 
     // Issue a request against `path` and wrap it in the reply type the endpoint
@@ -85,6 +91,8 @@ public:
     // The returning half, hung off the reply that is about to run.
     void runAfterResponse(RestReplyBase *reply, const InterceptedRequest &sent,
                           bool fromCache) const;
+    // Hold the reply back until the limiter says there is budget for it.
+    void gateDispatch(RestReplyBase *reply, const QByteArray &body) const;
 
     // Join the base URL with an endpoint path (tolerating trailing slashes) and
     // append the Azure api-version query parameter when configured.
@@ -272,6 +280,25 @@ QList<Interceptor *> Client::interceptors() const
 {
     Q_D(const Client);
     return d->interceptors;
+}
+
+void Client::setRateLimiter(RateLimiter *limiter)
+{
+    Q_D(Client);
+    if (d->limiter == limiter)
+        return;
+    // Requests already waiting on the old limiter are released rather than
+    // stranded: a caller holding a reply that would now never start would wait
+    // forever, which is worse than one burst over budget.
+    if (d->limiter)
+        d->limiter->flush();
+    d->limiter = limiter;
+}
+
+RateLimiter *Client::rateLimiter() const
+{
+    Q_D(const Client);
+    return d->limiter;
 }
 
 void Client::setDefaultHeader(const QByteArray &name, const QByteArray &value)
@@ -633,6 +660,50 @@ void ClientPrivate::runAfterResponse(RestReplyBase *reply, const InterceptedRequ
     });
 }
 
+void ClientPrivate::gateDispatch(RestReplyBase *reply, const QByteArray &body) const
+{
+    if (!limiter)
+        return;
+
+    // Deliberately generous: the estimate runs over the serialised body, so it
+    // counts the JSON framing as well as the prompt. A token budget that
+    // undercounts is a budget that does not work, and the heuristic counter is
+    // the same one Core uses rather than a second estimator to keep in step.
+    const int estimatedTokens = Core::TokenCounter().count(QString::fromUtf8(body));
+
+    reply->d_func()->engine->setGate([limiter = limiter, estimatedTokens,
+                                      reply = QPointer<RestReplyBase>(reply)](
+                                             std::function<void()> proceed) {
+        if (!limiter) {
+            proceed();
+            return;
+        }
+        limiter->schedule(estimatedTokens, [proceed, reply](RateLimiter::Ticket ticket) {
+            if (!reply)
+                return; // abandoned while queued; the ticket frees the slot
+            // The ticket *is* the slot. Held until the request settles,
+            // and released with the reply if it is destroyed first, so
+            // no slot can leak by anyone forgetting to give it back.
+            auto held = std::make_shared<RateLimiter::Ticket>(std::move(ticket));
+            QObject::connect(reply, &RestReplyBase::done, reply, [held]() { held->reset(); });
+            proceed();
+        });
+    });
+
+    // A 429 is the provider saying that *you* are going too fast, not that this
+    // one request was unlucky -- so the whole client backs off, not just the
+    // reply that heard it. Same for a window the provider reports as spent.
+    QObject::connect(reply, &RestReplyBase::done, q, [this, reply]() {
+        if (!limiter)
+            return;
+        const RateLimit rateLimit = reply->rateLimit();
+        if (reply->error().httpStatus() == 429 && rateLimit.retryAfterMs > 0)
+            limiter->pauseFor(rateLimit.retryAfterMs);
+        else if (rateLimit.remainingRequests == 0 && rateLimit.resetRequestsMs > 0)
+            limiter->pauseFor(rateLimit.resetRequestsMs);
+    });
+}
+
 template <typename Reply, typename MakeFactory>
 Reply *ClientPrivate::issue(const QByteArray &method, QNetworkRequest request,
                             const QByteArray &body, MakeFactory makeFactory) const
@@ -655,6 +726,9 @@ Reply *ClientPrivate::issue(const QByteArray &method, QNetworkRequest request,
 
     Reply *reply = Client::makeReply<Reply>(q, std::move(factory), retryPolicy);
     runAfterResponse(reply, outgoing, answer.has_value());
+    // A request answered locally spends no budget, because it makes no request.
+    if (!answer)
+        gateDispatch(reply, outgoing.body);
     return reply;
 }
 

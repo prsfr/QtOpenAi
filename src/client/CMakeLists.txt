@@ -12,6 +12,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/LoggingInterceptor.h
     include/QtOpenAi/Client/ResponseCache.h
     include/QtOpenAi/Client/CachingInterceptor.h
+    include/QtOpenAi/Client/RateLimiter.h
     include/QtOpenAi/Client/ToolRegistry.h
     include/QtOpenAi/Client/RetryPolicy.h
     include/QtOpenAi/Client/RestReplyBase.h
@@ -120,6 +121,7 @@ add_library(QtOpenAiClient
     src/LoggingInterceptor.cpp
     src/ResponseCache.cpp
     src/CachingInterceptor.cpp
+    src/RateLimiter.cpp
     src/ToolRegistry.cpp
     src/ClientError.cpp
     src/RetryPolicy.cpp

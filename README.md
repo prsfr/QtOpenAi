@@ -1559,6 +1559,64 @@ measure a hit rate without the cache keeping counters nobody reads.
 
 See [`examples/interceptors.cpp`](examples/interceptors.cpp).
 
+## Rate limiting
+
+`Client::RateLimiter` throttles a client so the provider does not have to. A 429
+costs a round trip, a retry and sometimes a longer penalty than the wait would
+have been, so staying under the limit is cheaper than recovering from crossing
+it:
+
+```cpp
+Client::RateLimiter limiter;
+limiter.setMaxConcurrent(4);
+limiter.setRequestsPerMinute(60);
+limiter.setTokensPerMinute(90000);
+client.setRateLimiter(&limiter);
+```
+
+The three budgets are independent and any of them may be left at `0`, meaning no
+limit:
+
+* **`maxConcurrent`** — requests in flight at once. Worth setting even when the
+  provider imposes no limit, because it also bounds how much of your own memory
+  and how many sockets a burst can take.
+* **`requestsPerMinute`** — a rolling window, not a per-minute bucket. A bucket
+  lets a caller spend the whole budget in the last second of one minute and the
+  whole of the next in the first second of the next, which is exactly the burst
+  the limit exists to prevent.
+* **`tokensPerMinute`** — the same window over *estimated* prompt tokens. The
+  estimate runs over the serialised body and is deliberately generous: a token
+  budget that undercounts is a budget that does not work.
+
+Requests over budget queue and are released in order. Calling code does not
+change: a call still returns its reply immediately, the reply simply has not
+started yet. `queued()`, `inFlight()` and `queueChanged()` are enough to drive a
+progress indicator.
+
+A 429 carrying `Retry-After` pauses the **whole client**, not only the reply
+that received it — the provider is saying that *you* are going too fast. A
+response reporting an exhausted window (`x-ratelimit-remaining-requests: 0`)
+does the same. `pauseFor()` is the same lever by hand, and it never shortens a
+pause already in force.
+
+Three things are deliberately outside its scope:
+
+* **Streams are not gated.** A stream is held open for as long as the model is
+  talking, and counting one against a concurrency budget would let a single long
+  answer starve everything behind it.
+* **Cache hits are not gated.** A hit makes no request, so there is no budget to
+  spend.
+* **Retries are not re-queued.** A retry is the tail of a request that already
+  got through; making it queue again would pin the slot it occupies behind
+  whatever is now ahead of it.
+
+Destroying a limiter, or replacing it with `setRateLimiter(nullptr)`, releases
+whatever is waiting rather than abandoning it — a caller holding a reply that
+would never start would wait forever, which is worse than one burst over budget.
+Nothing is queued when no limiter is installed.
+
+See [`examples/rate_limiting.cpp`](examples/rate_limiting.cpp).
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -1644,6 +1702,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `agent`             | The tool loop driven by `Chat::Agent`, with guards    |
 | `metrics`           | Token usage, cost, latency and time-to-first-token   |
 | `interceptors`      | Redacting log, per-request trace header, response cache |
+| `rate_limiting`     | Concurrency cap, RPM/TPM budgets and a request queue |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
 | `meta_tools`        | Tool calling with a schema derived from a Q_INVOKABLE |
 | `streaming`         | Streamed chat completion (SSE), token by token       |

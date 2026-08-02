@@ -134,6 +134,7 @@ namespace Client {
 class ClientPrivate;
 class Interceptor;
 class ProviderProfile;
+class RateLimiter;
 
 // The entry point for talking to the OpenAI API, or anything that speaks it.
 //
@@ -229,6 +230,16 @@ public:
     void addInterceptor(Interceptor *interceptor);
     void removeInterceptor(Interceptor *interceptor);
     QList<Interceptor *> interceptors() const;
+
+    // Throttle this client so the provider does not have to. Requests over
+    // budget queue and are released in order; a call still returns its reply
+    // immediately, the reply simply has not started yet.
+    //
+    // Nothing is queued without a limiter, and the client does not take
+    // ownership -- a destroyed limiter detaches itself. Passing nullptr removes
+    // the limit; requests already waiting are released rather than stranded.
+    void setRateLimiter(RateLimiter *limiter);
+    RateLimiter *rateLimiter() const;
 
     // Inject a custom QNetworkAccessManager (e.g. for proxies or test doubles).
     // The client does not take ownership.

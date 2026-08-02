@@ -24,6 +24,15 @@ class RestReply : public QObject
 {
     Q_OBJECT
 public:
+    // Decides *when* the first attempt runs. Handed a callback it must
+    // eventually invoke (or drop, if the request was abandoned while waiting).
+    // This is where a rate limiter holds a request back.
+    //
+    // Only the first attempt is gated. A retry is the tail of a request that
+    // already got through, and making it queue again would pin the slot it
+    // occupies behind whatever is now ahead of it.
+    using Gate = std::function<void(std::function<void()>)>;
+
     // Constructed with a factory that (re)issues the underlying network request,
     // so the engine can transparently retry per the supplied policy. The first
     // attempt is scheduled on the next event-loop turn.
@@ -37,6 +46,10 @@ public:
     // for endpoints that return a binary blob rather than JSON.
     QByteArray contentType() const;
     void abort();
+
+    // Must be installed before the event loop turns, i.e. in the same turn the
+    // reply was constructed -- the first attempt is scheduled from there.
+    void setGate(Gate gate);
 
 Q_SIGNALS:
     // Emitted once per settled request whatever the outcome -- 2xx, HTTP error
@@ -59,6 +72,7 @@ private:
     QNetworkReply *m_networkReply = nullptr;
     RateLimit m_rateLimit;
     QByteArray m_contentType;
+    Gate m_gate;
     int m_retryCount = 0;
 };
 

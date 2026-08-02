@@ -5,6 +5,7 @@
 
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QPointer>
 #include <QtCore/QTimer>
 #include <QtNetwork/QNetworkReply>
 
@@ -17,8 +18,22 @@ RestReply::RestReply(std::function<QNetworkReply *()> requestFactory, RetryPolic
     , m_factory(std::move(requestFactory))
     , m_policy(std::move(policy))
 {
-    // Defer the first attempt so callers can connect before anything fires.
-    QTimer::singleShot(0, this, [this]() { start(); });
+    // Defer the first attempt so callers can connect before anything fires --
+    // and so a gate installed right after construction is in place by then.
+    QTimer::singleShot(0, this, [this]() {
+        if (!m_gate) {
+            start();
+            return;
+        }
+        // The gate may hold the callback for an arbitrary time, by which point
+        // this reply may be gone; it must not resurrect a dead one.
+        QPointer<RestReply> self(this);
+        const Gate gate = std::move(m_gate);
+        gate([self]() {
+            if (self)
+                self->start();
+        });
+    });
 }
 
 RestReply::~RestReply() = default;
@@ -26,6 +41,8 @@ RestReply::~RestReply() = default;
 RateLimit RestReply::rateLimit() const { return m_rateLimit; }
 int RestReply::retryCount() const { return m_retryCount; }
 QByteArray RestReply::contentType() const { return m_contentType; }
+
+void RestReply::setGate(Gate gate) { m_gate = std::move(gate); }
 
 void RestReply::abort()
 {
