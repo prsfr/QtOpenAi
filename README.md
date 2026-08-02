@@ -1617,6 +1617,60 @@ Nothing is queued when no limiter is installed.
 
 See [`examples/rate_limiting.cpp`](examples/rate_limiting.cpp).
 
+## Guardrails
+
+`Client::Guardrail` screens text against the Moderations API and applies a
+policy to the answer:
+
+```cpp
+Client::Guardrail guardrail(&client);
+guardrail.setAction("violence", Client::GuardrailAction::Warn);
+guardrail.setAction("self-harm", Client::GuardrailAction::Block);
+
+auto *reply = guardrail.createChatCompletion(request);
+connect(reply, &Client::GuardedChatReply::blocked, this, &Ui::showRefusal);
+connect(reply, &Client::GuardedChatReply::flagged, this, &Ui::showNotice);
+connect(reply, &Client::GuardedChatReply::finished, this, &Ui::showAnswer);
+```
+
+Both sides are screened, for different reasons: the **input**, so the
+application does not spend a request relaying something it would refuse to
+show; the **output**, because a model can produce what its prompt did not ask
+for. Either check can be turned off with `setScreenInput()` /
+`setScreenOutput()`. A fully screened exchange is three round trips, not one —
+that is the honest cost, and it is why the checks are separable.
+
+The policy is **per category**, because the categories are not comparable. An
+app for adults may reasonably allow what a children's app must block, and
+neither is a "level" of the other. Categories are the provider's own strings;
+anything the policy does not name gets `defaultAction()`, which is `Block` — a
+category nobody thought about is more likely to matter than not, and an
+application that wants everything through can say so in one line. Where several
+categories match, the strictest decides; letting a warned category downgrade a
+blocked one would make the outcome depend on map ordering.
+
+`setThreshold()` makes the policy stricter than the provider: `1.0` (the
+default) trusts the provider's own `flagged` and nothing else, while a lower
+value also matches on the category score. A verdict carries *every* category the
+provider scored, not only the ones that crossed the line, so a UI can show a
+breakdown rather than a bare refusal.
+
+Two things worth being explicit about:
+
+* **A failed screening fails the exchange.** A guardrail that treats "I could
+  not check" as "it is fine" is not a guardrail.
+* **This is deliberately not an `Interceptor`.** The interceptor chain is
+  synchronous — a request either goes out now or is answered now — and
+  screening needs a round trip of its own. Wiring an awaited call into a chain
+  that cannot wait would mean either blocking the event loop or letting the
+  unscreened request go out first, and both defeat the purpose. So the guardrail
+  composes calls instead.
+
+`judge()` applies the same policy to a `ModerationResult` obtained some other
+way, so there is one decision procedure rather than two that can drift.
+
+See [`examples/guardrails.cpp`](examples/guardrails.cpp).
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -1712,6 +1766,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `vision`            | Multimodal input (text + image content parts)        |
 | `embeddings`        | Embeddings (`/embeddings`)                            |
 | `moderations`       | Moderation (`/moderations`)                           |
+| `guardrails`        | Screen input and output against a per-category policy |
 | `tts`               | Text-to-speech (`/audio/speech`)                      |
 | `voice_cloning`     | Custom voice: consent → voice (`/audio/voices`)      |
 | `transcribe`        | Speech-to-text (`/audio/transcriptions`)             |
