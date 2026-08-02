@@ -11,8 +11,11 @@ on:
         type: boolean
         default: false
 
+# `github.ref` differs between the push and pull_request events for the same
+# commit (refs/heads/... vs refs/pull/N/merge), so keying on it put them in two
+# groups and built every pushed SHA twice. head_ref is the branch in both cases.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -97,8 +100,15 @@ jobs:
           -DQTOPENAI_BUILD_TESTS=ON
           -DQTOPENAI_BUILD_EXAMPLES=ON
 
+      # `--parallel` without a number becomes `make -j` with no argument on the
+      # Makefiles generator, which is *unbounded*: every ready target compiles
+      # at once. Each tests/client TU pulls in Client.h with its ~70 reply
+      # headers, so ~35 concurrent Release compiles exhausted the runner's
+      # memory and the OOM killer took the runner agent with it (exit 143,
+      # "runner has received a shutdown signal"). Locally this never showed:
+      # Ninja's own default is bounded. Pin it to the runner's core count.
       - name: Build
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release --parallel 4
 
       - name: Test
         working-directory: build
@@ -130,7 +140,7 @@ jobs:
           -DQTOPENAI_BUILD_TESTS=OFF
           -DQTOPENAI_BUILD_EXAMPLES=OFF
           -DQTOPENAI_BUILD_SHARED=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} &&
-          cmake --build build --parallel &&
+          cmake --build build --parallel 4 &&
           cmake --install build
 
       - name: Configure, build & run the consumer
