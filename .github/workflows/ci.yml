@@ -11,11 +11,14 @@ on:
         type: boolean
         default: false
 
-# `github.ref` differs between the push and pull_request events for the same
-# commit (refs/heads/... vs refs/pull/N/merge), so keying on it put them in two
-# groups and built every pushed SHA twice. head_ref is the branch in both cases.
+# A push to a branch with an open PR fires both the push and the pull_request
+# event, and the group has to name the same thing under both or the SHA is
+# built twice. Neither `github.ref` (refs/heads/<branch> vs refs/pull/N/merge)
+# nor `github.head_ref` (the bare branch, but *empty* on push, so it falls back
+# to the refs/heads/ form) is that thing. This pair is: the PR's head branch
+# where there is a PR, the pushed branch otherwise -- both the bare name.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
