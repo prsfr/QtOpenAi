@@ -157,6 +157,9 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: "6.11.1"
+          # qtwebsockets for QtOpenAi::Realtime. The rest are for the GUI
+          # consumer below: the library must not depend on them, and must still
+          # work when the application does.
           modules: qtwebsockets
           cache: true
 
@@ -177,3 +180,14 @@ jobs:
           -DCMAKE_PREFIX_PATH=$PWD/_prefix &&
           cmake --build build-consumer &&
           LD_LIBRARY_PATH="$PWD/_prefix/lib:$QT_ROOT_DIR/lib" ./build-consumer/consumer
+
+      # The converse of the "No GUI dependency" check. That one proves the
+      # library needs no display stack; this one proves it still works inside an
+      # application that has one, which is where most callers will be. Built
+      # only when Qt6::Widgets is part of the install -- its absence is the
+      # normal headless case, not a failure.
+      - name: Run the GUI consumer
+        if: hashFiles('build-consumer/gui_consumer') != ''
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: LD_LIBRARY_PATH="$PWD/_prefix/lib:$QT_ROOT_DIR/lib" ./build-consumer/gui_consumer

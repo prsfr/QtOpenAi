@@ -37,27 +37,36 @@ sight. `QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets` — the one 
 nothing else needs, which is why it is a module of its own and is built only when
 that component is found (`QTOPENAI_BUILD_REALTIME`).
 
-### Headless, and checked
+### Headless, not UI-hostile
 
-**No module links `Qt6::Gui`, `Qt6::Widgets`, `Qt6::Quick`, `Qt6::Qml` or
-`Qt6::OpenGL`, and none ever will.** `Qt6::Core`, `Qt6::Network` and — for the
-optional Realtime module — `Qt6::WebSockets` are the whole dependency list. The
-library runs in a daemon, a CLI, a test harness, a container or a server with no
+**The library does not depend on a GUI stack. Your application is free to.**
+
+Those are two different statements and both matter. `Qt6::Core`, `Qt6::Network`
+and — for the optional Realtime module — `Qt6::WebSockets` are the whole
+dependency list; no module links `Qt6::Gui`, `Qt6::Widgets`, `Qt6::Quick`,
+`Qt6::Qml` or `Qt6::OpenGL`, and none ever will. That is what lets the same
+library run inside a daemon, a CLI, a test harness or a container with no
 display stack anywhere near it.
 
-That is a property that erodes one convenient link line at a time, so it is
-enforced rather than intended, twice:
+It is emphatically **not** a restriction on the caller. A Widgets or Qt Quick
+application links `QtOpenAi::Client` exactly like any other one, connects to its
+signals from a widget or a `QObject` exposed to QML, and puts its value types in
+a `QVariant` for a model or a property binding. Building a UI on this library is
+the expected case — the library simply does not contain one, so that nothing
+forces the dependency on callers who have no use for it.
 
-* **At configure time.** Naming a GUI module in any target's link libraries
-  fails `cmake` with a message saying why.
-* **In CI, against the built artefacts.** `objdump -p` over each `libQtOpenAi*`
-  checks what the linker actually recorded, so a GUI dependency arriving
-  *transitively* — through a dependency of a dependency, where no `CMakeLists`
-  mentions it — is caught too.
+Both halves are checked rather than intended, because both are the kind of thing
+that erodes one convenient line at a time:
 
-There is deliberately no UI layer here and no plan for one: this library
-produces values and signals, and what an application does with them is its own
-business.
+| Check | Where | What would otherwise slip through |
+|---|---|---|
+| Configure-time link-library guard | `CMakeLists.txt` | a GUI module named in any QtOpenAi target |
+| `objdump -p` over the built libraries | CI | a GUI dependency arriving *transitively*, where no `CMakeLists` mentions it |
+| `gui_consumer` — a real `QApplication` linking the installed package | CI | the library becoming unusable *from* a GUI application |
+
+The last one is the converse of the first two, and it is there because "does not
+depend on a GUI" would be worthless if it quietly came to mean "does not work
+with one".
 
 ## Design
 
