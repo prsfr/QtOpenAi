@@ -8,6 +8,8 @@
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/ToolRegistry.h>
 #include <QtOpenAi/Core/ChatCompletionRequest.h>
+#include <QtOpenAi/Core/VectorIndex.h>
+#include <QtOpenAi/Tools/DefaultTools.h>
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QJsonObject>
@@ -49,10 +51,21 @@ int main(int argc, char **argv)
     transcript.setSystemPrompt(QStringLiteral("be terse"));
     transcript.addUserMessage(QStringLiteral("hi"));
 
+    // The Tools module. An empty policy installs nothing, which is both the
+    // documented default and the cheapest thing to assert here.
+    Client::ToolRegistry sandboxed;
+    Tools::DefaultTools tools;
+    const int granted = tools.install(&sandboxed, Tools::ToolPolicy {}).size();
+
+    // A Core type with no networking behind it at all.
+    Core::VectorIndex index;
+    index.add(QStringLiteral("a"), {1.0, 0.0});
+
     // Round-trip a request through JSON to touch the Core serialisation path.
     const bool ok
             = request.toJson().value(QStringLiteral("model")).toString() == QStringLiteral("gpt-4o")
-              && registry.tools().size() == 1
+              && registry.tools().size() == 1 && granted == 0 && index.size() == 1
+              && index.search({1.0, 0.0}, 1).size() == 1
               && transcript.buildRequest(QStringLiteral("gpt-4o")).messages().size() == 2;
     return ok ? 0 : 1;
 }
