@@ -13,7 +13,6 @@ set(QTOPENAI_CHAT_PUBLIC_HEADERS
     include/QtOpenAi/Chat/GlobalChat.h
     include/QtOpenAi/Chat/TrimPolicy.h
     include/QtOpenAi/Chat/Transcript.h
-    include/QtOpenAi/Chat/ConversationModel.h
     include/QtOpenAi/Chat/Agent.h
 )
 
@@ -21,7 +20,6 @@ add_library(QtOpenAiChat
     ${QTOPENAI_CHAT_PUBLIC_HEADERS}
     src/TrimPolicy.cpp
     src/Transcript.cpp
-    src/ConversationModel.cpp
     src/Agent.cpp
 )
 

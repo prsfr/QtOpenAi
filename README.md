@@ -526,19 +526,6 @@ the room the reply needs — and counts with that model's tokenizer.
 `setSummariser()` replaces what was dropped with one message of your making,
 which is where a running summary belongs.
 
-### Driving a UI
-
-`Chat::ConversationModel` is the same transcript as a QObject, for when a view
-needs to know that something changed:
-
-```cpp
-connect(model, &Chat::ConversationModel::messageAdded, view, &View::appendRow);
-connect(model, &Chat::ConversationModel::activeBranchChanged, view, &View::reload);
-```
-
-It stays a thin wrapper: `transcript()` hands back the value, so persistence and
-threading work as they do for any other value type here.
-
 See [`examples/conversation.cpp`](examples/conversation.cpp) — interactive with
 a key, and an offline walk-through of branching and trimming without one.
 

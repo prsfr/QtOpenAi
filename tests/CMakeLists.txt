@@ -8,8 +8,6 @@ function(qtopenai_add_test name)
     # Lets tests share helpers via #include "support/....h".
     target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME ${name} COMMAND ${name})
-    set_tests_properties(${name} PROPERTIES
-        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endfunction()
 
 # --- Core module tests ---
@@ -342,10 +340,6 @@ qtopenai_add_test(tst_chat_transcript
 
 qtopenai_add_test(tst_chat_trimpolicy
     SOURCES chat/tst_trimpolicy.cpp
-    LIBS QtOpenAi::Chat)
-
-qtopenai_add_test(tst_chat_conversationmodel
-    SOURCES chat/tst_conversationmodel.cpp
     LIBS QtOpenAi::Chat)
 
 qtopenai_add_test(tst_chat_agent
