@@ -121,7 +121,7 @@ public:
                               double minScore = -std::numeric_limits<double>::infinity());
 
 Q_SIGNALS:
-    // The index changed -- for a model or a view that shows what is in it.
+    // The index changed -- for anything tracking what is in it.
     void indexChanged();
 
 private:

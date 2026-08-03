@@ -21,7 +21,7 @@ class RunStreamReplyPrivate;
 //
 // The run stream is a sequence of events whose payloads are ordinary Assistants
 // objects; this reply routes them by their `object` field. Every event is
-// surfaced through event(object, data); the two that matter for a UI get their
+// surfaced through event(object, data); the two that matter most get their
 // own signals — messageDelta() for incremental assistant text, and runChanged()
 // for each new run state.
 //

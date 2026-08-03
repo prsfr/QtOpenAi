@@ -37,6 +37,28 @@ sight. `QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets` — the one 
 nothing else needs, which is why it is a module of its own and is built only when
 that component is found (`QTOPENAI_BUILD_REALTIME`).
 
+### Headless, and checked
+
+**No module links `Qt6::Gui`, `Qt6::Widgets`, `Qt6::Quick`, `Qt6::Qml` or
+`Qt6::OpenGL`, and none ever will.** `Qt6::Core`, `Qt6::Network` and — for the
+optional Realtime module — `Qt6::WebSockets` are the whole dependency list. The
+library runs in a daemon, a CLI, a test harness, a container or a server with no
+display stack anywhere near it.
+
+That is a property that erodes one convenient link line at a time, so it is
+enforced rather than intended, twice:
+
+* **At configure time.** Naming a GUI module in any target's link libraries
+  fails `cmake` with a message saying why.
+* **In CI, against the built artefacts.** `objdump -p` over each `libQtOpenAi*`
+  checks what the linker actually recorded, so a GUI dependency arriving
+  *transitively* — through a dependency of a dependency, where no `CMakeLists`
+  mentions it — is caught too.
+
+There is deliberately no UI layer here and no plan for one: this library
+produces values and signals, and what an application does with them is its own
+business.
+
 ## Design
 
 * **SOTA data structures** — every model type (`Message`, `ToolCall`, `Tool`,
@@ -560,7 +582,7 @@ agent.setApprovalCallback([](const Core::ToolCall &call) {
 ```
 
 `cancel()` abandons a run. Every turn is announced — `assistantMessage`,
-`toolInvoked`, `toolRejected`, `finished`, `failed` — so a UI can show the loop
+`toolInvoked`, `toolRejected`, `finished`, `failed` — so a caller can report the loop
 rather than wait for it. See [`examples/agent.cpp`](examples/agent.cpp)
 (`--ask` confirms each tool call on the terminal).
 
@@ -616,7 +638,7 @@ Byte-pair merging then follows tiktoken's algorithm over the UTF-8 bytes of each
 piece the encoding's pre-tokenizer produces, so counts match the server's.
 Without the file, `count()` still answers using the customary
 one-token-per-four-characters estimate, and `isExact()` says which of the two
-you got — enough for a progress bar, not enough to fill a context window to the
+you got — enough for a rough figure, not enough to fill a context window to the
 brim. A counter built before its vocabulary is loaded becomes exact the moment
 it arrives.
 
@@ -1351,7 +1373,7 @@ client.setApiKey(key);
 
 Built in: `openAi()`, `azure(resource, apiVersion = {})`, `ollama()`,
 `lmStudio()`, `vllm()`, `groq()`, `openRouter()`. `builtIn()` returns the
-argument-free ones for a combo box, and `fromName()` looks one up
+argument-free ones for offering a choice, and `fromName()` looks one up
 case-insensitively for a config file.
 
 A profile is a value, so a built-in is a starting point rather than a fixed
@@ -1372,7 +1394,7 @@ Two deliberate limits:
 * **The API key is not part of a profile.** A profile says which provider; a key
   says who you are. `setProfile()` leaves the key untouched — putting a secret
   in a value type that gets copied, compared and logged is how secrets escape.
-* **`requiresApiKey()`** is `false` for the local servers, so a UI knows not to
+* **`requiresApiKey()`** is `false` for the local servers, so a caller knows not to
   prompt for something the user does not have.
 
 `azure()` configures the key header and the `api-version` parameter, which is
@@ -1498,13 +1520,13 @@ itself defaults to off; turn it on without a rebuild with
 QT_LOGGING_RULES="qtopenai.http.debug=true"
 ```
 
-or connect to `logged()` to route the same lines into a UI or a test.
+or connect to `logged()` to route the same lines somewhere of your own.
 
 ### Response caching
 
 `CachingInterceptor` answers an identical request from a store instead of the
 network — worth having for deterministic calls (`temperature: 0`), for a prompt
-a UI re-issues as the user navigates back and forth, and for tests. Each hit is
+an application re-issues as the user moves back and forth, and for tests. Each hit is
 a round trip and a bill that did not happen:
 
 ```cpp
@@ -1578,8 +1600,8 @@ limit:
 
 Requests over budget queue and are released in order. Calling code does not
 change: a call still returns its reply immediately, the reply simply has not
-started yet. `queued()`, `inFlight()` and `queueChanged()` are enough to drive a
-progress indicator.
+started yet. `queued()`, `inFlight()` and `queueChanged()` are enough to report
+how far along a burst is.
 
 A 429 carrying `Retry-After` pauses the **whole client**, not only the reply
 that received it — the provider is saying that *you* are going too fast. A
@@ -1640,8 +1662,8 @@ blocked one would make the outcome depend on map ordering.
 `setThreshold()` makes the policy stricter than the provider: `1.0` (the
 default) trusts the provider's own `flagged` and nothing else, while a lower
 value also matches on the category score. A verdict carries *every* category the
-provider scored, not only the ones that crossed the line, so a UI can show a
-breakdown rather than a bare refusal.
+provider scored, not only the ones that crossed the line, so a caller can explain
+a refusal rather than only announcing it.
 
 Two things worth being explicit about:
 

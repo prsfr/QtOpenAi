@@ -23,9 +23,9 @@
 //   * Every refusal is printed. An application that never looks at these will
 //     not know it is being probed; one that logs them will.
 //   * The approval handler is asked before anything that changes state. Here it
-//     asks on the terminal; a GUI would show a dialog. Refusing is answered with
-//     a sentence the model can read and work around rather than an error that
-//     would end the turn.
+//     asks on the terminal; the decision is the caller's to make however they
+//     like. Refusing is answered with a sentence the model can read and work
+//     around rather than an error that would end the turn.
 
 #include <QtOpenAi/Chat/Agent.h>
 #include <QtOpenAi/Client/Client.h>
@@ -75,8 +75,8 @@ int main(int argc, char **argv)
 
     Tools::DefaultTools tools;
 
-    // Asked before anything that changes state. A GUI would show a dialog; this
-    // asks on the terminal, which is the same decision in a smaller frame.
+    // Asked before anything that changes state. Where that question gets asked
+    // is the caller's business; this one asks on the terminal.
     tools.setApprovalHandler([&out](const QString &name, const QJsonObject &arguments) {
         out << "\nThe model wants to run " << name << " with "
             << QString::fromUtf8(QJsonDocument(arguments).toJson(QJsonDocument::Compact))

@@ -69,7 +69,7 @@ public:
     void setTokensPerMinute(int count);
     int tokensPerMinute() const;
 
-    // Waiting and running right now. Enough to drive a progress indicator.
+    // Waiting and running right now. Enough to report how far along a burst is.
     int queued() const;
     int inFlight() const;
 

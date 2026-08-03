@@ -66,7 +66,7 @@ public:
 
 Q_SIGNALS:
     void itemFinished(int index, const QtOpenAi::Client::ChatMapItem &item);
-    // Progress, for a bar. Emitted with every item, after itemFinished().
+    // How far along the run is. Emitted with every item, after itemFinished().
     void progress(int finished, int total);
     void allFinished();
 

@@ -18,9 +18,9 @@ class CachingInterceptorPrivate;
 //     CachingInterceptor cache;
 //     client.addInterceptor(&cache);
 //
-// Worth having for deterministic calls (`temperature: 0`), for a prompt a UI
-// re-issues as the user navigates back and forth, and for tests -- each hit is
-// a round trip and a bill that did not happen.
+// Worth having for deterministic calls (`temperature: 0`), for a prompt an
+// application re-issues as the user moves back and forth, and for tests -- each
+// hit is a round trip and a bill that did not happen.
 //
 // **What is cached is an allow-list, and that is the whole safety story.** A
 // POST is not idempotent in general: replaying `POST /files` from a cache would

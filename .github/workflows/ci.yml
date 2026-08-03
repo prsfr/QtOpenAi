@@ -117,6 +117,31 @@ jobs:
         working-directory: build
         run: ctest --build-config Release --output-on-failure
 
+      # The configure step already refuses a GUI module named in any target's
+      # link libraries. This is the other half: what the linker actually
+      # recorded, so a GUI dependency arriving *transitively* -- through a
+      # dependency of a dependency, where no CMakeLists mentions it -- is caught
+      # too. A headless library that turns out to need a display stack at
+      # runtime is discovered on the deployment, not in review.
+      - name: No GUI dependency
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          found=0
+          for lib in build/lib/libQtOpenAi*.so.*; do
+            offenders=$(objdump -p "$lib" | awk '/NEEDED/ {print $2}' \
+              | grep -E 'libQt6(Gui|Widgets|Quick|Qml|OpenGL|Charts|Svg|PrintSupport)' || true)
+            if [ -n "$offenders" ]; then
+              echo "::error::$(basename "$lib") needs $(echo $offenders | tr '\n' ' ')"
+              found=1
+            fi
+          done
+          if [ "$found" -ne 0 ]; then
+            echo "QtOpenAi is a headless library; no module may depend on a GUI stack."
+            exit 1
+          fi
+          echo "No QtOpenAi module depends on a GUI stack."
+
   install-consumer:
     name: find_package smoke test (${{ matrix.link }})
     runs-on: ubuntu-latest

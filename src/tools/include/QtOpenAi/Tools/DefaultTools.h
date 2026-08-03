@@ -76,8 +76,8 @@ struct QTOPENAI_TOOLS_EXPORT ToolPolicy
 // **The approval handler runs before every side-effecting call** -- writing a
 // file, fetching a URL -- and returning false refuses it with a message the
 // model can read and work around. Reading is not gated by default, since a
-// prompt per read makes a UI unusable and the sandbox already bounds what is
-// readable; setApproveReads(true) gates those too.
+// confirmation per read makes an agent unusable and the sandbox already bounds
+// what is readable; setApproveReads(true) gates those too.
 //
 // The tool objects belong to this object, so a caller keeps one DefaultTools
 // alive for as long as the registry is used and does not have to track four
@@ -103,8 +103,8 @@ public:
     void setApprovalHandler(ApprovalHandler handler);
     bool hasApprovalHandler() const;
 
-    // Also ask before reads. Off by default -- a prompt per read makes a UI
-    // unusable, and the sandbox already bounds what can be read.
+    // Also ask before reads. Off by default -- a confirmation per read makes an
+    // agent unusable, and the sandbox already bounds what can be read.
     void setApproveReads(bool enabled);
     bool approvesReads() const;
 

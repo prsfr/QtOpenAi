@@ -57,7 +57,7 @@ public:
     static ProviderProfile groq();
     static ProviderProfile openRouter();
 
-    // Every built-in that needs no argument, so a UI can offer a list.
+    // Every built-in that needs no argument, so a caller can offer a list.
     static QList<ProviderProfile> builtIn();
     // One of them by name, case-insensitively; a null profile when there is no
     // such provider, which `isNull()` reports.

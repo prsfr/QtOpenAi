@@ -36,7 +36,7 @@ class ToolRegistryPrivate;
 //    callable as a tool without unpacking anything itself.
 //
 // Results are delivered both as return values (invoke / invokeAll) and via
-// signals, so a UI can react asynchronously to tool execution.
+// signals, so a caller can react asynchronously to tool execution.
 class QTOPENAI_CLIENT_EXPORT ToolRegistry : public QObject
 {
     Q_OBJECT

@@ -77,8 +77,9 @@ public:
     void afterResponse(const InterceptedResponse &response) override;
 
 Q_SIGNALS:
-    // Every line written, verbatim. Lets a test assert on the output, and a GUI
-    // show a request log, without hijacking the global message handler.
+    // Every line written, verbatim. Lets a caller route the log somewhere of
+    // their own -- and a test assert on it -- without hijacking the global
+    // message handler.
     void logged(const QString &line);
 
 private:

@@ -33,7 +33,7 @@ class TokenCounterData;
 // Without it, `count()` still answers, using the customary one-token-per-four-
 // characters estimate. `isExact()` says which of the two you are getting, so a
 // caller that must not overrun a window can leave itself room, and one that
-// only wants a progress bar need not care.
+// only wants a rough figure need not care.
 //
 // Byte-pair merging follows tiktoken's algorithm on the UTF-8 bytes of each
 // piece the encoding's pre-tokenizer regex produces, so a loaded vocabulary
