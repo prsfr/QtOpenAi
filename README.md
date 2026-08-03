@@ -26,6 +26,7 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
 | `QtOpenAi::Core`     | `QtOpenAiCore`    | Value types, JSON (de)serialisation, and JSON-Schema.      |
 | `QtOpenAi::Client`   | `QtOpenAiClient`  | Async networking `Client`, replies, and the `ToolRegistry`.|
 | `QtOpenAi::Chat`     | `QtOpenAiChat`    | Conversation history, branching, trimming, and the agent loop. |
+| `QtOpenAi::Tools`    | `QtOpenAiTools`   | Ready-made tools for the `ToolRegistry`, sandboxed and opt-in. |
 | `QtOpenAi::Realtime` | `QtOpenAiRealtime`| The Realtime WebSocket channel (optional).                 |
 
 `QtOpenAi::Client` depends on `QtOpenAi::Core`; `Core` has no dependency beyond
@@ -1768,6 +1769,98 @@ shorter vector.
 
 See [`examples/semantic_search.cpp`](examples/semantic_search.cpp).
 
+## Ready-made tools
+
+`QtOpenAi::Tools` is a set of tools a model can be given — the filesystem, one
+HTTP GET, a clock and a calculator — each behind a policy that has to be filled
+in on purpose.
+
+```cpp
+Tools::ToolPolicy policy;                    // everything off
+policy.utilities = true;
+policy.fileRead  = true;
+policy.sandbox   = Tools::FileSandbox({docsPath});
+
+Tools::DefaultTools tools;
+tools.setApprovalHandler([this](const QString &name, const QJsonObject &args) {
+    return askTheUser(name, args);
+});
+const QStringList installed = tools.install(&registry, policy);
+```
+
+**It is a separate module, and that is not tidiness.** Linking
+`QtOpenAi::Client` must never be what gives a model access to a filesystem.
+Reaching these tools takes a line in a `CMakeLists.txt`, then a policy object,
+then an explicit `install()` — and a reviewer can find every application that
+took those steps by grepping for the module name.
+
+Everything is off by default, at every level: an empty `ToolPolicy` installs
+nothing, a `FileSandbox` with no roots allows nothing, and an `HttpTools` with
+no allowed hosts fetches nothing. Forgetting to configure this cannot be the
+thing that grants a power.
+
+### The filesystem sandbox
+
+A model that can name a file can name any file, and it is steered by whatever
+text is in its context — including text an attacker wrote into a document it was
+asked to summarise. So `FileSandbox` never asks whether a path looks suspicious;
+it asks whether the path, **after every symlink has been followed**, is inside a
+directory the application named:
+
+* `docs/../../etc/passwd` and a symlink from inside the jail to `/etc/shadow`
+  fail the same check for the same reason — the check is on the resolved path,
+  not on the spelling.
+* `/srv/docs-secret` is not inside `/srv/docs`, even though one string starts
+  with the other. Containment is by path component.
+* Writing to a file that does not exist yet resolves the **parent**, which is
+  what catches creating a file through a symlinked directory.
+* Read-only is separate from access, and on by default: reading a corpus and
+  rewriting it are different powers, and only one of them cannot be undone.
+  `write_file` needs `fileWrite` in the policy **and** a non-read-only sandbox.
+* A size cap, because a tool result is pasted straight into a context window.
+
+A refusal is a *result*, not an exception: the model has to be able to read it
+and try something else, and a thrown error would end the turn instead of
+correcting it. `FileTools::refused()` reports every attempt, which is how an
+application notices it is being probed.
+
+### HTTP
+
+Letting a model fetch URLs is the most dangerous ordinary tool there is, and not
+because of what it downloads: a model asked to summarise a page will happily
+fetch `http://169.254.169.254/` or `http://localhost:8080/admin`, from inside
+the network the application is running in. The allow-list is the whole defence,
+so it is required rather than recommended, matched **exactly** — `example.com`
+does not allow `evil.example.com` — and https is required unless waived.
+Redirects are not followed, because a redirect names a host the allow-list never
+approved. The body cap is enforced as the response arrives rather than after.
+
+### Utilities
+
+`current_time`, `calculate` and `uuid`: worth shipping precisely because they
+are dull. A model that cannot read a clock will confidently state the wrong
+date, and one that does arithmetic by predicting the next token gets it wrong in
+ways that look right.
+
+`calculate` uses a small arithmetic parser written for the purpose. Handing
+model-supplied text to a scripting engine would be `eval` on a string the user
+never saw; this grammar has no names to resolve and nothing to call, so there is
+nothing to escape into.
+
+### Approval
+
+`setApprovalHandler()` is asked before every side-effecting call — writing a
+file, fetching a URL — and returning false refuses it with a sentence the model
+can work around. Reads are not gated by default, since a prompt per read makes a
+UI unusable and the sandbox already bounds what is readable;
+`setApproveReads(true)` gates those too.
+
+Schemas come from the methods themselves via
+[`MetaSchema`](#tool-schemas-from-the-meta-object-system), so renaming an
+argument cannot leave a stale schema behind for the model to call with.
+
+See [`examples/sandboxed_tools.cpp`](examples/sandboxed_tools.cpp).
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -1857,6 +1950,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `parallel_map`      | Map many prompts to answers, N at a time, in order   |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
 | `meta_tools`        | Tool calling with a schema derived from a Q_INVOKABLE |
+| `sandboxed_tools`   | Filesystem tools inside a jail, with an approval prompt |
 | `streaming`         | Streamed chat completion (SSE), token by token       |
 | `responses`         | Responses API (`/responses`)                         |
 | `structured_output` | Structured Outputs (`response_format` json_schema)   |

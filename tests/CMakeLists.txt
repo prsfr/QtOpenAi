@@ -318,6 +318,23 @@ qtopenai_add_test(tst_client_realtime
     SOURCES client/tst_realtime.cpp
     LIBS QtOpenAi::Client)
 
+# --- Tools module tests ---
+qtopenai_add_test(tst_tools_filesandbox
+    SOURCES tools/tst_filesandbox.cpp
+    LIBS QtOpenAi::Tools)
+
+qtopenai_add_test(tst_tools_utility
+    SOURCES tools/tst_utility.cpp
+    LIBS QtOpenAi::Tools)
+
+qtopenai_add_test(tst_tools_http
+    SOURCES tools/tst_http.cpp
+    LIBS QtOpenAi::Tools)
+
+qtopenai_add_test(tst_tools_defaults
+    SOURCES tools/tst_defaults.cpp
+    LIBS QtOpenAi::Tools)
+
 # --- Chat module tests ---
 qtopenai_add_test(tst_chat_transcript
     SOURCES chat/tst_transcript.cpp
