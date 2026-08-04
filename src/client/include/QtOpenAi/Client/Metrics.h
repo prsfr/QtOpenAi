@@ -7,6 +7,7 @@
 #include <QtOpenAi/Core/Usage.h>
 
 #include <QtCore/QHash>
+#include <QtCore/QJsonObject>
 #include <QtCore/QMetaType>
 #include <QtCore/QString>
 
@@ -52,6 +53,9 @@ struct QTOPENAI_CLIENT_EXPORT ModelMetrics
     double cost = 0;
 
     ModelMetrics &operator+=(const ModelMetrics &other);
+
+    QJsonObject toJson() const;
+    static ModelMetrics fromJson(const QJsonObject &json);
 };
 
 // Everything recorded so far.
@@ -82,6 +86,14 @@ struct QTOPENAI_CLIENT_EXPORT MetricsSnapshot
     // Zero when nothing has been recorded, rather than a division by it.
     double averageDurationMs() const;
     double averageTimeToFirstTokenMs() const;
+
+    // --- Persistence ------------------------------------------------------
+    // Round-trips so a session's numbers survive a restart; MetricsCollector::
+    // restore() puts one back. `totals()`, `cost()` and the averages are
+    // derived and therefore not written -- storing them would create a second
+    // source of truth for a number that already has one.
+    QJsonObject toJson() const;
+    static MetricsSnapshot fromJson(const QJsonObject &json);
 };
 
 } // namespace Client

@@ -11,13 +11,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QtOpenAi REQUIRED)
 
 add_executable(consumer main.cpp)
-target_link_libraries(consumer PRIVATE QtOpenAi::Client QtOpenAi::Chat QtOpenAi::Tools)
+target_link_libraries(consumer
+    PRIVATE QtOpenAi::Client QtOpenAi::Chat QtOpenAi::Tools QtOpenAi::Storage)
 
 # QtOpenAi::Realtime is optional (it needs Qt6::WebSockets), so the consumer
 # exercises it only when the installed package actually carries it.
 if(TARGET QtOpenAi::Realtime)
     target_link_libraries(consumer PRIVATE QtOpenAi::Realtime)
     target_compile_definitions(consumer PRIVATE QTOPENAI_CONSUMER_HAS_REALTIME)
+endif()
+
+# The same for QtOpenAi::Sql, which needs Qt6::Sql.
+if(TARGET QtOpenAi::Sql)
+    target_link_libraries(consumer PRIVATE QtOpenAi::Sql)
+    target_compile_definitions(consumer PRIVATE QTOPENAI_CONSUMER_HAS_SQL)
 endif()
 
 # The other half of the headless guarantee. QtOpenAi must not *depend* on a GUI

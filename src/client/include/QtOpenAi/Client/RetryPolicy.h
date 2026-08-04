@@ -3,6 +3,7 @@
 
 #include <QtOpenAi/Client/GlobalClient.h>
 
+#include <QtCore/QJsonObject>
 #include <QtCore/QList>
 #include <QtCore/QMetaType>
 
@@ -55,6 +56,11 @@ struct QTOPENAI_CLIENT_EXPORT RateLimit
         return limitRequests >= 0 || remainingRequests >= 0 || limitTokens >= 0
                || remainingTokens >= 0 || retryAfterMs >= 0;
     }
+
+    // Absent fields are left out rather than written as -1, so a stored value
+    // that gains a field later reads back with that field absent, not zero.
+    QJsonObject toJson() const;
+    static RateLimit fromJson(const QJsonObject &json);
 };
 
 } // namespace Client

@@ -11,6 +11,12 @@ if(@QTOPENAI_BUILD_REALTIME@)
     find_dependency(Qt6 REQUIRED COMPONENTS WebSockets)
 endif()
 
+# QtOpenAi::Sql additionally needs Qt6::Sql, and is in the export set only when
+# it was built -- the same arrangement as Realtime above.
+if(@QTOPENAI_BUILD_SQL@)
+    find_dependency(Qt6 REQUIRED COMPONENTS Sql)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/QtOpenAiTargets.cmake")
 
 check_required_components(QtOpenAi)
