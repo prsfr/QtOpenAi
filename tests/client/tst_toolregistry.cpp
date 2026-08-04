@@ -14,8 +14,7 @@ using namespace QtOpenAi::Client;
 class WeatherProvider : public QObject
 {
     Q_OBJECT
-    QTOPENAI_DOC_METHOD(forecast, "Weather for a city")
-    QTOPENAI_DOC_ARGUMENT(forecast, location, "City name")
+    QTOPENAI_DOC_METHOD(forecast, "Weather for a city", location, "City name")
 public:
     using QObject::QObject;
 

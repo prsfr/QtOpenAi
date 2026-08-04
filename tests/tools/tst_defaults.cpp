@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
+#include <QtOpenAi/Core/MetaSchema.h>
 #include <QtOpenAi/Tools/DefaultTools.h>
+#include <QtOpenAi/Tools/FileTools.h>
 #include <QtOpenAi/Tools/HttpTools.h>
+#include <QtOpenAi/Tools/UtilityTools.h>
 
 #include <QtCore/QDir>
 #include <QtCore/QFile>
@@ -38,6 +41,7 @@ private slots:
     void theApprovalHandlerGatesSideEffects();
     void readsAreNotGatedUnlessAsked();
     void schemasComeFromTheMethods();
+    void everyAnnotationOnTheseToolsDescribesSomething();
 
 private:
     QTemporaryDir m_temp;
@@ -292,6 +296,43 @@ void TestDefaultTools::schemasComeFromTheMethods()
     const Message rejected
             = registry.invoke(call(QStringLiteral("read_file"), {{QStringLiteral("path"), 42}}));
     QVERIFY(rejected.content().contains(QStringLiteral("path")));
+}
+
+void TestDefaultTools::everyAnnotationOnTheseToolsDescribesSomething()
+{
+    // The macros make a misspelt name a lone mistake rather than one hidden
+    // among punctuation, but `QTOPENAI_DOC_METHOD(raed_file, ...)` still
+    // compiles -- and a key that matches nothing is simply never read, so the
+    // model would be handed a tool with no description and nobody would notice.
+    //
+    // Only the meta-object knows the real names, so this is the one check that
+    // can answer it, and it costs a line per class. Renaming a method or an
+    // argument without moving its description fails here.
+    QCOMPARE(MetaSchema::danglingAnnotations<FileTools>(), QStringList());
+    QCOMPARE(MetaSchema::danglingAnnotations<HttpTools>(), QStringList());
+    QCOMPARE(MetaSchema::danglingAnnotations<UtilityTools>(), QStringList());
+
+    // And the descriptions really are on the tools, not merely well-formed:
+    // every method these classes offer has one.
+    FileTools files;
+    HttpTools http;
+    UtilityTools utilities;
+    const QList<QObject *> everything {&files, &http, &utilities};
+
+    for (QObject *tools : everything) {
+        ToolRegistry registry;
+        const QMetaObject *meta = tools->metaObject();
+        for (int i = meta->methodOffset(); i < meta->methodCount(); ++i) {
+            const QMetaMethod method = meta->method(i);
+            if (method.methodType() != QMetaMethod::Method)
+                continue;
+            const QString name = QString::fromUtf8(method.name());
+            QVERIFY2(registry.registerMethod(tools, name), qPrintable(name));
+        }
+        for (const Tool &tool : registry.tools()) {
+            QVERIFY2(!tool.function().description().isEmpty(), qPrintable(tool.function().name()));
+        }
+    }
 }
 
 QTEST_MAIN(TestDefaultTools)

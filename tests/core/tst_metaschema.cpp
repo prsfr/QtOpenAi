@@ -71,6 +71,30 @@ public:
     Q_INVOKABLE QString noArguments() { return {}; }
 };
 
+// The grouped macro: each method named once, its arguments listed after it.
+class Grouped : public QObject
+{
+    Q_OBJECT
+    QTOPENAI_DOC("Everything described in one invocation per method")
+    QTOPENAI_DOC_METHOD(nothing, "No arguments at all.")
+    QTOPENAI_DOC_METHOD(one, "One argument.", only, "The only one.")
+    QTOPENAI_DOC_METHOD(two, "Two arguments.", first, "The first.", second, "The second.")
+    // The supported ceiling, so a change to it fails here rather than in a
+    // caller's header.
+    QTOPENAI_DOC_METHOD(eight, "Eight arguments.", a, "A.", b, "B.", c, "C.", d, "D.", e, "E.", f,
+                        "F.", g, "G.", h, "H.")
+public:
+    Q_INVOKABLE void nothing() { }
+    Q_INVOKABLE void one(const QString &only) {Q_UNUSED(only)} Q_INVOKABLE
+            void two(const QString &first,
+                     int second) {Q_UNUSED(first) Q_UNUSED(second)} Q_INVOKABLE
+            void eight(int a, int b, int c, int d, int e, int f, int g, int h)
+    {
+        Q_UNUSED(a)
+        Q_UNUSED(b) Q_UNUSED(c) Q_UNUSED(d) Q_UNUSED(e) Q_UNUSED(f) Q_UNUSED(g) Q_UNUSED(h)
+    }
+};
+
 // Every way a `doc` key can name something that is not there.
 class Misannotated : public QObject
 {
@@ -126,6 +150,8 @@ private slots:
     void describesAMethodWithoutArguments();
     void unknownTypesStayUnconstrained();
     void theMacrosBuildTheSameKeysAsHandWrittenOnes();
+    void aMethodAndItsArgumentsAreOneInvocation();
+    void theShippedAnnotationsAllDescribeSomething();
     void findsAnnotationsThatDescribeNothing();
 };
 
@@ -262,6 +288,76 @@ void TestMetaSchema::theMacrosBuildTheSameKeysAsHandWrittenOnes()
     const int index = weather.indexOfClassInfo("doc:forecast:location");
     QVERIFY(index >= 0);
     QCOMPARE(weather.classInfo(index).value(), "City name");
+}
+
+void TestMetaSchema::aMethodAndItsArgumentsAreOneInvocation()
+{
+    // Written per argument, a method's name appeared once per parameter plus
+    // once for itself -- every repetition a place for the two to drift apart
+    // while still compiling. Grouped, it is written once. What lands in the
+    // meta-object has to be exactly what the separate form produced.
+    const QMetaObject &meta = Grouped::staticMetaObject;
+
+    const auto info = [&meta](const char *key) {
+        const int index = meta.indexOfClassInfo(key);
+        return index < 0 ? QByteArray() : QByteArray(meta.classInfo(index).value());
+    };
+
+    // No arguments: the same macro, nothing after the description. One macro to
+    // know rather than two.
+    QCOMPARE(info("doc:nothing"), QByteArray("No arguments at all."));
+    QVERIFY(meta.indexOfClassInfo("doc:nothing:") < 0);
+
+    QCOMPARE(info("doc:one"), QByteArray("One argument."));
+    QCOMPARE(info("doc:one:only"), QByteArray("The only one."));
+
+    QCOMPARE(info("doc:two"), QByteArray("Two arguments."));
+    QCOMPARE(info("doc:two:first"), QByteArray("The first."));
+    QCOMPARE(info("doc:two:second"), QByteArray("The second."));
+
+    // The ceiling, every argument distinct so an off-by-one in the dispatch
+    // chain shows up as a missing or duplicated key rather than passing.
+    QCOMPARE(info("doc:eight"), QByteArray("Eight arguments."));
+    const QByteArrayList names {"a", "b", "c", "d", "e", "f", "g", "h"};
+    for (int i = 0; i < names.size(); ++i) {
+        const QByteArray key = "doc:eight:" + names.at(i);
+        QCOMPARE(info(key.constData()), QByteArray(names.at(i).toUpper() + "."));
+    }
+
+    // And the descriptions reach the schema, which is the only reason any of
+    // this exists.
+    const QJsonObject schema = MetaSchema::fromMethod(&meta, QStringLiteral("two"));
+    const QJsonObject properties = schema.value(QStringLiteral("properties")).toObject();
+    QCOMPARE(properties.value(QStringLiteral("first"))
+                     .toObject()
+                     .value(QStringLiteral("description"))
+                     .toString(),
+             QStringLiteral("The first."));
+    QCOMPARE(properties.value(QStringLiteral("second"))
+                     .toObject()
+                     .value(QStringLiteral("description"))
+                     .toString(),
+             QStringLiteral("The second."));
+
+    // Nothing described that is not there: the grouped form must not invent a
+    // key, which is the failure mode a dispatch chain off by one would have.
+    QCOMPARE(MetaSchema::danglingAnnotations<Grouped>(), QStringList());
+}
+
+void TestMetaSchema::theShippedAnnotationsAllDescribeSomething()
+{
+    // The macros make a typo a lone mistake rather than one hidden among
+    // punctuation -- but `QTOPENAI_DOC_METHOD(raed_file, ...)` still compiles,
+    // and a key matching nothing is simply never read. Only the meta-object
+    // knows the real names, so only a runtime check can answer this, and it
+    // costs one line per annotated class.
+    //
+    // These are the classes this library itself ships annotated. A rename that
+    // forgets its description fails here rather than quietly shipping a tool
+    // the model is told nothing about.
+    QCOMPARE(MetaSchema::danglingAnnotations<Person>(), QStringList());
+    QCOMPARE(MetaSchema::danglingAnnotations<Weather>(), QStringList());
+    QCOMPARE(MetaSchema::danglingAnnotations<Grouped>(), QStringList());
 }
 
 void TestMetaSchema::findsAnnotationsThatDescribeNothing()

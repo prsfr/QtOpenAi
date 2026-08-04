@@ -114,14 +114,80 @@ QStringList danglingAnnotations()
 // One Q_PROPERTY, by name.
 #define QTOPENAI_DOC_PROPERTY(property, description) Q_CLASSINFO("doc:" #property, description)
 
-// One Q_INVOKABLE method, by name. Expands the same as QTOPENAI_DOC_PROPERTY
-// because properties and methods share the key space -- a class with a property
-// and a method of the same name gives them one description between them, which
-// is worth knowing and has never yet been worth separating.
-#define QTOPENAI_DOC_METHOD(method, description) Q_CLASSINFO("doc:" #method, description)
+// One Q_INVOKABLE method and, optionally, its arguments -- the method named
+// once, each argument a `name, "description"` pair after it:
+//
+//     QTOPENAI_DOC_METHOD(write_file, "Write UTF-8 text to a file.",
+//                         path,    "Path to the file to write.",
+//                         content, "The text to write.")
+//
+// One invocation, three Q_CLASSINFO. Naming the method once is the whole point:
+// spelled per argument it was written once per parameter plus once for the
+// method itself, and every one of those repetitions was a place for the two to
+// drift apart while still compiling.
+//
+// A method with no arguments is the same macro with nothing after the
+// description, so there is one macro to know rather than two.
+//
+// Up to eight arguments; past that, or to describe an argument away from its
+// method, QTOPENAI_DOC_ARGUMENT is still there.
+#define QTOPENAI_DOC_METHOD(method, ...)                                                           \
+    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_CAT(QTOPENAI_DOC_M_,                                          \
+                                         QTOPENAI_DOC_NARG(__VA_ARGS__))(method, __VA_ARGS__))
 
-// One argument of one method. `argument` is the parameter name as the signature
-// spells it -- the name moc recorded, which is the same name the generated
-// schema advertises.
+// One argument of one method, on its own. `argument` is the parameter name as
+// the signature spells it -- the name moc recorded, which is the same name the
+// generated schema advertises.
 #define QTOPENAI_DOC_ARGUMENT(method, argument, description)                                       \
     Q_CLASSINFO("doc:" #method ":" #argument, description)
+
+// --- The plumbing behind QTOPENAI_DOC_METHOD -------------------------------
+//
+// Preprocessor, and it has to be. Q_CLASSINFO's key must be a string literal in
+// the source text, because moc reads the tokens rather than compiling them --
+// so no constexpr function, no consteval, nothing from C++17 or later can take
+// part in building one. Assembling the key is the preprocessor's job or it is
+// the caller's, and the whole point of these macros is that it is not the
+// caller's.
+//
+// The argument count is the *variadic* count, description included, so it is
+// never zero -- which is what makes the dispatch portable. Counting a possibly
+// empty __VA_ARGS__ needs __VA_OPT__ (C++20) or a compiler extension, and this
+// library is C++17 and has to pass through moc's own preprocessor besides.
+//
+// Verified against moc rather than assumed: its preprocessor accepts token
+// pasting and a macro expanding to several Q_CLASSINFO, but *not* the usual
+// trick of unparenthesising a parameter, which is why the arguments are flat
+// pairs rather than `(name, "description")` tuples.
+#define QTOPENAI_DOC_EXPAND(x) x
+#define QTOPENAI_DOC_CAT_(a, b) a##b
+#define QTOPENAI_DOC_CAT(a, b) QTOPENAI_DOC_CAT_(a, b)
+#define QTOPENAI_DOC_COUNT(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16,  \
+                           _17, N, ...)                                                            \
+    N
+#define QTOPENAI_DOC_NARG(...)                                                                     \
+    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_COUNT(__VA_ARGS__, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7,   \
+                                           6, 5, 4, 3, 2, 1))
+
+#define QTOPENAI_DOC_M_1(m, d) Q_CLASSINFO("doc:" #m, d)
+#define QTOPENAI_DOC_M_3(m, d, n1, d1) QTOPENAI_DOC_M_1(m, d) Q_CLASSINFO("doc:" #m ":" #n1, d1)
+#define QTOPENAI_DOC_M_5(m, d, n1, d1, n2, d2)                                                     \
+    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_M_3(m, d, n1, d1)) Q_CLASSINFO("doc:" #m ":" #n2, d2)
+#define QTOPENAI_DOC_M_7(m, d, n1, d1, n2, d2, n3, d3)                                             \
+    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_M_5(m, d, n1, d1, n2, d2)) Q_CLASSINFO("doc:" #m ":" #n3, d3)
+#define QTOPENAI_DOC_M_9(m, d, n1, d1, n2, d2, n3, d3, n4, d4)                                     \
+    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_M_7(m, d, n1, d1, n2, d2, n3, d3))                            \
+    Q_CLASSINFO("doc:" #m ":" #n4, d4)
+#define QTOPENAI_DOC_M_11(m, d, n1, d1, n2, d2, n3, d3, n4, d4, n5, d5)                            \
+    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_M_9(m, d, n1, d1, n2, d2, n3, d3, n4, d4))                    \
+    Q_CLASSINFO("doc:" #m ":" #n5, d5)
+#define QTOPENAI_DOC_M_13(m, d, n1, d1, n2, d2, n3, d3, n4, d4, n5, d5, n6, d6)                    \
+    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_M_11(m, d, n1, d1, n2, d2, n3, d3, n4, d4, n5, d5))           \
+    Q_CLASSINFO("doc:" #m ":" #n6, d6)
+#define QTOPENAI_DOC_M_15(m, d, n1, d1, n2, d2, n3, d3, n4, d4, n5, d5, n6, d6, n7, d7)            \
+    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_M_13(m, d, n1, d1, n2, d2, n3, d3, n4, d4, n5, d5, n6, d6))   \
+    Q_CLASSINFO("doc:" #m ":" #n7, d7)
+#define QTOPENAI_DOC_M_17(m, d, n1, d1, n2, d2, n3, d3, n4, d4, n5, d5, n6, d6, n7, d7, n8, d8)    \
+    QTOPENAI_DOC_EXPAND(                                                                           \
+            QTOPENAI_DOC_M_15(m, d, n1, d1, n2, d2, n3, d3, n4, d4, n5, d5, n6, d6, n7, d7))       \
+    Q_CLASSINFO("doc:" #m ":" #n8, d8)

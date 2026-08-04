@@ -36,8 +36,8 @@ using namespace QtOpenAi;
 class WeatherService : public QObject
 {
     Q_OBJECT
-    QTOPENAI_DOC_METHOD(forecast, "Get the current weather for a city.")
-    QTOPENAI_DOC_ARGUMENT(forecast, location, "City name, e.g. Berlin")
+    QTOPENAI_DOC_METHOD(forecast, "Get the current weather for a city.", location,
+                        "City name, e.g. Berlin")
 public:
     using QObject::QObject;
 

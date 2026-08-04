@@ -40,9 +40,8 @@ using namespace QtOpenAi;
 class WeatherService : public QObject
 {
     Q_OBJECT
-    QTOPENAI_DOC_METHOD(forecast, "Get the weather forecast for a city.")
-    QTOPENAI_DOC_ARGUMENT(forecast, location, "City name, e.g. Berlin")
-    QTOPENAI_DOC_ARGUMENT(forecast, days, "How many days ahead to forecast, 1 to 7")
+    QTOPENAI_DOC_METHOD(forecast, "Get the weather forecast for a city.", location,
+                        "City name, e.g. Berlin", days, "How many days ahead to forecast, 1 to 7")
 public:
     using QObject::QObject;
 

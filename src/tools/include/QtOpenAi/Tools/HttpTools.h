@@ -42,8 +42,8 @@ class QTOPENAI_TOOLS_EXPORT HttpTools : public QObject
 {
     Q_OBJECT
     QTOPENAI_DOC("Fetch pages over HTTP from an allowed set of hosts.")
-    QTOPENAI_DOC_METHOD(http_get, "Fetch a URL with GET and return the response body as text.")
-    QTOPENAI_DOC_ARGUMENT(http_get, url, "The absolute URL to fetch.")
+    QTOPENAI_DOC_METHOD(http_get, "Fetch a URL with GET and return the response body as text.", url,
+                        "The absolute URL to fetch.")
 public:
     explicit HttpTools(QObject *parent = nullptr);
     ~HttpTools() override;

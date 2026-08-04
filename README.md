@@ -146,10 +146,9 @@ class WeatherService : public QObject
 {
     Q_OBJECT
     // The one thing the meta-object system does not know: what things mean.
-    // The macros assemble the Q_CLASSINFO key from the names, so the `doc:`
-    // path convention is never written out by hand.
-    QTOPENAI_DOC_METHOD(forecast, "Get the weather forecast for a city.")
-    QTOPENAI_DOC_ARGUMENT(forecast, location, "City name, e.g. Berlin")
+    // The method is named once; its arguments follow as name/description pairs.
+    QTOPENAI_DOC_METHOD(forecast, "Get the weather forecast for a city.",
+                        location, "City name, e.g. Berlin")
 public:
     Q_INVOKABLE QJsonObject forecast(const QString &location, int days);
 };
@@ -161,13 +160,55 @@ registry.registerMethod(&service, "forecast");
 //              "required":["location","days"],"additionalProperties":false}
 ```
 
-The `QTOPENAI_DOC*` macros are the only hand-written part, and they take
-identifiers rather than a path: they expand to the `Q_CLASSINFO` the schema
-reads (`"doc"`, `"doc:<member>"`, `"doc:<method>:<argument>"`), with moc joining
-the literals, so there is no prefix to forget and no colon to misplace. A name
-that matches nothing is still legal C++ and still silent — for that,
+### The description macros
+
+The `QTOPENAI_DOC*` macros are the only hand-written part. They take
+identifiers rather than a path and expand to the `Q_CLASSINFO` the schema reads
+— `"doc"`, `"doc:<member>"`, `"doc:<method>:<argument>"` — so there is no
+prefix to forget and no colon to misplace.
+
+`QTOPENAI_DOC_METHOD` names the method **once** and takes its arguments after
+the description, one `name, "description"` pair each:
+
+```cpp
+QTOPENAI_DOC_METHOD(write_file, "Write UTF-8 text to a file.",
+                    path,    "Path to the file to write.",
+                    content, "The text to write.")
+```
+
+One invocation, three `Q_CLASSINFO`. A method with no arguments is the same
+macro with nothing after the description, so there is one macro to know rather
+than two. Up to eight arguments; past that, or to describe an argument away from
+its method, `QTOPENAI_DOC_ARGUMENT` is still there.
+
+**Why the preprocessor, and not `constexpr` or anything else from C++17?**
+Because `Q_CLASSINFO`'s key has to be a string literal *in the source text*: moc
+reads the tokens rather than compiling them, so no `constexpr` function and no
+`consteval` can take part in building one. Assembling that key is either the
+preprocessor's job or the caller's, and the whole point is that it is not the
+caller's. The dispatch counts the *variadic* arguments including the
+description, so the count is never zero — counting a possibly-empty
+`__VA_ARGS__` needs `__VA_OPT__` (C++20) or a compiler extension, and this is
+C++17 that must also pass through moc's own preprocessor.
+
+That preprocessor is weaker than a conforming one, which is why the arguments
+are flat pairs and not `(name, "description")` tuples: it handles token pasting
+and a macro expanding to several `Q_CLASSINFO`, but not the usual trick of
+unparenthesising a parameter. All three were checked by running `moc` on a
+probe rather than assumed.
+
+A name that matches nothing is still legal C++ and still silent — only the
+meta-object knows the real names, so only a runtime check can answer it.
 `MetaSchema::danglingAnnotations<T>()` lists every annotation describing
-something the class does not have, which is worth an assertion in a test.
+something the class does not have, and it costs one line per class in a test:
+
+```cpp
+QCOMPARE(MetaSchema::danglingAnnotations<WeatherService>(), QStringList());
+```
+
+The tools this library ships are checked that way, so renaming a method without
+moving its description fails the suite rather than quietly shipping a tool the
+model is told nothing about.
 
 The method is called with its parameters filled in from the model's JSON by
 name — a `QString` stays a `QString`, an `int` an `int`, a `Q_ENUM` is matched
