@@ -43,6 +43,32 @@ QJsonObject typed(QLatin1String type)
     return schema;
 }
 
+// A string whose shape has a name in JSON Schema. `format` is advisory -- a
+// validator may ignore it -- but it is the standard way to say "this is a date"
+// or "this is a URL", and it costs one word where prose would cost a sentence.
+QJsonObject formatted(QLatin1String format)
+{
+    QJsonObject schema = typed(QLatin1String("string"));
+    schema.insert(QStringLiteral("format"), QString(format));
+    return schema;
+}
+
+// An integer the type says cannot be negative.
+QJsonObject atLeast(qint64 minimum)
+{
+    QJsonObject schema = typed(QLatin1String("integer"));
+    schema.insert(QStringLiteral("minimum"), double(minimum));
+    return schema;
+}
+
+// An integer whose whole range the type knows.
+QJsonObject bounded(qint64 minimum, qint64 maximum)
+{
+    QJsonObject schema = atLeast(minimum);
+    schema.insert(QStringLiteral("maximum"), double(maximum));
+    return schema;
+}
+
 QJsonObject arrayOf(const QJsonObject &items)
 {
     QJsonObject schema = typed(QLatin1String("array"));
@@ -103,14 +129,33 @@ QJsonObject fromMetaType(QMetaType type)
         return typed(QLatin1String("string"));
     case QMetaType::Bool:
         return typed(QLatin1String("boolean"));
-    case QMetaType::Int:
-    case QMetaType::UInt:
-    case QMetaType::Long:
-    case QMetaType::ULong:
-    case QMetaType::LongLong:
-    case QMetaType::ULongLong:
+    // The bounds come from the type, and they are facts the *name* could never
+    // carry: a model asked for a `quint8` has no way to know it may not answer
+    // 300, and SchemaValidator enforces minimum/maximum, so saying so here also
+    // means a wrong value is rejected before it ever reaches the method.
+    //
+    // Only bounds a double represents exactly are stated. A qint64's extremes
+    // are not, and a limit that is off by a few hundred is worse than no limit:
+    // it would reject a value the method accepts.
+    case QMetaType::SChar:
+        return bounded(-128, 127);
+    case QMetaType::UChar:
+        return bounded(0, 255);
     case QMetaType::Short:
+        return bounded(-32768, 32767);
     case QMetaType::UShort:
+        return bounded(0, 65535);
+    case QMetaType::Int:
+        return bounded(-2147483648LL, 2147483647LL);
+    case QMetaType::UInt:
+        return bounded(0, 4294967295LL);
+    case QMetaType::ULong:
+    case QMetaType::ULongLong:
+        // Unsigned, so never negative; the upper end is past what a double
+        // states exactly, and is left unsaid rather than stated wrongly.
+        return atLeast(0);
+    case QMetaType::Long:
+    case QMetaType::LongLong:
         return typed(QLatin1String("integer"));
     case QMetaType::Double:
     case QMetaType::Float:
@@ -125,17 +170,18 @@ QJsonObject fromMetaType(QMetaType type)
     case QMetaType::QJsonObject:
         return typed(QLatin1String("object"));
     case QMetaType::QDate:
-        return [] {
-            QJsonObject schema = typed(QLatin1String("string"));
-            schema.insert(QStringLiteral("format"), QStringLiteral("date"));
-            return schema;
-        }();
+        return formatted(QLatin1String("date"));
     case QMetaType::QDateTime:
-        return [] {
-            QJsonObject schema = typed(QLatin1String("string"));
-            schema.insert(QStringLiteral("format"), QStringLiteral("date-time"));
-            return schema;
-        }();
+        return formatted(QLatin1String("date-time"));
+    case QMetaType::QTime:
+        return formatted(QLatin1String("time"));
+    // A URL and a UUID are strings with a shape, and JSON Schema has a name for
+    // each. Both were previously unknown types, so they reached the model as an
+    // empty schema -- no type at all, which accepts anything.
+    case QMetaType::QUrl:
+        return formatted(QLatin1String("uri"));
+    case QMetaType::QUuid:
+        return formatted(QLatin1String("uuid"));
     default:
         break;
     }

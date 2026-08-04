@@ -258,6 +258,46 @@ items -- type, name, description. A parameter type containing a comma, such as
 QMap<QString, int>, needs a typedef first.
 ```
 
+### What a missing description does, and what the type says instead
+
+Nothing breaks. An annotation that is absent is *absent* — not an empty string —
+so the schema comes out with its structure intact and no `description` key:
+
+```json
+{"type":"object",
+ "properties":{"path":{"type":"string"},
+               "maxBytes":{"type":"integer","minimum":0,"maximum":4294967295}},
+ "required":["path","maxBytes"],"additionalProperties":false}
+```
+
+The model still has the method name, the argument names and their types, which
+for `read_file(path, maxBytes)` is most of the story.
+
+**Descriptions are not generated from names**, and that is deliberate rather
+than unfinished. Derived from the identifiers, `read_file` yields "Read file."
+and `path` yields "Path." — the model already has `"name": "read_file"` and
+`"path"`, so such a description restates what it can see, costs tokens on every
+request (about 32 across the tools this library ships), and, worst of the three,
+*looks* like documentation: a reviewer and `danglingAnnotations()` both see a
+described tool and stop looking. A blank is honest about being blank.
+
+What the traits do contribute is **facts the name could never carry**, taken
+from the type:
+
+| Type | Contributes |
+|---|---|
+| `quint8`, `qint16`, `quint32`, … | `minimum` / `maximum` |
+| `quint64`, `unsigned long` | `minimum: 0` — the ceiling is past what a double states exactly, so it is left unsaid rather than stated wrongly |
+| `QDate`, `QTime`, `QDateTime` | `format: date` / `time` / `date-time` |
+| `QUrl`, `QUuid` | `format: uri` / `uuid` |
+| `Q_ENUM` | the closed set of its keys |
+| `Q_GADGET`, QObject | a nested object schema |
+
+These are not decoration. A model handed a `quint8` has no way to know it may
+not answer `300`, and [`SchemaValidator`](#validating-what-the-model-sent)
+enforces `minimum`/`maximum` — so stating the bound also means a wrong value is
+rejected before it reaches the method.
+
 ### When a description names nothing
 
 A name that matches nothing is still legal C++ and still silent — only the

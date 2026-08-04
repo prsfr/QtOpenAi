@@ -4,6 +4,9 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
 #include <QtCore/QObject>
+#include <QtCore/QUrl>
+#include <QtCore/QUuid>
+#include <QtOpenAi/Core/SchemaValidator.h>
 #include <QtTest/QtTest>
 
 using namespace QtOpenAi::Core;
@@ -69,6 +72,19 @@ public:
         return QStringLiteral("%1/%2").arg(location).arg(days);
     }
     Q_INVOKABLE QString noArguments() { return {}; }
+};
+
+// Types that carry a constraint the name never could.
+class Bounded : public QObject
+{
+    Q_OBJECT
+public:
+    Q_INVOKABLE void ranged(quint8 small, quint32 large, qint16 signedSmall, quint64 wide) {
+            Q_UNUSED(small) Q_UNUSED(large) Q_UNUSED(signedSmall) Q_UNUSED(wide)} Q_INVOKABLE
+            void shaped(const QUrl &link, const QUuid &id, QTime clock)
+    {
+        Q_UNUSED(link) Q_UNUSED(id) Q_UNUSED(clock)
+    }
 };
 
 // The grouped macro: each method named once, its arguments listed after it.
@@ -186,6 +202,7 @@ private slots:
     void describesMethodArguments();
     void describesAMethodWithoutArguments();
     void unknownTypesStayUnconstrained();
+    void aTypeContributesWhatItsNameCannot();
     void theMacrosBuildTheSameKeysAsHandWrittenOnes();
     void aMethodAndItsArgumentsAreOneInvocation();
     void anAnnotationMaySitNextToWhatItDescribes();
@@ -310,6 +327,72 @@ void TestMetaSchema::unknownTypesStayUnconstrained()
     QVERIFY(MetaSchema::fromMetaType(QMetaType::fromType<QVariant>()).isEmpty());
     // ... and a method naming one still produces a usable object schema.
     QVERIFY(MetaSchema::fromMethod(nullptr, QStringLiteral("nope")).isEmpty());
+}
+
+void TestMetaSchema::aTypeContributesWhatItsNameCannot()
+{
+    // A description is prose a human writes. These are *facts*, and they come
+    // from the type: a model handed a quint8 has no way to know it may not
+    // answer 300, and SchemaValidator enforces minimum/maximum, so stating them
+    // means a wrong value is rejected before it reaches the method.
+    const QJsonObject ranged
+            = MetaSchema::fromMethod(&Bounded::staticMetaObject, QStringLiteral("ranged"));
+    const QJsonObject properties = ranged.value(QStringLiteral("properties")).toObject();
+
+    const auto bound = [&properties](const char *name, const char *key) {
+        return properties.value(QLatin1String(name)).toObject().value(QLatin1String(key));
+    };
+
+    QCOMPARE(bound("small", "minimum").toDouble(), 0.0);
+    QCOMPARE(bound("small", "maximum").toDouble(), 255.0);
+    QCOMPARE(bound("signedSmall", "minimum").toDouble(), -32768.0);
+    QCOMPARE(bound("signedSmall", "maximum").toDouble(), 32767.0);
+    QCOMPARE(bound("large", "minimum").toDouble(), 0.0);
+    QCOMPARE(bound("large", "maximum").toDouble(), 4294967295.0);
+
+    // Unsigned and wider than a double states exactly: the floor is a fact, the
+    // ceiling would be a guess, and a limit that is off by a few hundred is
+    // worse than no limit because it would reject a value the method accepts.
+    QCOMPARE(bound("wide", "minimum").toDouble(), 0.0);
+    QVERIFY(!properties.value(QStringLiteral("wide"))
+                     .toObject()
+                     .contains(QStringLiteral("maximum")));
+
+    // A URL and a UUID are strings with a shape. Both used to be unknown types,
+    // which reached the model as an empty schema -- no type at all.
+    const QJsonObject shaped
+            = MetaSchema::fromMethod(&Bounded::staticMetaObject, QStringLiteral("shaped"));
+    const QJsonObject shapes = shaped.value(QStringLiteral("properties")).toObject();
+    const auto format = [&shapes](const char *name) {
+        return shapes.value(QLatin1String(name))
+                .toObject()
+                .value(QStringLiteral("format"))
+                .toString();
+    };
+    QCOMPARE(shapes.value(QStringLiteral("link"))
+                     .toObject()
+                     .value(QStringLiteral("type"))
+                     .toString(),
+             QStringLiteral("string"));
+    QCOMPARE(format("link"), QStringLiteral("uri"));
+    QCOMPARE(format("id"), QStringLiteral("uuid"));
+    QCOMPARE(format("clock"), QStringLiteral("time"));
+
+    // The bounds are not decoration: the validator rejects what they exclude.
+    QVERIFY(SchemaValidator::isValid(ranged, QJsonObject {{QStringLiteral("small"), 200},
+                                                          {QStringLiteral("large"), 5},
+                                                          {QStringLiteral("signedSmall"), -5},
+                                                          {QStringLiteral("wide"), 5}}));
+    const QStringList errors
+            = SchemaValidator::validate(ranged, QJsonObject {{QStringLiteral("small"), 300},
+                                                             {QStringLiteral("large"), 5},
+                                                             {QStringLiteral("signedSmall"), -5},
+                                                             {QStringLiteral("wide"), -1}});
+    QCOMPARE(errors.size(), 2);
+    QVERIFY2(errors.join(QLatin1Char(' ')).contains(QStringLiteral("/small")),
+             qPrintable(errors.join(QLatin1Char(' '))));
+    QVERIFY2(errors.join(QLatin1Char(' ')).contains(QStringLiteral("/wide")),
+             qPrintable(errors.join(QLatin1Char(' '))));
 }
 
 void TestMetaSchema::theMacrosBuildTheSameKeysAsHandWrittenOnes()
