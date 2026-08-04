@@ -214,6 +214,52 @@ and a macro expanding to several `Q_CLASSINFO`, but not the usual trick of
 unparenthesising a parameter. All three were checked by running `moc` on a
 probe rather than assumed.
 
+### Writing each name once
+
+`QTOPENAI_DOC_METHOD` still leaves the method name and every argument name
+written **twice** — once in the description, once in the signature — and nothing
+checks that the two agree. `QTOPENAI_TOOL` declares the method as well, so each
+name is written once and the type, the name and the meaning of a parameter sit
+together:
+
+```cpp
+class Weather : public QObject
+{
+    Q_OBJECT
+    QTOPENAI_DOC("Weather lookups.")
+public:
+    QTOPENAI_TOOL(QJsonObject, forecast, "Get the weather forecast for a city.",
+                  const QString &, location, "City name, e.g. Berlin",
+                  int,             days,     "How many days ahead, 1 to 7");
+};
+```
+
+That expands to the two `Q_CLASSINFO` **and** the `Q_INVOKABLE` declaration. The
+method is declared, not defined — write the body out of line as usual.
+
+**This library's own public headers deliberately do not use it.** A plain
+declaration is plain C++ that every reader and every tool understands at a
+glance, and in a header other people read that is worth more than the saved
+repetition — the same call [Cutelyst](https://github.com/cutelyst/cutelyst/wiki/Tutorial_02_CutelystBasics)
+makes with `C_ATTR`. `QTOPENAI_TOOL` is for tool classes in your own
+application, where the header is yours and terseness wins. Both produce an
+identical meta-object; a test pins that, so the choice is presentation only.
+
+Two limits, each reported as a sentence rather than as a puzzle about an
+undeclared identifier:
+
+* A parameter type containing a comma (`QMap<QString, int>`) needs a typedef,
+  because the preprocessor splits on it.
+* Up to six parameters.
+
+```
+error: static assertion failed: QTOPENAI_TOOL: every parameter needs three
+items -- type, name, description. A parameter type containing a comma, such as
+QMap<QString, int>, needs a typedef first.
+```
+
+### When a description names nothing
+
 A name that matches nothing is still legal C++ and still silent — only the
 meta-object knows the real names, so only a runtime check can answer it.
 `MetaSchema::danglingAnnotations<T>()` lists every annotation describing
@@ -226,6 +272,13 @@ QCOMPARE(MetaSchema::danglingAnnotations<WeatherService>(), QStringList());
 The tools this library ships are checked that way, so renaming a method without
 moving its description fails the suite rather than quietly shipping a tool the
 model is told nothing about.
+
+You do not have to remember to write that test, though: `registerMethod()` has
+the meta-object and the annotations both in hand at the moment of registration,
+so it **warns** there when a description names nothing on the method being
+registered. Registration still succeeds — the tool works, it is simply missing a
+description its author believed they had written — and the warning says which
+key and which class.
 
 The method is called with its parameters filled in from the model's JSON by
 name — a `QString` stays a `QString`, an `int` an `int`, a `Q_ENUM` is matched

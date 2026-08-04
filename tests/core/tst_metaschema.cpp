@@ -119,6 +119,19 @@ public:
     Q_INVOKABLE void two(const QString &first, int second) { Q_UNUSED(first) Q_UNUSED(second) }
 };
 
+// The same two methods again, declared *by* the macro so that neither the
+// method name nor an argument name is written twice.
+class Generated : public QObject
+{
+    Q_OBJECT
+    QTOPENAI_DOC("Everything described in one invocation per method")
+public:
+    QTOPENAI_TOOL(void, nothing, "No arguments at all.");
+    QTOPENAI_TOOL(void, one, "One argument.", const QString &, only, "The only one.");
+    QTOPENAI_TOOL(void, two, "Two arguments.", const QString &, first, "The first.", int, second,
+                  "The second.");
+};
+
 // Every way a `doc` key can name something that is not there.
 class Misannotated : public QObject
 {
@@ -176,6 +189,7 @@ private slots:
     void theMacrosBuildTheSameKeysAsHandWrittenOnes();
     void aMethodAndItsArgumentsAreOneInvocation();
     void anAnnotationMaySitNextToWhatItDescribes();
+    void theToolMacroWritesEveryNameOnce();
     void theShippedAnnotationsAllDescribeSomething();
     void findsAnnotationsThatDescribeNothing();
 };
@@ -400,6 +414,41 @@ void TestMetaSchema::anAnnotationMaySitNextToWhatItDescribes()
     QCOMPARE(MetaSchema::danglingAnnotations<Adjacent>(), QStringList());
 }
 
+void TestMetaSchema::theToolMacroWritesEveryNameOnce()
+{
+    // QTOPENAI_DOC_METHOD leaves every name written twice -- once in the
+    // description, once in the signature -- and nothing checks that the two
+    // agree until danglingAnnotations() runs. QTOPENAI_TOOL declares the method
+    // too, so there is only one place to get it wrong.
+    //
+    // What it produces must be indistinguishable from the hand-declared form,
+    // or the two would be different features rather than one written two ways.
+    const QMetaObject &generated = Generated::staticMetaObject;
+    const QMetaObject &grouped = Grouped::staticMetaObject;
+
+    const auto info = [](const QMetaObject &meta, const char *key) {
+        const int index = meta.indexOfClassInfo(key);
+        return index < 0 ? QByteArray() : QByteArray(meta.classInfo(index).value());
+    };
+    for (const char *key : {"doc", "doc:nothing", "doc:one", "doc:one:only", "doc:two",
+                            "doc:two:first", "doc:two:second"}) {
+        QVERIFY2(!info(generated, key).isEmpty(), key);
+        QCOMPARE(info(generated, key), info(grouped, key));
+    }
+
+    // The declaration is real: moc recorded the methods, their parameter names
+    // and their types, which is what the schema is actually built from.
+    QCOMPARE(MetaSchema::fromMethod(&generated, QStringLiteral("two")),
+             MetaSchema::fromMethod(&grouped, QStringLiteral("two")));
+    QVERIFY(generated.indexOfMethod("nothing()") >= 0);
+    QVERIFY(generated.indexOfMethod("two(QString,int)") >= 0);
+
+    // And nothing dangles, which here is stronger than usual: the names in the
+    // annotations and the names in the signature came from the same tokens, so
+    // this can only fail if the macro itself is wrong.
+    QCOMPARE(MetaSchema::danglingAnnotations<Generated>(), QStringList());
+}
+
 void TestMetaSchema::theShippedAnnotationsAllDescribeSomething()
 {
     // The macros make a typo a lone mistake rather than one hidden among
@@ -432,6 +481,10 @@ void TestMetaSchema::findsAnnotationsThatDescribeNothing()
 
     QCOMPARE(MetaSchema::danglingAnnotations(nullptr), QStringList());
 }
+
+void Generated::nothing() { }
+void Generated::one(const QString &only) { Q_UNUSED(only) }
+void Generated::two(const QString &first, int second) {Q_UNUSED(first) Q_UNUSED(second)}
 
 QTEST_MAIN(TestMetaSchema)
 #include "tst_metaschema.moc"

@@ -162,12 +162,15 @@ QStringList danglingAnnotations()
 #define QTOPENAI_DOC_EXPAND(x) x
 #define QTOPENAI_DOC_CAT_(a, b) a##b
 #define QTOPENAI_DOC_CAT(a, b) QTOPENAI_DOC_CAT_(a, b)
+// Counts to 19, which is QTOPENAI_TOOL with six parameters (1 + 3*6); the
+// eight-argument ceiling of QTOPENAI_DOC_METHOD sits at 17. Shared, so there is
+// one counter to reason about rather than two that could disagree.
 #define QTOPENAI_DOC_COUNT(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16,  \
-                           _17, N, ...)                                                            \
+                           _17, _18, _19, N, ...)                                                  \
     N
 #define QTOPENAI_DOC_NARG(...)                                                                     \
-    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_COUNT(__VA_ARGS__, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7,   \
-                                           6, 5, 4, 3, 2, 1))
+    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_COUNT(__VA_ARGS__, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, \
+                                           8, 7, 6, 5, 4, 3, 2, 1))
 
 #define QTOPENAI_DOC_M_1(m, d) Q_CLASSINFO("doc:" #m, d)
 #define QTOPENAI_DOC_M_3(m, d, n1, d1) QTOPENAI_DOC_M_1(m, d) Q_CLASSINFO("doc:" #m ":" #n1, d1)
@@ -191,3 +194,98 @@ QStringList danglingAnnotations()
     QTOPENAI_DOC_EXPAND(                                                                           \
             QTOPENAI_DOC_M_15(m, d, n1, d1, n2, d2, n3, d3, n4, d4, n5, d5, n6, d6, n7, d7))       \
     Q_CLASSINFO("doc:" #m ":" #n8, d8)
+
+// --- Declaring a tool method and describing it in one place ----------------
+//
+// QTOPENAI_DOC_METHOD leaves the method name and every argument name written
+// twice -- once in the description, once in the signature -- and nothing checks
+// that the two agree until danglingAnnotations() is run. This declares the
+// method as well, so each name is written exactly once:
+//
+//     QTOPENAI_TOOL(QString, write_file, "Write UTF-8 text to a file.",
+//                   const QString &, path,    "Path to the file to write.",
+//                   const QString &, content, "The text to write.");
+//
+// expands to the two Q_CLASSINFO and the Q_INVOKABLE declaration. The type,
+// the name and the meaning of each parameter sit together, which is the order
+// one thinks about them in.
+//
+// The trade is that the signature is now inside a macro, and that is a real
+// cost in a header other people read: a plain declaration is plain C++ that any
+// tool and any reader understands at a glance. This library's own public
+// headers therefore keep QTOPENAI_DOC_METHOD above an ordinary declaration --
+// the same choice Cutelyst makes with C_ATTR. Use this where the header is your
+// application's own and terseness wins.
+//
+// Two limits, both reported as a sentence rather than as a puzzle:
+//   * A parameter type containing a comma (QMap<QString, int>) needs a typedef,
+//     because the preprocessor splits on it.
+//   * Up to 6 parameters. A tool with more has a different problem.
+//
+// The method is declared, not defined: write the body out of line as usual.
+#define QTOPENAI_TOOL(returnType, method, ...)                                                     \
+    QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_CAT(QTOPENAI_TOOL_, QTOPENAI_DOC_NARG(__VA_ARGS__))(          \
+            returnType, method, __VA_ARGS__))
+
+// Reached only when the item count is not 1 + 3n, which means a triple is
+// short -- or a type had a comma in it and split into two items.
+#define QTOPENAI_TOOL_BAD                                                                          \
+    static_assert(false, "QTOPENAI_TOOL: every parameter needs three items -- type, name, "        \
+                         "description. A parameter type containing a comma, such as "              \
+                         "QMap<QString, int>, needs a typedef first.")
+#define QTOPENAI_TOOL_2(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_3(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_5(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_6(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_8(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_9(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_11(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_12(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_14(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_15(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_17(...) QTOPENAI_TOOL_BAD;
+#define QTOPENAI_TOOL_18(...) QTOPENAI_TOOL_BAD;
+
+#define QTOPENAI_TOOL_1(r, m, d)                                                                   \
+    Q_CLASSINFO("doc:" #m, d)                                                                      \
+    Q_INVOKABLE r m()
+#define QTOPENAI_TOOL_4(r, m, d, t1, n1, d1)                                                       \
+    Q_CLASSINFO("doc:" #m, d)                                                                      \
+    Q_CLASSINFO("doc:" #m ":" #n1, d1)                                                             \
+    Q_INVOKABLE r m(t1 n1)
+#define QTOPENAI_TOOL_7(r, m, d, t1, n1, d1, t2, n2, d2)                                           \
+    Q_CLASSINFO("doc:" #m, d)                                                                      \
+    Q_CLASSINFO("doc:" #m ":" #n1, d1)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n2, d2)                                                             \
+    Q_INVOKABLE r m(t1 n1, t2 n2)
+#define QTOPENAI_TOOL_10(r, m, d, t1, n1, d1, t2, n2, d2, t3, n3, d3)                              \
+    Q_CLASSINFO("doc:" #m, d)                                                                      \
+    Q_CLASSINFO("doc:" #m ":" #n1, d1)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n2, d2)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n3, d3)                                                             \
+    Q_INVOKABLE r m(t1 n1, t2 n2, t3 n3)
+#define QTOPENAI_TOOL_13(r, m, d, t1, n1, d1, t2, n2, d2, t3, n3, d3, t4, n4, d4)                  \
+    Q_CLASSINFO("doc:" #m, d)                                                                      \
+    Q_CLASSINFO("doc:" #m ":" #n1, d1)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n2, d2)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n3, d3)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n4, d4)                                                             \
+    Q_INVOKABLE r m(t1 n1, t2 n2, t3 n3, t4 n4)
+#define QTOPENAI_TOOL_16(r, m, d, t1, n1, d1, t2, n2, d2, t3, n3, d3, t4, n4, d4, t5, n5, d5)      \
+    Q_CLASSINFO("doc:" #m, d)                                                                      \
+    Q_CLASSINFO("doc:" #m ":" #n1, d1)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n2, d2)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n3, d3)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n4, d4)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n5, d5)                                                             \
+    Q_INVOKABLE r m(t1 n1, t2 n2, t3 n3, t4 n4, t5 n5)
+#define QTOPENAI_TOOL_19(r, m, d, t1, n1, d1, t2, n2, d2, t3, n3, d3, t4, n4, d4, t5, n5, d5, t6,  \
+                         n6, d6)                                                                   \
+    Q_CLASSINFO("doc:" #m, d)                                                                      \
+    Q_CLASSINFO("doc:" #m ":" #n1, d1)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n2, d2)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n3, d3)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n4, d4)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n5, d5)                                                             \
+    Q_CLASSINFO("doc:" #m ":" #n6, d6)                                                             \
+    Q_INVOKABLE r m(t1 n1, t2 n2, t3 n3, t4 n4, t5 n5, t6 n6)

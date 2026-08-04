@@ -4,6 +4,7 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QRegularExpression>
 #include <QtTest/QtTest>
 
 using namespace QtOpenAi::Core;
@@ -60,6 +61,7 @@ class TestToolRegistry : public QObject
 {
     Q_OBJECT
 private slots:
+    void registeringWarnsAboutADescriptionThatNamesNothing();
     void functorDispatchProducesToolResult();
     void metaObjectDispatchByName();
     void registerMethodRejectsMissingSlot();
@@ -340,6 +342,41 @@ void TestToolRegistry::validationIsOffByDefault()
                                       QStringLiteral("{}")))
                      .content(),
              QStringLiteral("ran"));
+}
+
+namespace {
+
+// One annotation that describes nothing, to prove the warning fires where the
+// mistake is made rather than only where someone remembered to assert.
+class Mistyped : public QObject
+{
+    Q_OBJECT
+    QTOPENAI_DOC_METHOD(forecast, "Weather for a city", locaiton, "Misspelt on purpose")
+public:
+    Q_INVOKABLE QString forecast(const QString &location) { return location; }
+};
+
+} // namespace
+
+void TestToolRegistry::registeringWarnsAboutADescriptionThatNamesNothing()
+{
+    Mistyped receiver;
+    ToolRegistry registry;
+
+    // Registration still succeeds -- the tool works, it is simply missing a
+    // description the author believed they had written.
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("doc:forecast:locaiton")));
+    QVERIFY(registry.registerMethod(&receiver, QStringLiteral("forecast")));
+    QVERIFY(registry.contains(QStringLiteral("forecast")));
+
+    // And the argument really did go undescribed, which is what the warning is
+    // about.
+    const QJsonObject parameters = registry.tools().at(0).function().parameters();
+    const QJsonObject location = parameters.value(QStringLiteral("properties"))
+                                         .toObject()
+                                         .value(QStringLiteral("location"))
+                                         .toObject();
+    QVERIFY(!location.contains(QStringLiteral("description")));
 }
 
 QTEST_MAIN(TestToolRegistry)

@@ -209,6 +209,22 @@ bool ToolRegistry::registerMethod(QObject *receiver, const QString &method,
     if (!receiver)
         return false;
 
+    // A description whose key names nothing is legal C++ and silent: the model
+    // is simply handed a tool it is told nothing about. Only the meta-object
+    // knows the real names, and this is the moment it and the annotations are
+    // both in hand -- so say so here, rather than waiting for someone to write
+    // the assertion. Filtered to this method, because the rest of the class is
+    // not what the caller just asked about.
+    const QString prefix = QStringLiteral("doc:") + method;
+    const QStringList dangling = Core::MetaSchema::danglingAnnotations(receiver->metaObject());
+    for (const QString &annotation : dangling) {
+        if (annotation == prefix || annotation.startsWith(prefix + QLatin1Char(':'))) {
+            qWarning("QtOpenAi: %s describes nothing on %s -- the model will be given this tool "
+                     "with that description missing. A renamed method or argument?",
+                     qUtf8Printable(annotation), receiver->metaObject()->className());
+        }
+    }
+
     QJsonObject parameters = Core::MetaSchema::fromMethod(receiver->metaObject(), method);
     // The description belongs on the function, not on its parameters object;
     // MetaSchema puts the Q_CLASSINFO annotation there because it has nowhere
