@@ -1,8 +1,24 @@
 name: CI
 
+# One run per commit, and the split is what makes it one.
+#
+# `push` on every branch plus `pull_request` fires *both* events for a push to a
+# branch with an open PR, so the same SHA was queued twice. A concurrency group
+# naming the same thing under both events did dedupe it -- but by cancelling,
+# and a cancelled run is a run that stays in the checks list looking like a
+# failure. Twenty-one of them had piled up on one pull request against nine
+# successes and not a single genuine failure.
+#
+# So the duplicate is no longer started. A branch under review is covered by
+# `pull_request`; the default branch, which has no pull request, by `push`. The
+# two sets do not overlap.
+#
+# The trade: a branch pushed with no pull request open gets no CI. That is the
+# deliberate part -- open the pull request, which is where the result would be
+# read anyway, or use "Run workflow".
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -11,15 +27,14 @@ on:
         type: boolean
         default: false
 
-# A push to a branch with an open PR fires both the push and the pull_request
-# event, and the group has to name the same thing under both or the SHA is
-# built twice. Neither `github.ref` (refs/heads/<branch> vs refs/pull/N/merge)
-# nor `github.head_ref` (the bare branch, but *empty* on push, so it falls back
-# to the refs/heads/ form) is that thing. This pair is: the PR's head branch
-# where there is a PR, the pushed branch otherwise -- both the bare name.
+# With one event per branch there is nothing left to reconcile, so the group is
+# just the ref. Superseding still applies to a pull request -- a commit nobody
+# is going to look at any more need not finish building -- but never to the
+# default branch, where every commit is built so that a break can be pinned to
+# the commit that caused it.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   format:
