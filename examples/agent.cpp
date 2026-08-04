@@ -39,9 +39,8 @@ class WeatherService : public QObject
 public:
     using QObject::QObject;
 
-    QTOPENAI_DOC_METHOD(forecast, "Get the current weather for a city.", location,
-                        "City name, e.g. Berlin")
-    Q_INVOKABLE QJsonObject forecast(const QString &location)
+    QTOPENAI_DOC_INVOKABLE(QJsonObject, forecast, "Get the current weather for a city.",
+                           const QString &, location, "City name, e.g. Berlin")
     {
         return QJsonObject {
                 {QStringLiteral("location"), location},

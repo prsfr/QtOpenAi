@@ -70,13 +70,13 @@ public:
     void setNetworkAccessManager(QNetworkAccessManager *manager);
     QNetworkAccessManager *networkAccessManager() const;
 
-    QTOPENAI_DOC_METHOD(http_get, "Fetch a URL with GET and return the response body as text.", url,
-                        "The absolute URL to fetch.")
     // Blocks on a local event loop until the fetch settles. A tool result has
     // to be a value by the time the registry returns it, and the alternative --
     // an asynchronous tool protocol -- would be a change to every tool in the
     // library for the benefit of this one.
-    Q_INVOKABLE QString http_get(const QString &url);
+    QTOPENAI_DOC_INVOKABLE(QString, http_get,
+                           "Fetch a URL with GET and return the response body as text.",
+                           const QString &, url, "The absolute URL to fetch.");
 
 Q_SIGNALS:
     void refused(const QString &url, const QString &reason);

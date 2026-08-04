@@ -142,10 +142,19 @@ class Generated : public QObject
     Q_OBJECT
     QTOPENAI_DOC("Everything described in one invocation per method")
 public:
-    QTOPENAI_TOOL(void, nothing, "No arguments at all.");
-    QTOPENAI_TOOL(void, one, "One argument.", const QString &, only, "The only one.");
-    QTOPENAI_TOOL(void, two, "Two arguments.", const QString &, first, "The first.", int, second,
-                  "The second.");
+    QTOPENAI_DOC_INVOKABLE(void, nothing, "No arguments at all.");
+    QTOPENAI_DOC_INVOKABLE(void, one, "One argument.", const QString &, only, "The only one.");
+    QTOPENAI_DOC_INVOKABLE(void, two, "Two arguments.", const QString &, first, "The first.", int,
+                           second, "The second.");
+
+    // The expansion ends at the signature, so a body may follow directly
+    // instead of a semicolon. Written out here because the difference is
+    // invisible until moc has read it, and both forms are documented.
+    QTOPENAI_DOC_INVOKABLE(int, inlined, "Defined inline rather than out of line.", int, value,
+                           "Any number, returned unchanged.")
+    {
+        return value;
+    }
 };
 
 // Every way a `doc` key can name something that is not there.
@@ -501,8 +510,8 @@ void TestMetaSchema::theToolMacroWritesEveryNameOnce()
 {
     // QTOPENAI_DOC_METHOD leaves every name written twice -- once in the
     // description, once in the signature -- and nothing checks that the two
-    // agree until danglingAnnotations() runs. QTOPENAI_TOOL declares the method
-    // too, so there is only one place to get it wrong.
+    // agree until danglingAnnotations() runs. QTOPENAI_DOC_INVOKABLE declares
+    // the method too, so there is only one place to get it wrong.
     //
     // What it produces must be indistinguishable from the hand-declared form,
     // or the two would be different features rather than one written two ways.
@@ -525,6 +534,17 @@ void TestMetaSchema::theToolMacroWritesEveryNameOnce()
              MetaSchema::fromMethod(&grouped, QStringLiteral("two")));
     QVERIFY(generated.indexOfMethod("nothing()") >= 0);
     QVERIFY(generated.indexOfMethod("two(QString,int)") >= 0);
+
+    // The inline-bodied form is a real invokable too, described and callable --
+    // callable being the half a declaration alone cannot show.
+    QCOMPARE(info(generated, "doc:inlined"), QByteArray("Defined inline rather than out of line."));
+    QCOMPARE(info(generated, "doc:inlined:value"), QByteArray("Any number, returned unchanged."));
+
+    Generated instance;
+    int returned = 0;
+    QVERIFY(QMetaObject::invokeMethod(&instance, "inlined", Q_RETURN_ARG(int, returned),
+                                      Q_ARG(int, 42)));
+    QCOMPARE(returned, 42);
 
     // And nothing dangles, which here is stronger than usual: the names in the
     // annotations and the names in the signature came from the same tokens, so

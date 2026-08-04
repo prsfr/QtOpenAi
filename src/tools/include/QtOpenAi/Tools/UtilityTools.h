@@ -31,17 +31,16 @@ public:
     explicit UtilityTools(QObject *parent = nullptr);
     ~UtilityTools() override;
 
-    QTOPENAI_DOC_METHOD(current_time, "The current date and time in ISO 8601 format, in UTC.")
-    Q_INVOKABLE QString current_time();
+    QTOPENAI_DOC_INVOKABLE(QString, current_time,
+                           "The current date and time in ISO 8601 format, in UTC.");
 
-    QTOPENAI_DOC_METHOD(calculate, "Evaluate an arithmetic expression and return the result.",
-                        expression,
-                        "An arithmetic expression, e.g. '(17 + 4) * 3 / 7'. Supports "
-                        "+ - * / % ^, parentheses, and sqrt, abs, min, max, round, floor, ceil.")
-    Q_INVOKABLE QString calculate(const QString &expression);
+    QTOPENAI_DOC_INVOKABLE(
+            QString, calculate, "Evaluate an arithmetic expression and return the result.",
+            const QString &, expression,
+            "An arithmetic expression, e.g. '(17 + 4) * 3 / 7'. Supports "
+            "+ - * / % ^, parentheses, and sqrt, abs, min, max, round, floor, ceil.");
 
-    QTOPENAI_DOC_METHOD(uuid, "Generate a new random UUID.")
-    Q_INVOKABLE QString uuid();
+    QTOPENAI_DOC_INVOKABLE(QString, uuid, "Generate a new random UUID.");
 
     static QStringList toolNames();
 };

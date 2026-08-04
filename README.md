@@ -216,11 +216,12 @@ probe rather than assumed.
 
 ### Writing each name once
 
-`QTOPENAI_DOC_METHOD` still leaves the method name and every argument name
-written **twice** — once in the description, once in the signature — and nothing
-checks that the two agree. `QTOPENAI_TOOL` declares the method as well, so each
-name is written once and the type, the name and the meaning of a parameter sit
-together:
+`QTOPENAI_DOC_METHOD` describes a method declared on the next line, which leaves
+the method name and every argument name written **twice** — once in the
+description, once in the signature — with nothing checking that the two agree.
+`QTOPENAI_DOC_INVOKABLE` is that macro and the `Q_INVOKABLE` declaration
+together, which is what the two halves of its name mean. No separate
+`Q_INVOKABLE` line, and each name written once:
 
 ```cpp
 class Weather : public QObject
@@ -228,22 +229,31 @@ class Weather : public QObject
     Q_OBJECT
     QTOPENAI_DOC("Weather lookups.")
 public:
-    QTOPENAI_TOOL(QJsonObject, forecast, "Get the weather forecast for a city.",
-                  const QString &, location, "City name, e.g. Berlin",
-                  int,             days,     "How many days ahead, 1 to 7");
+    QTOPENAI_DOC_INVOKABLE(QJsonObject, forecast, "Get the weather forecast for a city.",
+                           const QString &, location, "City name, e.g. Berlin",
+                           int,             days,     "How many days ahead, 1 to 7");
 };
 ```
 
-That expands to the two `Q_CLASSINFO` **and** the `Q_INVOKABLE` declaration. The
-method is declared, not defined — write the body out of line as usual.
+That expands to the three `Q_CLASSINFO` **and** `Q_INVOKABLE QJsonObject
+forecast(const QString &location, int days)`. A renamed argument renames its
+description with it, because they are now the same token.
 
-**This library's own public headers deliberately do not use it.** A plain
-declaration is plain C++ that every reader and every tool understands at a
-glance, and in a header other people read that is worth more than the saved
-repetition — the same call [Cutelyst](https://github.com/cutelyst/cutelyst/wiki/Tutorial_02_CutelystBasics)
-makes with `C_ATTR`. `QTOPENAI_TOOL` is for tool classes in your own
-application, where the header is yours and terseness wins. Both produce an
-identical meta-object; a test pins that, so the choice is presentation only.
+The expansion stops at the closing parenthesis of the signature, so what follows
+decides which it is: a `;` leaves a declaration and the body goes out of line, or
+a `{ ... }` follows directly and defines it inline. `examples/agent.cpp` does the
+latter.
+
+The library's own tool classes — `FileTools`, `HttpTools`, `UtilityTools` — are
+written this way, so the form shipped here is the form under test.
+
+**`QTOPENAI_DOC_METHOD` is not thereby obsolete.** It is what to reach for when
+the declaration is not something a macro can produce: a `const` invokable, an
+overload, a method with a default argument, one that is also a slot, or a
+signature you simply want spelled out as plain C++ for the reader — the same
+call [Cutelyst](https://github.com/cutelyst/cutelyst/wiki/Tutorial_02_CutelystBasics)
+makes with `C_ATTR`. The two produce an identical meta-object, and a test pins
+that, so it is never a behavioural choice.
 
 Two limits, each reported as a sentence rather than as a puzzle about an
 undeclared identifier:
@@ -253,10 +263,15 @@ undeclared identifier:
 * Up to six parameters.
 
 ```
-error: static assertion failed: QTOPENAI_TOOL: every parameter needs three
-items -- type, name, description. A parameter type containing a comma, such as
-QMap<QString, int>, needs a typedef first.
+error: static assertion failed: QTOPENAI_DOC_INVOKABLE: every parameter needs
+three items -- type, name, description. A parameter type containing a comma,
+such as QMap<QString, int>, needs a typedef first.
 ```
+
+One cosmetic caveat: `clang-format` reads the invocation as a function call and
+packs the arguments, so the type/name/description columns above survive only
+while they fit. The formatting converges — it is not a fight with CI — but the
+alignment is a courtesy, not a guarantee.
 
 ### What a missing description does, and what the type says instead
 

@@ -300,10 +300,12 @@ void TestDefaultTools::schemasComeFromTheMethods()
 
 void TestDefaultTools::everyAnnotationOnTheseToolsDescribesSomething()
 {
-    // The macros make a misspelt name a lone mistake rather than one hidden
-    // among punctuation, but `QTOPENAI_DOC_METHOD(raed_file, ...)` still
-    // compiles -- and a key that matches nothing is simply never read, so the
-    // model would be handed a tool with no description and nobody would notice.
+    // These classes declare their tools with QTOPENAI_DOC_INVOKABLE, which
+    // writes each name once -- so a name cannot drift from its description here
+    // the way it can when the two are written separately. It can still be
+    // misspelt in the one place it appears, and a key that matches nothing is
+    // simply never read, so the model would be handed a tool with no
+    // description and nobody would notice.
     //
     // Only the meta-object knows the real names, so this is the one check that
     // can answer it, and it costs a line per class. Renaming a method or an
@@ -333,6 +335,30 @@ void TestDefaultTools::everyAnnotationOnTheseToolsDescribesSomething()
             QVERIFY2(!tool.function().description().isEmpty(), qPrintable(tool.function().name()));
         }
     }
+
+    // Non-empty is a weak claim: it survives two descriptions swapped between
+    // arguments, which is the one mistake the macro cannot rule out by writing
+    // each name once. So pin the whole of one tool by content -- write_file,
+    // because two parameters is where the expansion has something to get wrong,
+    // and because clang-format packs that invocation tightly enough that the
+    // triples stop being visually obvious in the header.
+    ToolRegistry registry;
+    QVERIFY(registry.registerMethod(&files, QStringLiteral("write_file")));
+
+    const FunctionDefinition writeFile = registry.tools().constFirst().function();
+    QCOMPARE(writeFile.name(), QStringLiteral("write_file"));
+    QCOMPARE(writeFile.description(),
+             QStringLiteral("Write UTF-8 text to a file, replacing it if it exists."));
+
+    const QJsonObject properties
+            = writeFile.parameters().value(QStringLiteral("properties")).toObject();
+    QCOMPARE(properties.value(QStringLiteral("path")).toObject(),
+             QJsonObject({{QStringLiteral("type"), QStringLiteral("string")},
+                          {QStringLiteral("description"), QStringLiteral("Path to the file to "
+                                                                         "write.")}}));
+    QCOMPARE(properties.value(QStringLiteral("content")).toObject(),
+             QJsonObject({{QStringLiteral("type"), QStringLiteral("string")},
+                          {QStringLiteral("description"), QStringLiteral("The text to write.")}}));
 }
 
 QTEST_MAIN(TestDefaultTools)

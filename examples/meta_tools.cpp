@@ -45,9 +45,9 @@ public:
 
     // Returning a QJsonObject is enough; the registry serialises it into the
     // tool result.
-    QTOPENAI_DOC_METHOD(forecast, "Get the weather forecast for a city.", location,
-                        "City name, e.g. Berlin", days, "How many days ahead to forecast, 1 to 7")
-    Q_INVOKABLE QJsonObject forecast(const QString &location, int days)
+    QTOPENAI_DOC_INVOKABLE(QJsonObject, forecast, "Get the weather forecast for a city.",
+                           const QString &, location, "City name, e.g. Berlin", int, days,
+                           "How many days ahead to forecast, 1 to 7")
     {
         return QJsonObject {
                 {QStringLiteral("location"), location},
