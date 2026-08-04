@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(QtOpenAi
     VERSION 0.2.0
-    DESCRIPTION "Qt 6 client library for OpenAI-compatible chat completion APIs with tool calling"
+    DESCRIPTION "Qt 6 client library for the OpenAI API and compatible endpoints, with tool calling"
     HOMEPAGE_URL "https://github.com/prsfr/qtopenai"
     LANGUAGES CXX)
 
@@ -68,6 +68,49 @@ qt_standard_project_setup()
 # Subdirectories
 # --------------------------------------------------------------------------
 add_subdirectory(src)
+
+# --------------------------------------------------------------------------
+# This is a headless library, and this is what keeps it one.
+#
+# Nothing here draws anything: no module links Qt6::Gui, Qt6::Widgets,
+# Qt6::Quick, Qt6::Qml or Qt6::OpenGL, and none ever should. That is a promise
+# to anyone embedding this in a daemon, a CLI, a test harness or a server -- it
+# is why the library can be used at all in those places, and it is exactly the
+# kind of property that erodes one convenient link line at a time.
+#
+# So it is checked rather than intended. Adding a GUI dependency to any module
+# fails the configure step with a message saying why, instead of quietly adding
+# a runtime dependency on a display stack that nobody notices until it is
+# deployed somewhere without one.
+set(QTOPENAI_FORBIDDEN_QT_MODULES
+    Qt6::Gui Qt6::Widgets Qt6::Quick Qt6::Qml Qt6::QuickWidgets Qt6::OpenGL
+    Qt6::OpenGLWidgets Qt6::Charts Qt6::Svg Qt6::PrintSupport)
+
+function(qtopenai_assert_headless target)
+    foreach(property IN ITEMS LINK_LIBRARIES INTERFACE_LINK_LIBRARIES)
+        get_target_property(linked ${target} ${property})
+        if(NOT linked)
+            continue()
+        endif()
+        foreach(forbidden IN LISTS QTOPENAI_FORBIDDEN_QT_MODULES)
+            if("${forbidden}" IN_LIST linked)
+                message(FATAL_ERROR
+                    "${target} links ${forbidden}.\n"
+                    "QtOpenAi is a headless library: it must be usable from a daemon, a CLI or "
+                    "a test harness with no display stack present. If you need this dependency, "
+                    "it belongs in a separate module outside this project rather than in "
+                    "${target}.")
+            endif()
+        endforeach()
+    endforeach()
+endfunction()
+
+foreach(module QtOpenAiCore QtOpenAiClient QtOpenAiChat QtOpenAiTools)
+    qtopenai_assert_headless(${module})
+endforeach()
+if(QTOPENAI_BUILD_REALTIME)
+    qtopenai_assert_headless(QtOpenAiRealtime)
+endif()
 
 if(QTOPENAI_BUILD_TESTS)
     enable_testing()

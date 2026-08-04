@@ -8,15 +8,30 @@ endfunction()
 
 # --- Infrastructure ---
 qtopenai_add_example(pagination pagination.cpp)
+qtopenai_add_example(token_budget token_budget.cpp)
+qtopenai_add_example(metrics metrics.cpp)
+qtopenai_add_example(interceptors interceptors.cpp)
+qtopenai_add_example(rate_limiting rate_limiting.cpp)
+qtopenai_add_example(parallel_map parallel_map.cpp)
 
 # --- Chat & core inference ---
+qtopenai_add_example(conversation conversation.cpp)
+target_link_libraries(conversation PRIVATE QtOpenAi::Chat)
+qtopenai_add_example(agent agent.cpp)
+target_link_libraries(agent PRIVATE QtOpenAi::Chat)
 qtopenai_add_example(chat_tool_loop tool_loop.cpp)
+qtopenai_add_example(meta_tools meta_tools.cpp)
+qtopenai_add_example(sandboxed_tools sandboxed_tools.cpp)
+target_link_libraries(sandboxed_tools PRIVATE QtOpenAi::Chat QtOpenAi::Tools)
 qtopenai_add_example(streaming streaming.cpp)
 qtopenai_add_example(responses responses.cpp)
 qtopenai_add_example(structured_output structured_output.cpp)
+qtopenai_add_example(typed_output typed_output.cpp)
 qtopenai_add_example(vision vision.cpp)
 qtopenai_add_example(embeddings embeddings.cpp)
+qtopenai_add_example(semantic_search semantic_search.cpp)
 qtopenai_add_example(moderations moderations.cpp)
+qtopenai_add_example(guardrails guardrails.cpp)
 
 # --- Multimodal generation (v0.5) ---
 qtopenai_add_example(tts text_to_speech.cpp)

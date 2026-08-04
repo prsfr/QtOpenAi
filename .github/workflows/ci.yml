@@ -1,8 +1,24 @@
 name: CI
 
+# One run per commit, and the split is what makes it one.
+#
+# `push` on every branch plus `pull_request` fires *both* events for a push to a
+# branch with an open PR, so the same SHA was queued twice. A concurrency group
+# naming the same thing under both events did dedupe it -- but by cancelling,
+# and a cancelled run is a run that stays in the checks list looking like a
+# failure. Twenty-one of them had piled up on one pull request against nine
+# successes and not a single genuine failure.
+#
+# So the duplicate is no longer started. A branch under review is covered by
+# `pull_request`; the default branch, which has no pull request, by `push`. The
+# two sets do not overlap.
+#
+# The trade: a branch pushed with no pull request open gets no CI. That is the
+# deliberate part -- open the pull request, which is where the result would be
+# read anyway, or use "Run workflow".
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -11,9 +27,14 @@ on:
         type: boolean
         default: false
 
+# With one event per branch there is nothing left to reconcile, so the group is
+# just the ref. Superseding still applies to a pull request -- a commit nobody
+# is going to look at any more need not finish building -- but never to the
+# default branch, where every commit is built so that a break can be pinned to
+# the commit that caused it.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   format:
@@ -97,12 +118,44 @@ jobs:
           -DQTOPENAI_BUILD_TESTS=ON
           -DQTOPENAI_BUILD_EXAMPLES=ON
 
+      # `--parallel` without a number becomes `make -j` with no argument on the
+      # Makefiles generator, which is *unbounded*: every ready target compiles
+      # at once. Each tests/client TU pulls in Client.h with its ~70 reply
+      # headers, so ~35 concurrent Release compiles exhausted the runner's
+      # memory and the OOM killer took the runner agent with it (exit 143,
+      # "runner has received a shutdown signal"). Locally this never showed:
+      # Ninja's own default is bounded. Pin it to the runner's core count.
       - name: Build
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release --parallel 4
 
       - name: Test
         working-directory: build
         run: ctest --build-config Release --output-on-failure
+
+      # The configure step already refuses a GUI module named in any target's
+      # link libraries. This is the other half: what the linker actually
+      # recorded, so a GUI dependency arriving *transitively* -- through a
+      # dependency of a dependency, where no CMakeLists mentions it -- is caught
+      # too. A headless library that turns out to need a display stack at
+      # runtime is discovered on the deployment, not in review.
+      - name: No GUI dependency
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          found=0
+          for lib in build/lib/libQtOpenAi*.so.*; do
+            offenders=$(objdump -p "$lib" | awk '/NEEDED/ {print $2}' \
+              | grep -E 'libQt6(Gui|Widgets|Quick|Qml|OpenGL|Charts|Svg|PrintSupport)' || true)
+            if [ -n "$offenders" ]; then
+              echo "::error::$(basename "$lib") needs $(echo $offenders | tr '\n' ' ')"
+              found=1
+            fi
+          done
+          if [ "$found" -ne 0 ]; then
+            echo "QtOpenAi is a headless library; no module may depend on a GUI stack."
+            exit 1
+          fi
+          echo "No QtOpenAi module depends on a GUI stack."
 
   install-consumer:
     name: find_package smoke test (${{ matrix.link }})
@@ -119,6 +172,9 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: "6.11.1"
+          # qtwebsockets for QtOpenAi::Realtime. The rest are for the GUI
+          # consumer below: the library must not depend on them, and must still
+          # work when the application does.
           modules: qtwebsockets
           cache: true
 
@@ -130,7 +186,7 @@ jobs:
           -DQTOPENAI_BUILD_TESTS=OFF
           -DQTOPENAI_BUILD_EXAMPLES=OFF
           -DQTOPENAI_BUILD_SHARED=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} &&
-          cmake --build build --parallel &&
+          cmake --build build --parallel 4 &&
           cmake --install build
 
       - name: Configure, build & run the consumer
@@ -139,3 +195,14 @@ jobs:
           -DCMAKE_PREFIX_PATH=$PWD/_prefix &&
           cmake --build build-consumer &&
           LD_LIBRARY_PATH="$PWD/_prefix/lib:$QT_ROOT_DIR/lib" ./build-consumer/consumer
+
+      # The converse of the "No GUI dependency" check. That one proves the
+      # library needs no display stack; this one proves it still works inside an
+      # application that has one, which is where most callers will be. Built
+      # only when Qt6::Widgets is part of the install -- its absence is the
+      # normal headless case, not a failure.
+      - name: Run the GUI consumer
+        if: hashFiles('build-consumer/gui_consumer') != ''
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: LD_LIBRARY_PATH="$PWD/_prefix/lib:$QT_ROOT_DIR/lib" ./build-consumer/gui_consumer

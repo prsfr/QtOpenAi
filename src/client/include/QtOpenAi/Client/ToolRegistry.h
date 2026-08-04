@@ -2,7 +2,10 @@
 #pragma once
 
 #include <QtOpenAi/Client/GlobalClient.h>
+// For the QTOPENAI_DOC macros: a class registered here is a class annotated
+// for the schema, so the two belong within one include of each other.
 #include <QtOpenAi/Core/Message.h>
+#include <QtOpenAi/Core/MetaSchema.h>
 #include <QtOpenAi/Core/Tool.h>
 #include <QtOpenAi/Core/ToolCall.h>
 
@@ -10,6 +13,7 @@
 #include <QtCore/QList>
 #include <QtCore/QObject>
 #include <QtCore/QString>
+#include <QtCore/QStringList>
 
 #include <functional>
 
@@ -25,12 +29,14 @@ class ToolRegistryPrivate;
 //
 //  * A std::function handler taking the parsed JSON arguments and returning
 //    the tool result as a string.
-//  * A QObject slot invoked by name via QMetaObject::invokeMethod. The slot
-//    must have the signature `QString slot(const QJsonObject &)` (or accept a
-//    QVariantMap). This lets any QObject expose Q_INVOKABLE methods as tools.
+//  * A QObject method invoked by name via the meta-object system. A method
+//    taking the whole arguments object -- `QString slot(const QJsonObject &)`,
+//    or a QVariantMap -- receives it verbatim. Any other signature has its
+//    parameters filled in from the JSON by name, so an ordinary C++ method is
+//    callable as a tool without unpacking anything itself.
 //
 // Results are delivered both as return values (invoke / invokeAll) and via
-// signals, so a UI can react asynchronously to tool execution.
+// signals, so a caller can react asynchronously to tool execution.
 class QTOPENAI_CLIENT_EXPORT ToolRegistry : public QObject
 {
     Q_OBJECT
@@ -53,6 +59,23 @@ public:
     // The named method is resolved and invoked with QMetaObject::invokeMethod.
     // Returns false if no matching invokable method exists on the receiver.
     bool registerMethod(const Core::Tool &tool, QObject *receiver, const QString &method);
+
+    // The same, with the tool definition derived from the method itself: the
+    // tool is named after the method, its `parameters` come from
+    // Core::MetaSchema::fromMethod, and its description from
+    // Q_CLASSINFO("doc:<method>") unless one is passed here. Nothing about the
+    // tool is then written twice, so renaming an argument cannot leave a stale
+    // schema behind.
+    bool registerMethod(QObject *receiver, const QString &method,
+                        const QString &description = QString());
+
+    // Check the model's arguments against the tool's own `parameters` schema
+    // before dispatching. A rejected call never reaches the handler; it returns
+    // a tool-result message listing what was wrong, which is what lets the
+    // model correct itself on the next turn. Off by default, so existing
+    // registries keep passing arguments through untouched.
+    void setValidateArguments(bool enabled);
+    bool validatesArguments() const;
 
     // Remove a registered tool. Returns true if it existed.
     bool unregister(const QString &name);
@@ -79,6 +102,10 @@ Q_SIGNALS:
     void toolFailed(const QString &id, const QString &name, const QString &error);
     // Emitted when a call referenced a name that is not registered.
     void unknownTool(const QString &id, const QString &name);
+    // Emitted when validation rejected the arguments, with one message per
+    // broken constraint. toolFailed() carries the same information as the
+    // payload sent to the model.
+    void argumentsRejected(const QString &id, const QString &name, const QStringList &errors);
 
 private:
     Q_DECLARE_PRIVATE(ToolRegistry)

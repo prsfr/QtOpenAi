@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/ResponseFormat.h"
 
+#include "QtOpenAi/Core/MetaSchema.h"
+
 #include "JsonHelpers_p.h"
 
 #include <QtCore/QSharedData>
@@ -66,6 +68,24 @@ ResponseFormat ResponseFormat::jsonSchema(const QString &name, const QJsonObject
     format.d->strict = strict;
     format.d->description = description;
     return format;
+}
+
+ResponseFormat ResponseFormat::forMetaObject(const QMetaObject *meta, const QString &name)
+{
+    if (!meta)
+        return {};
+
+    QJsonObject schema = MetaSchema::fromMetaObject(meta);
+    // The API keeps the schema's name and description in their own fields, so
+    // the annotation MetaSchema had nowhere else to leave moves up to them.
+    const QString description = schema.take(QStringLiteral("description")).toString();
+
+    // A class name is qualified where the API's name is not (^[a-zA-Z0-9_-]+$),
+    // so only the last segment goes in.
+    const QString className
+            = QString::fromUtf8(meta->className()).split(QLatin1String("::")).last();
+
+    return jsonSchema(name.isEmpty() ? className : name, schema, true, description);
 }
 
 QJsonObject ResponseFormat::toJson() const

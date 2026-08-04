@@ -1,8 +1,14 @@
 # QtOpenAi
 
-A modular **Qt 6** client library for **OpenAI-compatible** chat completion
-APIs, with first-class **tool calling** wired through Qt's meta-object system
-(signals/slots and `QMetaObject::invokeMethod`).
+A modular **Qt 6** client library for the **OpenAI API** and OpenAI-compatible
+endpoints, with first-class **tool calling** wired through Qt's meta-object
+system (signals/slots and `QMetaObject::invokeMethod`).
+
+It covers the API rather than a corner of it: chat completions and the
+Responses API, streaming, structured outputs, embeddings, images, speech and
+transcription, video, files, uploads, vector stores, containers, batch,
+fine-tuning, evals, the Assistants beta, ChatKit, Skills, and the Realtime
+WebSocket channel.
 
 The data model is derived from the official
 [OpenAI OpenAPI specification](https://github.com/openai/openai-openapi) and
@@ -17,14 +23,50 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
 
 | Namespace            | Library           | Responsibility                                             |
 |----------------------|-------------------|------------------------------------------------------------|
-| `QtOpenAi::Core`     | `QtOpenAiCore`    | Value types & JSON (de)serialisation for the chat API.     |
+| `QtOpenAi::Core`     | `QtOpenAiCore`    | Value types, JSON (de)serialisation, and JSON-Schema.      |
 | `QtOpenAi::Client`   | `QtOpenAiClient`  | Async networking `Client`, replies, and the `ToolRegistry`.|
+| `QtOpenAi::Chat`     | `QtOpenAiChat`    | Conversation history, branching, trimming, and the agent loop. |
+| `QtOpenAi::Tools`    | `QtOpenAiTools`   | Ready-made tools for the `ToolRegistry`, sandboxed and opt-in. |
 | `QtOpenAi::Realtime` | `QtOpenAiRealtime`| The Realtime WebSocket channel (optional).                 |
 
 `QtOpenAi::Client` depends on `QtOpenAi::Core`; `Core` has no dependency beyond
-`Qt6::Core`. `QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets` — the
-one dependency nothing else needs, which is why it is a module of its own and is
-built only when that component is found (`QTOPENAI_BUILD_REALTIME`).
+`Qt6::Core`. `QtOpenAi::Chat` sits on top of both, because `Agent` drives the
+request loop — though `Transcript` and `TrimPolicy` themselves touch no
+networking, so history can be built, trimmed and persisted with no `Client` in
+sight. `QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets` — the one dependency
+nothing else needs, which is why it is a module of its own and is built only when
+that component is found (`QTOPENAI_BUILD_REALTIME`).
+
+### Headless, not UI-hostile
+
+**The library does not depend on a GUI stack. Your application is free to.**
+
+Those are two different statements and both matter. `Qt6::Core`, `Qt6::Network`
+and — for the optional Realtime module — `Qt6::WebSockets` are the whole
+dependency list; no module links `Qt6::Gui`, `Qt6::Widgets`, `Qt6::Quick`,
+`Qt6::Qml` or `Qt6::OpenGL`, and none ever will. That is what lets the same
+library run inside a daemon, a CLI, a test harness or a container with no
+display stack anywhere near it.
+
+It is emphatically **not** a restriction on the caller. A Widgets or Qt Quick
+application links `QtOpenAi::Client` exactly like any other one, connects to its
+signals from a widget or a `QObject` exposed to QML, and puts its value types in
+a `QVariant` for a model or a property binding. Building a UI on this library is
+the expected case — the library simply does not contain one, so that nothing
+forces the dependency on callers who have no use for it.
+
+Both halves are checked rather than intended, because both are the kind of thing
+that erodes one convenient line at a time:
+
+| Check | Where | What would otherwise slip through |
+|---|---|---|
+| Configure-time link-library guard | `CMakeLists.txt` | a GUI module named in any QtOpenAi target |
+| `objdump -p` over the built libraries | CI | a GUI dependency arriving *transitively*, where no `CMakeLists` mentions it |
+| `gui_consumer` — a real `QApplication` linking the installed package | CI | the library becoming unusable *from* a GUI application |
+
+The last one is the converse of the first two, and it is there because "does not
+depend on a GUI" would be worthless if it quietly came to mean "does not work
+with one".
 
 ## Design
 
@@ -41,7 +83,7 @@ built only when that component is found (`QTOPENAI_BUILD_REALTIME`).
   typed `finished(...)` signal, a getter named the way that endpoint names its
   payload, and the one line that fires the signal. The streaming replies, which
   carry real state, still derive from `RestReplyBase` directly.
-* **One request path** — the ~100 endpoint methods on `Client` are each a
+* **One request path** — the ~165 endpoint methods on `Client` are each a
   single call into one of four private helpers (`get`, `post`, `postMultipart`,
   `remove`). Building the request, merging the query, capturing a retry factory
   and attaching the `RetryPolicy` happen in exactly one place, so a change to
@@ -54,7 +96,7 @@ built only when that component is found (`QTOPENAI_BUILD_REALTIME`).
 ## Tool calling via the Qt meta-object system
 
 `QtOpenAi::Client::ToolRegistry` maps a model's tool calls back onto local C++
-code in two interchangeable ways:
+code in three interchangeable ways:
 
 ```cpp
 using namespace QtOpenAi;
@@ -82,6 +124,9 @@ registry.registerFunction("add", "Add two integers", addSchema,
 // 2) A QObject slot dispatched by name through QMetaObject::invokeMethod
 registry.registerMethod(weatherTool, weatherProvider, "getWeather");
 
+// 3) An invokable method whose definition is derived from its own signature
+registry.registerMethod(weatherProvider, "forecast");
+
 // React to execution via signals
 connect(&registry, &Client::ToolRegistry::toolInvoked,
         this, [](const QString &id, const QString &name, const QString &result) {
@@ -89,9 +134,242 @@ connect(&registry, &Client::ToolRegistry::toolInvoked,
         });
 ```
 
-> Hand-writing the schema is only needed until #39 lands — it will derive the
-> `parameters` schema straight from a `Q_GADGET`/QObject via the meta-object
-> system, so the property names can't drift from the handler.
+### Schema without hand-writing
+
+The third form needs no schema at all. `Core::MetaSchema` derives one from the
+meta-object, so the names and types the model is told about are the names and
+types the method actually has — rename an argument and the advertised schema
+follows:
+
+```cpp
+class WeatherService : public QObject
+{
+    Q_OBJECT
+    // The one thing the meta-object system does not know: what things mean.
+    // The method is named once; its arguments follow as name/description pairs.
+    QTOPENAI_DOC_METHOD(forecast, "Get the weather forecast for a city.",
+                        location, "City name, e.g. Berlin")
+public:
+    Q_INVOKABLE QJsonObject forecast(const QString &location, int days);
+};
+
+registry.registerMethod(&service, "forecast");
+// parameters: {"type":"object",
+//              "properties":{"location":{"type":"string","description":"City name, e.g. Berlin"},
+//                            "days":{"type":"integer"}},
+//              "required":["location","days"],"additionalProperties":false}
+```
+
+### The description macros
+
+The `QTOPENAI_DOC*` macros are the only hand-written part. They take
+identifiers rather than a path and expand to the `Q_CLASSINFO` the schema reads
+— `"doc"`, `"doc:<member>"`, `"doc:<method>:<argument>"` — so there is no
+prefix to forget and no colon to misplace.
+
+`QTOPENAI_DOC_METHOD` names the method **once** and takes its arguments after
+the description, one `name, "description"` pair each. Put it **directly above
+the declaration it describes** — the placement
+[Cutelyst's `C_ATTR`](https://github.com/cutelyst/cutelyst/wiki/Tutorial_02_CutelystBasics)
+uses, and the better one, because the description then lives where the signature
+does:
+
+```cpp
+class FileTools : public QObject
+{
+    Q_OBJECT
+    QTOPENAI_DOC("Read and inspect files inside an allowed set of directories.")
+public:
+    QTOPENAI_DOC_METHOD(write_file, "Write UTF-8 text to a file.",
+                        path,    "Path to the file to write.",
+                        content, "The text to write.")
+    Q_INVOKABLE QString write_file(const QString &path, const QString &content);
+};
+```
+
+`Q_CLASSINFO` does not care where in the class body it appears, so grouping the
+annotations at the top still works and produces exactly the same meta-object — a
+test pins that. Adjacent is the convention because renaming an argument and
+forgetting its description then becomes a change in one place rather than two
+screens apart.
+
+One invocation, three `Q_CLASSINFO`. A method with no arguments is the same
+macro with nothing after the description, so there is one macro to know rather
+than two. Up to eight arguments; past that, or to describe an argument away from
+its method, `QTOPENAI_DOC_ARGUMENT` is still there.
+
+**Why the preprocessor, and not `constexpr` or anything else from C++17?**
+Because `Q_CLASSINFO`'s key has to be a string literal *in the source text*: moc
+reads the tokens rather than compiling them, so no `constexpr` function and no
+`consteval` can take part in building one. Assembling that key is either the
+preprocessor's job or the caller's, and the whole point is that it is not the
+caller's. The dispatch counts the *variadic* arguments including the
+description, so the count is never zero — counting a possibly-empty
+`__VA_ARGS__` needs `__VA_OPT__` (C++20) or a compiler extension, and this is
+C++17 that must also pass through moc's own preprocessor.
+
+That preprocessor is weaker than a conforming one, which is why the arguments
+are flat pairs and not `(name, "description")` tuples: it handles token pasting
+and a macro expanding to several `Q_CLASSINFO`, but not the usual trick of
+unparenthesising a parameter. All three were checked by running `moc` on a
+probe rather than assumed.
+
+### Writing each name once
+
+`QTOPENAI_DOC_METHOD` describes a method declared on the next line, which leaves
+the method name and every argument name written **twice** — once in the
+description, once in the signature — with nothing checking that the two agree.
+`QTOPENAI_DOC_INVOKABLE` is that macro and the `Q_INVOKABLE` declaration
+together, which is what the two halves of its name mean. No separate
+`Q_INVOKABLE` line, and each name written once:
+
+```cpp
+class Weather : public QObject
+{
+    Q_OBJECT
+    QTOPENAI_DOC("Weather lookups.")
+public:
+    QTOPENAI_DOC_INVOKABLE(QJsonObject, forecast, "Get the weather forecast for a city.",
+                           const QString &, location, "City name, e.g. Berlin",
+                           int,             days,     "How many days ahead, 1 to 7");
+};
+```
+
+That expands to the three `Q_CLASSINFO` **and** `Q_INVOKABLE QJsonObject
+forecast(const QString &location, int days)`. A renamed argument renames its
+description with it, because they are now the same token.
+
+The expansion stops at the closing parenthesis of the signature, so what follows
+decides which it is: a `;` leaves a declaration and the body goes out of line, or
+a `{ ... }` follows directly and defines it inline. `examples/agent.cpp` does the
+latter.
+
+The library's own tool classes — `FileTools`, `HttpTools`, `UtilityTools` — are
+written this way, so the form shipped here is the form under test.
+
+**`QTOPENAI_DOC_METHOD` is not thereby obsolete.** It is what to reach for when
+the declaration is not something a macro can produce: a `const` invokable, an
+overload, a method with a default argument, one that is also a slot, or a
+signature you simply want spelled out as plain C++ for the reader — the same
+call [Cutelyst](https://github.com/cutelyst/cutelyst/wiki/Tutorial_02_CutelystBasics)
+makes with `C_ATTR`. The two produce an identical meta-object, and a test pins
+that, so it is never a behavioural choice.
+
+Two limits, each reported as a sentence rather than as a puzzle about an
+undeclared identifier:
+
+* A parameter type containing a comma (`QMap<QString, int>`) needs a typedef,
+  because the preprocessor splits on it.
+* Up to six parameters.
+
+```
+error: static assertion failed: QTOPENAI_DOC_INVOKABLE: every parameter needs
+three items -- type, name, description. A parameter type containing a comma,
+such as QMap<QString, int>, needs a typedef first.
+```
+
+One cosmetic caveat: `clang-format` reads the invocation as a function call and
+packs the arguments, so the type/name/description columns above survive only
+while they fit. The formatting converges — it is not a fight with CI — but the
+alignment is a courtesy, not a guarantee.
+
+### What a missing description does, and what the type says instead
+
+Nothing breaks. An annotation that is absent is *absent* — not an empty string —
+so the schema comes out with its structure intact and no `description` key:
+
+```json
+{"type":"object",
+ "properties":{"path":{"type":"string"},
+               "maxBytes":{"type":"integer","minimum":0,"maximum":4294967295}},
+ "required":["path","maxBytes"],"additionalProperties":false}
+```
+
+The model still has the method name, the argument names and their types, which
+for `read_file(path, maxBytes)` is most of the story.
+
+**Descriptions are not generated from names**, and that is deliberate rather
+than unfinished. Derived from the identifiers, `read_file` yields "Read file."
+and `path` yields "Path." — the model already has `"name": "read_file"` and
+`"path"`, so such a description restates what it can see, costs tokens on every
+request (about 32 across the tools this library ships), and, worst of the three,
+*looks* like documentation: a reviewer and `danglingAnnotations()` both see a
+described tool and stop looking. A blank is honest about being blank.
+
+What the traits do contribute is **facts the name could never carry**, taken
+from the type:
+
+| Type | Contributes |
+|---|---|
+| `quint8`, `qint16`, `quint32`, … | `minimum` / `maximum` |
+| `quint64`, `unsigned long` | `minimum: 0` — the ceiling is past what a double states exactly, so it is left unsaid rather than stated wrongly |
+| `QDate`, `QTime`, `QDateTime` | `format: date` / `time` / `date-time` |
+| `QUrl`, `QUuid` | `format: uri` / `uuid` |
+| `Q_ENUM` | the closed set of its keys |
+| `Q_GADGET`, QObject | a nested object schema |
+
+These are not decoration. A model handed a `quint8` has no way to know it may
+not answer `300`, and [`SchemaValidator`](#validating-what-the-model-sent)
+enforces `minimum`/`maximum` — so stating the bound also means a wrong value is
+rejected before it reaches the method.
+
+### When a description names nothing
+
+A name that matches nothing is still legal C++ and still silent — only the
+meta-object knows the real names, so only a runtime check can answer it.
+`MetaSchema::danglingAnnotations<T>()` lists every annotation describing
+something the class does not have, and it costs one line per class in a test:
+
+```cpp
+QCOMPARE(MetaSchema::danglingAnnotations<WeatherService>(), QStringList());
+```
+
+The tools this library ships are checked that way, so renaming a method without
+moving its description fails the suite rather than quietly shipping a tool the
+model is told nothing about.
+
+You do not have to remember to write that test, though: `registerMethod()` has
+the meta-object and the annotations both in hand at the moment of registration,
+so it **warns** there when a description names nothing on the method being
+registered. Registration still succeeds — the tool works, it is simply missing a
+description its author believed they had written — and the warning says which
+key and which class.
+
+The method is called with its parameters filled in from the model's JSON by
+name — a `QString` stays a `QString`, an `int` an `int`, a `Q_ENUM` is matched
+against its keys — and a `QJsonObject` return value is serialised into the tool
+result. A method taking the whole arguments object (`QString(const QJsonObject
+&)` or a `QVariantMap`) still receives it verbatim, so form 2 is unchanged.
+
+`MetaSchema::fromType<T>()` does the same for a `Q_GADGET` or QObject, mapping
+its `Q_PROPERTY`s to an object schema — which is also what
+[typed structured outputs](#typed-structured-outputs) are built on.
+
+### Validating what the model sent
+
+Models can emit arguments that do not fit the schema they were given. Turn on
+validation and a bad call never reaches the handler; it comes back as a tool
+result naming what was wrong, which is what the model needs to correct itself:
+
+```cpp
+registry.setValidateArguments(true);   // off by default
+
+connect(&registry, &Client::ToolRegistry::argumentsRejected,
+        this, [](const QString &id, const QString &name, const QStringList &errors) {
+            qInfo() << name << "rejected:" << errors;   // "/days: expected integer, got string"
+        });
+```
+
+The check is `Core::SchemaValidator`, a small implementation of the JSON-Schema
+keywords that describe data — `type` (with `integer` as a whole number), `enum`,
+`const`, `required`, `properties`, `additionalProperties`, `items`, the numeric
+bounds, `minLength`/`maxLength`/`pattern` and `minItems`/`maxItems`. Keywords it
+does not implement constrain nothing, so a schema it only partly understands
+never rejects valid data. It is public API, usable on its own:
+
+```cpp
+const QStringList errors = Core::SchemaValidator::validate(schema, value);
+```
 
 Advertise the tools in a request and dispatch the model's calls:
 
@@ -112,7 +390,9 @@ connect(reply, &Client::ChatCompletionReply::finished, this,
     });
 ```
 
-A complete, runnable version lives in [`examples/tool_loop.cpp`](examples/tool_loop.cpp).
+A complete, runnable version lives in [`examples/tool_loop.cpp`](examples/tool_loop.cpp),
+and the derived-schema variant in [`examples/meta_tools.cpp`](examples/meta_tools.cpp)
+(`./meta_tools --schema` prints the generated definition without calling the API).
 
 ## Multimodal input
 
@@ -170,6 +450,47 @@ response.setTextFormat(ResponseFormat::jsonSchema("person", schema));
 
 `ResponseFormat::text()` and `ResponseFormat::jsonObject()` cover the simpler
 modes.
+
+### Typed structured outputs
+
+The schema above describes a shape the C++ code has to reproduce by hand at
+both ends — once to ask for it, once to read it back. A `Q_GADGET` can be both:
+
+```cpp
+class Person
+{
+    Q_GADGET
+    QTOPENAI_DOC("A person mentioned in the text")
+    QTOPENAI_DOC_PROPERTY(age, "Age in whole years")
+    Q_PROPERTY(QString name MEMBER name)
+    Q_PROPERTY(int age MEMBER age)
+public:
+    QString name;
+    int age = 0;
+};
+
+request.setResponseFormat(ResponseFormat::forType<Person>());
+// ... and when the reply arrives:
+const Person person = MetaJson::parse<Person>(response.firstMessage().content());
+```
+
+`forType<T>()` derives the schema from the properties (via `MetaSchema`), takes
+the name from the class and the description from `QTOPENAI_DOC`, and asks
+for strict mode — which `MetaSchema` already satisfies, since it marks every
+property required and closes the object.
+
+`Core::MetaJson` is the other direction: `parse<T>()` / `fromJson<T>()` populate
+the properties from the model's JSON, and `write()` / `toJson()` go back out.
+Nested gadgets, `QStringList`s and `Q_ENUM`s (matched against their keys, as the
+schema advertised them) all round-trip. A value that does not fit its property
+is not written and the read reports `false`, so one malformed field does not
+cost the whole object.
+
+Both work on a QObject too — `MetaJson::readInto(object, json)` — with
+`objectName` left out, since it is Qt's property and not the model's business.
+
+See [`examples/typed_output.cpp`](examples/typed_output.cpp) (`--schema` prints
+the generated `response_format` without calling the API).
 
 ## Streaming (Server-Sent Events)
 
@@ -332,6 +653,172 @@ connect(models, &Client::ModelListReply::finished, this,
 
 `Core::ModelList` is `ListPage<Model>`, the same page type the other list
 endpoints return.
+
+## Conversation history (`QtOpenAi::Chat`)
+
+Every endpoint above takes a request and returns a reply. Keeping the running
+conversation — appending turns, building the next request from them, staying
+inside the window, letting the user edit a past question — is the application's
+job, and `QtOpenAi::Chat` is the part of it that is the same in every
+application.
+
+Not to be confused with the server-side [Conversations API](#conversations-api-conversations),
+which persists state at the provider. This is local, and works against any
+OpenAI-compatible endpoint.
+
+```cpp
+using namespace QtOpenAi;
+
+Chat::Transcript transcript;
+transcript.setSystemPrompt("You are terse.");
+transcript.setTrimPolicy(Chat::TrimPolicy::forModel("gpt-4o-mini"));
+
+transcript.addUserMessage("Why is the sky blue?");
+auto *reply = client.createChatCompletion(transcript.buildRequest("gpt-4o-mini"));
+connect(reply, &Client::ChatCompletionReply::finished, this,
+    [&](const Core::ChatCompletionResponse &response) {
+        transcript.addMessage(response.firstMessage());   // and the next request
+    });                                                   // is a conversation
+```
+
+### It is a tree, and linear use is the tree that never branched
+
+Editing a past message does not overwrite it. `fork()` gives it a sibling and
+makes the new one active, so both answers stay reachable — the behaviour behind
+every chat UI's `‹ 2/3 ›` control:
+
+```cpp
+auto question = transcript.addUserMessage("Why is the sky blue?");
+transcript.addMessage(answer);
+
+transcript.fork(question, Core::Message::user("Why are sunsets red?"));
+transcript.siblings(question);        // both versions
+transcript.setActiveLeaf(previous);   // the first answer is still there
+```
+
+`messages()` is the path root → active leaf, with the system prompt in front and
+the trim policy applied; that path is the conversation as far as the model is
+concerned, and the rest of the tree is history to navigate back to. A transcript
+that is only ever appended to has one child per node and reads as a plain list —
+which is why there is one type here and not two.
+
+`toJson()`/`fromJson()` round-trip the whole tree, node ids included, so
+anything stored alongside an id still points at the right message.
+
+### Trimming
+
+A conversation grows; a context window does not. `Chat::TrimPolicy` takes a
+message limit, a token budget or both, and drops from the oldest end — with
+three invariants it will not break:
+
+* **The system prompt survives.** Dropping it changes how the model behaves
+  rather than merely shortening what it remembers.
+* **A tool result never leads.** Dropping the assistant turn that requested the
+  tools would leave its results answering nothing, which some providers reject.
+* **The newest turn survives.** A single message over budget is sent anyway:
+  being told it is too long beats silently sending nothing.
+
+`TrimPolicy::forModel()` takes the budget from `ModelCatalog` — the window less
+the room the reply needs — and counts with that model's tokenizer.
+`setSummariser()` replaces what was dropped with one message of your making,
+which is where a running summary belongs.
+
+See [`examples/conversation.cpp`](examples/conversation.cpp) — interactive with
+a key, and an offline walk-through of branching and trimming without one.
+
+### The tool loop, driven for you
+
+`Chat::Agent` owns the chat → `tool_calls` → tool results → chat loop that
+[`examples/tool_loop.cpp`](examples/tool_loop.cpp) writes out by hand:
+
+```cpp
+Chat::Agent agent(&client, &registry);
+agent.setModel("gpt-4o-mini");
+agent.setStreaming(true);
+
+connect(&agent, &Chat::Agent::contentDelta, this, &Ui::append);
+connect(&agent, &Chat::Agent::finished, this, &Ui::showAnswer);
+
+agent.run("What is the weather in Berlin and Hamburg?");
+```
+
+The conversation accumulates in the agent's `Transcript`, so a second `run()`
+continues where the first ended, and the trim policy applies throughout.
+
+**The guards are not optional extras.** A loop that talks to a model needs all
+three:
+
+```cpp
+agent.setMaxIterations(5);   // a model that keeps calling tools instead of answering
+agent.setTimeoutMs(60000);   // a run that stops making progress at all
+agent.setApprovalCallback([](const Core::ToolCall &call) {
+    return confirmWithUser(call);       // refusing is reported to the model as
+});                                     // the tool's result, so it can say so
+```
+
+`cancel()` abandons a run. Every turn is announced — `assistantMessage`,
+`toolInvoked`, `toolRejected`, `finished`, `failed` — so a caller can report the loop
+rather than wait for it. See [`examples/agent.cpp`](examples/agent.cpp)
+(`--ask` confirms each tool call on the terminal).
+
+## Model capabilities, pricing & token counting
+
+`GET /models` says which models exist. `Core::ModelCatalog` says what they can
+do and what they cost — knowledge the API does not return, held locally so it is
+available before a request goes out:
+
+```cpp
+const Core::ModelInfo info = Core::ModelCatalog::shared().model("gpt-4o-mini-2024-07-18");
+
+info.isKnown();                                  // true — resolved by prefix
+info.contextWindow();                            // 128000
+info.encoding();                                 // "o200k_base"
+info.supports(Core::ModelCapability::Vision);    // true
+info.inputPrice();                               // 0.15, USD per 1M tokens
+```
+
+Two properties matter more than the table itself:
+
+* **Lookup never fails.** An unknown id first resolves to the longest known id
+  that is a prefix of it — which is what turns `gpt-4o-mini-2024-07-18` into the
+  entry for `gpt-4o-mini` — and otherwise returns a conservative fallback whose
+  `isKnown()` is `false`. Callers do not have to guard the lookup, and one that
+  cares can still tell a fact from a guess.
+* **The table ages.** Prices change and models appear; the bundled defaults are
+  a snapshot. `merge()` takes a JSON table of `{ "<id>": { … } }` and overwrites
+  only what it mentions, so a corrected price is a data file rather than a
+  release:
+
+```cpp
+Core::ModelCatalog::shared().merge(QJsonDocument::fromJson(file.readAll()).object());
+```
+
+`Core::TokenCounter` answers the other half — how much of that window a prompt
+uses:
+
+```cpp
+Core::TokenCounter counter = Core::TokenCounter::forModel("gpt-4o-mini");
+counter.count(messages);   // framing overhead included
+```
+
+**Vocabulary is not bundled.** The OpenAI encodings are megabytes of table each
+and belong to a project with its own release cadence, so this ships the
+algorithm and takes the data:
+
+```cpp
+Core::TokenCounter::loadEncodingFile("o200k_base", "/path/to/o200k_base.tiktoken");
+```
+
+Byte-pair merging then follows tiktoken's algorithm over the UTF-8 bytes of each
+piece the encoding's pre-tokenizer produces, so counts match the server's.
+Without the file, `count()` still answers using the customary
+one-token-per-four-characters estimate, and `isExact()` says which of the two
+you got — enough for a rough figure, not enough to fill a context window to the
+brim. A counter built before its vocabulary is loaded becomes exact the moment
+it arrives.
+
+See [`examples/token_budget.cpp`](examples/token_budget.cpp), which runs
+entirely offline.
 
 ## Speech-to-text (`/audio/transcriptions`, `/audio/translations`)
 
@@ -1048,6 +1535,516 @@ is kept exactly as the API spells it. Deleting a skill or a version answers with
 the same value types, reporting `object()` as `skill.deleted` /
 `skill.version.deleted`.
 
+## Provider profiles
+
+The endpoints are the same across OpenAI-compatible providers; the way in is
+not. `Client::ProviderProfile` bundles the four things that differ — base URL,
+auth scheme, Azure's `api-version`, any headers — under the provider's name:
+
+```cpp
+client.setProfile(Client::ProviderProfile::groq());
+client.setApiKey(key);
+```
+
+Built in: `openAi()`, `azure(resource, apiVersion = {})`, `ollama()`,
+`lmStudio()`, `vllm()`, `groq()`, `openRouter()`. `builtIn()` returns the
+argument-free ones for offering a choice, and `fromName()` looks one up
+case-insensitively for a config file.
+
+A profile is a value, so a built-in is a starting point rather than a fixed
+menu — and a provider this library has never heard of is the same type with its
+fields set:
+
+```cpp
+ProviderProfile profile = ProviderProfile::openRouter();
+profile.setHeader("HTTP-Referer", "https://example.test");
+
+ProviderProfile house;                                    // nothing privileged
+house.setBaseUrl(QUrl("https://llm.internal/v1"));        // about the built-ins
+house.setAuthScheme(Client::AuthScheme::AzureApiKey);
+```
+
+Two deliberate limits:
+
+* **The API key is not part of a profile.** A profile says which provider; a key
+  says who you are. `setProfile()` leaves the key untouched — putting a secret
+  in a value type that gets copied, compared and logged is how secrets escape.
+* **`requiresApiKey()`** is `false` for the local servers, so a caller knows not to
+  prompt for something the user does not have.
+
+`azure()` configures the key header and the `api-version` parameter, which is
+what an Azure endpoint speaking the OpenAI-compatible path shape needs. It does
+**not** rewrite paths into the older `/openai/deployments/<deployment>/…` form —
+that is a different path grammar, not a different profile, and faking it with a
+base URL would produce requests that quietly 404.
+
+## Metrics & observability
+
+`Client::MetricsCollector` records what the client is costing and how it is
+behaving. Attach one and every request is timed and counted — duration,
+outcome, HTTP status, retries, and the rate-limit headroom the provider
+reported — without any of the calling code knowing it is there:
+
+```cpp
+Client::MetricsCollector metrics;
+metrics.attach(&client);
+
+connect(&metrics, &Client::MetricsCollector::requestRecorded, this,
+    [](const Client::RequestMetrics &r) {
+        qInfo() << r.durationMs << "ms" << (r.ok ? "ok" : "failed")
+                << r.rateLimit.remainingRequests << "requests left";
+    });
+
+const auto snapshot = metrics.snapshot();
+snapshot.averageDurationMs();
+snapshot.failuresByStatus.value(429);   // status 0 is "no response at all"
+snapshot.cost();                        // USD, from the catalog's prices
+```
+
+Tokens and cost need one thing more. A reply is generic; only the *typed*
+response knows which model answered and what it spent, so `observe()` wraps the
+call:
+
+```cpp
+metrics.observe(client.createChatCompletion(request));
+```
+
+It compiles for any reply whose response reports `model()` and `usage()`, and
+fails to compile for one that does not — which is the right answer for a file
+upload. Cost comes from [`ModelCatalog`](#model-capabilities-pricing--token-counting)
+at the moment each request is recorded; a model with no price contributes zero,
+an honest "unknown" rather than "free". `setCatalog()` takes a corrected table.
+
+**Time to first token** — what a user perceives as latency — is measured for
+streams. The collector finds the streaming reply's `contentDelta` signal through
+the meta-object rather than naming each streaming type, so an endpoint added
+later is measured on the day it is added. Ask for `stream_options:
+{include_usage: true}` if you want a streamed response to report tokens too.
+
+Nothing is paid for when nothing is attached: `Client` announces each reply
+through an ordinary signal, and an unconnected signal costs a comparison.
+
+See [`examples/metrics.cpp`](examples/metrics.cpp).
+
+## Interceptors
+
+`Client::Interceptor` is a hook around every request the client makes. Subclass
+it, override one or both halves, and install it:
+
+```cpp
+Client::LoggingInterceptor logger;
+client.addInterceptor(&logger);
+```
+
+```cpp
+std::optional<Client::InterceptedResponse>
+beforeRequest(Client::InterceptedRequest &request) override;   // on the way out
+void afterResponse(const Client::InterceptedResponse &response) override;
+```
+
+Interceptors exist for what has to happen on *every* call and cannot be written
+at the call sites: structured logging with the credentials taken out, a header
+whose value differs per request, serving a repeat from a cache. A header with a
+**constant** value is not one of them — that is `setDefaultHeader()`, and
+routing it through an interceptor would only make it harder to find.
+
+Ordering nests the way middleware conventionally does: `beforeRequest()` runs in
+installation order, `afterResponse()` in reverse, so the first installed is the
+outermost. The exchange carries the request that caused it
+(`response.request`), so the two halves correlate without an interceptor
+keeping state across requests that overlap.
+
+The client does not take ownership, but it does keep track: a destroyed
+interceptor removes itself, so it cannot be called after it is gone. Nothing is
+paid for when nothing is installed — the chain is one empty-list check.
+
+Two scope limits, both deliberate:
+
+* `afterResponse()` does not fire for the **streaming** endpoints. A stream's
+  body arrives as a sequence of events and never exists as one object.
+  `beforeRequest()` does fire for them, so header injection and logging still
+  cover streams.
+* The **multipart uploads** do not offer their body to the chain. It is rebuilt
+  per attempt and can be a whole file; handing it over would mean holding an
+  upload in memory for the benefit of a logger.
+
+### Logging, redacted
+
+`LoggingInterceptor` writes one line per request and one per response to the
+`qtopenai.http` category:
+
+```
+--> POST https://api.openai.com/v1/chat/completions
+    Authorization: <redacted>
+<-- 200 POST https://api.openai.com/v1/chat/completions (412 ms)
+```
+
+The redaction is the point. An API key is a bearer credential: once it is in a
+log file it is in every backup, bug report and pasted terminal buffer that file
+reaches. So the header values that can carry one are replaced before anything is
+written, as are query parameters whose name looks like a secret — and the
+*default* is to redact, so forgetting to configure it is the safe outcome rather
+than the leak. `setRedactedHeaders()` replaces the list;
+`defaultRedactedHeaders()` is what it starts as.
+
+Bodies are off by default for a related reason: they hold the user's prompts.
+`setLogBodies(true)` turns them on, truncated to `maxBodyLength()`. The category
+itself defaults to off; turn it on without a rebuild with
+
+```sh
+QT_LOGGING_RULES="qtopenai.http.debug=true"
+```
+
+or connect to `logged()` to route the same lines somewhere of your own.
+
+### Response caching
+
+`CachingInterceptor` answers an identical request from a store instead of the
+network — worth having for deterministic calls (`temperature: 0`), for a prompt
+an application re-issues as the user moves back and forth, and for tests. Each hit is
+a round trip and a bill that did not happen:
+
+```cpp
+Client::CachingInterceptor cache;
+client.addInterceptor(&cache);                     // installing it is the opt-in
+```
+
+The store is pluggable. `MemoryResponseCache` is the default — an LRU with a
+size ceiling and a time limit, both because both failure modes are real: without
+a size limit a long-running process grows without bound, and without a time
+limit a cached answer outlives the question.
+
+```cpp
+Client::MemoryResponseCache store(512);
+store.setTtlSeconds(60);                           // 0 disables expiry
+cache.setCache(&store);                            // not owned; nullptr restores the default
+```
+
+**What is cached is an allow-list, and that is the whole safety story.** A POST
+is not idempotent in general: replaying `POST /files` from a cache would hand
+back the id of a file the caller believes it just created, and replaying `POST
+/fine_tuning/jobs` would hide a job that was never started. So only the
+endpoints that compute an answer from their input and change nothing are
+cacheable by default — `/chat/completions`, `/completions`, `/embeddings`,
+`/moderations` — and `setCacheablePaths()` is the caller's to extend if their
+provider has others. GET and DELETE are never cached: a listing that cannot
+change is not a listing, and a cached DELETE is a lie.
+
+Three more rules that follow from the same reasoning:
+
+* The key hashes the verb, the URL, the body **and the credential**, so a cache
+  shared between two accounts cannot serve one account's answer to the other.
+  The credential is hashed, never stored.
+* Only 2xx responses are stored. An error describes the provider at a moment,
+  not the request; caching one turns a blip into a sticky failure.
+* Streams are bypassed on their own — there is no single body to store.
+
+`hit()`, `missed()` and `stored()` report what happened, which is enough to
+measure a hit rate without the cache keeping counters nobody reads.
+
+See [`examples/interceptors.cpp`](examples/interceptors.cpp).
+
+## Rate limiting
+
+`Client::RateLimiter` throttles a client so the provider does not have to. A 429
+costs a round trip, a retry and sometimes a longer penalty than the wait would
+have been, so staying under the limit is cheaper than recovering from crossing
+it:
+
+```cpp
+Client::RateLimiter limiter;
+limiter.setMaxConcurrent(4);
+limiter.setRequestsPerMinute(60);
+limiter.setTokensPerMinute(90000);
+client.setRateLimiter(&limiter);
+```
+
+The three budgets are independent and any of them may be left at `0`, meaning no
+limit:
+
+* **`maxConcurrent`** — requests in flight at once. Worth setting even when the
+  provider imposes no limit, because it also bounds how much of your own memory
+  and how many sockets a burst can take.
+* **`requestsPerMinute`** — a rolling window, not a per-minute bucket. A bucket
+  lets a caller spend the whole budget in the last second of one minute and the
+  whole of the next in the first second of the next, which is exactly the burst
+  the limit exists to prevent.
+* **`tokensPerMinute`** — the same window over *estimated* prompt tokens. The
+  estimate runs over the serialised body and is deliberately generous: a token
+  budget that undercounts is a budget that does not work.
+
+Requests over budget queue and are released in order. Calling code does not
+change: a call still returns its reply immediately, the reply simply has not
+started yet. `queued()`, `inFlight()` and `queueChanged()` are enough to report
+how far along a burst is.
+
+A 429 carrying `Retry-After` pauses the **whole client**, not only the reply
+that received it — the provider is saying that *you* are going too fast. A
+response reporting an exhausted window (`x-ratelimit-remaining-requests: 0`)
+does the same. `pauseFor()` is the same lever by hand, and it never shortens a
+pause already in force.
+
+Three things are deliberately outside its scope:
+
+* **Streams are not gated.** A stream is held open for as long as the model is
+  talking, and counting one against a concurrency budget would let a single long
+  answer starve everything behind it.
+* **Cache hits are not gated.** A hit makes no request, so there is no budget to
+  spend.
+* **Retries are not re-queued.** A retry is the tail of a request that already
+  got through; making it queue again would pin the slot it occupies behind
+  whatever is now ahead of it.
+
+Destroying a limiter, or replacing it with `setRateLimiter(nullptr)`, releases
+whatever is waiting rather than abandoning it — a caller holding a reply that
+would never start would wait forever, which is worse than one burst over budget.
+Nothing is queued when no limiter is installed.
+
+See [`examples/rate_limiting.cpp`](examples/rate_limiting.cpp).
+
+## Guardrails
+
+`Client::Guardrail` screens text against the Moderations API and applies a
+policy to the answer:
+
+```cpp
+Client::Guardrail guardrail(&client);
+guardrail.setAction("violence", Client::GuardrailAction::Warn);
+guardrail.setAction("self-harm", Client::GuardrailAction::Block);
+
+auto *reply = guardrail.createChatCompletion(request);
+connect(reply, &Client::GuardedChatReply::blocked, this, &Ui::showRefusal);
+connect(reply, &Client::GuardedChatReply::flagged, this, &Ui::showNotice);
+connect(reply, &Client::GuardedChatReply::finished, this, &Ui::showAnswer);
+```
+
+Both sides are screened, for different reasons: the **input**, so the
+application does not spend a request relaying something it would refuse to
+show; the **output**, because a model can produce what its prompt did not ask
+for. Either check can be turned off with `setScreenInput()` /
+`setScreenOutput()`. A fully screened exchange is three round trips, not one —
+that is the honest cost, and it is why the checks are separable.
+
+The policy is **per category**, because the categories are not comparable. An
+app for adults may reasonably allow what a children's app must block, and
+neither is a "level" of the other. Categories are the provider's own strings;
+anything the policy does not name gets `defaultAction()`, which is `Block` — a
+category nobody thought about is more likely to matter than not, and an
+application that wants everything through can say so in one line. Where several
+categories match, the strictest decides; letting a warned category downgrade a
+blocked one would make the outcome depend on map ordering.
+
+`setThreshold()` makes the policy stricter than the provider: `1.0` (the
+default) trusts the provider's own `flagged` and nothing else, while a lower
+value also matches on the category score. A verdict carries *every* category the
+provider scored, not only the ones that crossed the line, so a caller can explain
+a refusal rather than only announcing it.
+
+Two things worth being explicit about:
+
+* **A failed screening fails the exchange.** A guardrail that treats "I could
+  not check" as "it is fine" is not a guardrail.
+* **This is deliberately not an `Interceptor`.** The interceptor chain is
+  synchronous — a request either goes out now or is answered now — and
+  screening needs a round trip of its own. Wiring an awaited call into a chain
+  that cannot wait would mean either blocking the event loop or letting the
+  unscreened request go out first, and both defeat the purpose. So the guardrail
+  composes calls instead.
+
+`judge()` applies the same policy to a `ModerationResult` obtained some other
+way, so there is one decision procedure rather than two that can drift.
+
+See [`examples/guardrails.cpp`](examples/guardrails.cpp).
+
+## Mapping many prompts
+
+`Client::ChatMap` runs many prompts and collects the answers in order — the
+shape of classification over a dataset, fan-out summarisation and offline
+evals: N requests that have nothing to do with each other, which should go out
+together but not all at once.
+
+```cpp
+Client::ChatMap map(&client);
+map.setConcurrency(4);
+
+auto *run = map.map(QStringLiteral("gpt-4o-mini"), prompts);
+connect(run, &Client::ChatMapReply::progress, this, &Ui::setProgress);
+connect(run, &Client::ChatMapReply::allFinished, this, [run]() { use(run->contents()); });
+```
+
+Results are **index-aligned with the input from the first moment**, before
+anything has answered. Classifying a thousand rows is only useful if row 837's
+answer can still be found at 837 after two of its neighbours failed, so
+`results()` keeps successes and failures side by side in input order and
+`contents()` leaves a hole rather than closing it.
+
+**A failed item does not fail the run.** One row hitting a content filter is not
+a reason to throw away the rest; the error is recorded against its index and the
+run carries on. `setMaxFailures()` is for the case where it *is* a reason — a
+wrong API key fails every item, and burning a thousand requests to discover that
+is a waste worth stopping.
+
+`concurrency()` is what this run keeps in flight, and it **composes with rather
+than replaces** [`RateLimiter`](#rate-limiting): a limiter governs everything
+the client does, a `ChatMap` governs one run, and with both, whichever is
+stricter decides. It is a cap and not a batch size — a slow item does not hold
+back the ones behind it.
+
+This is the client-side counterpart to the server-side Batch API, and the trade
+is latency against cost: a batch job is cheaper and answers in hours, this
+answers in seconds at full price.
+
+`abort()` stops issuing and abandons what is in flight; `allFinished()` still
+fires, because a caller waiting on it must not be left waiting because it was
+the one who gave up.
+
+See [`examples/parallel_map.cpp`](examples/parallel_map.cpp).
+
+## Local vector search
+
+`Core::VectorIndex` is a small in-memory vector index — the local,
+dependency-free half of retrieval-augmented generation — and
+`Client::SemanticIndex` attaches the embedding step to it:
+
+```cpp
+Client::SemanticIndex index(&client);
+index.add(paragraphs);                       // one request for the whole batch
+
+auto *hits = index.query("how do I cancel?", 3);
+connect(hits, &Client::SemanticQueryReply::finished, this, &Ui::showPassages);
+```
+
+Everything `SemanticIndex` does is two steps a caller could have written: embed
+the text, then search the vectors. It exists because those two steps have to
+agree about the model — vectors from two different embedding models rank
+against each other as convincing nonsense — and keeping the model next to the
+index is how they cannot drift apart. `VectorIndex::add()` refuses a vector
+whose length differs from the rest for the same reason; a model change
+mid-corpus is exactly how that happens, and refusing is the only way a caller
+finds out.
+
+Ranking is **brute force, deliberately**. An approximate-nearest-neighbour
+structure earns its complexity somewhere past a hundred thousand vectors; below
+that a scan over a few thousand embeddings is a few milliseconds, and it is
+exact, has no index to rebuild and no parameters to tune wrongly. Past that
+point the answer is a real vector database — or OpenAI's own server-side vector
+stores — not a worse one here.
+
+Three metrics, all reported so that **higher is better**: `Cosine` (the
+default — embedding models encode meaning in direction, and magnitude mostly
+encodes how long the text was), `DotProduct`, and `Euclidean`, whose score is
+the negated distance so ranking code never has to ask which metric produced it.
+`search(query, k, minScore)`'s floor is the difference between "the five
+closest documents" and "the five closest documents that are actually about
+this", which for a retrieval prompt is the difference between context and
+noise.
+
+The index is a plain serialisable value, so a corpus survives a restart:
+
+```cpp
+saveJson(index.index().toJson());
+index.setIndex(Core::VectorIndex::fromJson(loadJson()));  // no re-embedding
+```
+
+The raw arithmetic is available on its own in the `Core::Vector` namespace —
+`dot()`, `norm()`, `cosineSimilarity()`, `euclideanDistance()`,
+`normalized()` — where mismatched lengths return 0 rather than reading past the
+shorter vector.
+
+See [`examples/semantic_search.cpp`](examples/semantic_search.cpp).
+
+## Ready-made tools
+
+`QtOpenAi::Tools` is a set of tools a model can be given — the filesystem, one
+HTTP GET, a clock and a calculator — each behind a policy that has to be filled
+in on purpose.
+
+```cpp
+Tools::ToolPolicy policy;                    // everything off
+policy.utilities = true;
+policy.fileRead  = true;
+policy.sandbox   = Tools::FileSandbox({docsPath});
+
+Tools::DefaultTools tools;
+tools.setApprovalHandler([this](const QString &name, const QJsonObject &args) {
+    return askTheUser(name, args);
+});
+const QStringList installed = tools.install(&registry, policy);
+```
+
+**It is a separate module, and that is not tidiness.** Linking
+`QtOpenAi::Client` must never be what gives a model access to a filesystem.
+Reaching these tools takes a line in a `CMakeLists.txt`, then a policy object,
+then an explicit `install()` — and a reviewer can find every application that
+took those steps by grepping for the module name.
+
+Everything is off by default, at every level: an empty `ToolPolicy` installs
+nothing, a `FileSandbox` with no roots allows nothing, and an `HttpTools` with
+no allowed hosts fetches nothing. Forgetting to configure this cannot be the
+thing that grants a power.
+
+### The filesystem sandbox
+
+A model that can name a file can name any file, and it is steered by whatever
+text is in its context — including text an attacker wrote into a document it was
+asked to summarise. So `FileSandbox` never asks whether a path looks suspicious;
+it asks whether the path, **after every symlink has been followed**, is inside a
+directory the application named:
+
+* `docs/../../etc/passwd` and a symlink from inside the jail to `/etc/shadow`
+  fail the same check for the same reason — the check is on the resolved path,
+  not on the spelling.
+* `/srv/docs-secret` is not inside `/srv/docs`, even though one string starts
+  with the other. Containment is by path component.
+* Writing to a file that does not exist yet resolves the **parent**, which is
+  what catches creating a file through a symlinked directory.
+* Read-only is separate from access, and on by default: reading a corpus and
+  rewriting it are different powers, and only one of them cannot be undone.
+  `write_file` needs `fileWrite` in the policy **and** a non-read-only sandbox.
+* A size cap, because a tool result is pasted straight into a context window.
+
+A refusal is a *result*, not an exception: the model has to be able to read it
+and try something else, and a thrown error would end the turn instead of
+correcting it. `FileTools::refused()` reports every attempt, which is how an
+application notices it is being probed.
+
+### HTTP
+
+Letting a model fetch URLs is the most dangerous ordinary tool there is, and not
+because of what it downloads: a model asked to summarise a page will happily
+fetch `http://169.254.169.254/` or `http://localhost:8080/admin`, from inside
+the network the application is running in. The allow-list is the whole defence,
+so it is required rather than recommended, matched **exactly** — `example.com`
+does not allow `evil.example.com` — and https is required unless waived.
+Redirects are not followed, because a redirect names a host the allow-list never
+approved. The body cap is enforced as the response arrives rather than after.
+
+### Utilities
+
+`current_time`, `calculate` and `uuid`: worth shipping precisely because they
+are dull. A model that cannot read a clock will confidently state the wrong
+date, and one that does arithmetic by predicting the next token gets it wrong in
+ways that look right.
+
+`calculate` uses a small arithmetic parser written for the purpose. Handing
+model-supplied text to a scripting engine would be `eval` on a string the user
+never saw; this grammar has no names to resolve and nothing to call, so there is
+nothing to escape into.
+
+### Approval
+
+`setApprovalHandler()` is asked before every side-effecting call — writing a
+file, fetching a URL — and returning false refuses it with a sentence the model
+can work around. Reads are not gated by default, since a prompt per read makes a
+UI unusable and the sandbox already bounds what is readable;
+`setApproveReads(true)` gates those too.
+
+Schemas come from the methods themselves via
+[`MetaSchema`](#tool-schemas-from-the-meta-object-system), so renaming an
+argument cannot leave a stale schema behind for the model to call with.
+
+See [`examples/sandboxed_tools.cpp`](examples/sandboxed_tools.cpp).
+
 ## Resilience & configuration
 
 The `Client` can retry transient failures, surface rate-limit headroom, and
@@ -1128,13 +2125,25 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | Program             | Endpoint / feature                                   |
 |---------------------|------------------------------------------------------|
 | `pagination`        | Iterate every page of a list endpoint (`PageWalker`) |
+| `token_budget`      | Model capabilities, pricing and token counting, offline |
+| `conversation`      | Conversation history, branching and trimming (`Chat`) |
+| `agent`             | The tool loop driven by `Chat::Agent`, with guards    |
+| `metrics`           | Token usage, cost, latency and time-to-first-token   |
+| `interceptors`      | Redacting log, per-request trace header, response cache |
+| `rate_limiting`     | Concurrency cap, RPM/TPM budgets and a request queue |
+| `parallel_map`      | Map many prompts to answers, N at a time, in order   |
 | `chat_tool_loop`    | Chat completion with tool calling via `ToolRegistry` |
+| `meta_tools`        | Tool calling with a schema derived from a Q_INVOKABLE |
+| `sandboxed_tools`   | Filesystem tools inside a jail, with an approval prompt |
 | `streaming`         | Streamed chat completion (SSE), token by token       |
 | `responses`         | Responses API (`/responses`)                         |
 | `structured_output` | Structured Outputs (`response_format` json_schema)   |
+| `typed_output`      | Structured Outputs bound to a Q_GADGET, both ways    |
 | `vision`            | Multimodal input (text + image content parts)        |
 | `embeddings`        | Embeddings (`/embeddings`)                            |
+| `semantic_search`   | Index a corpus locally and answer from what it finds |
 | `moderations`       | Moderation (`/moderations`)                           |
+| `guardrails`        | Screen input and output against a per-category policy |
 | `tts`               | Text-to-speech (`/audio/speech`)                      |
 | `voice_cloning`     | Custom voice: consent → voice (`/audio/voices`)      |
 | `transcribe`        | Speech-to-text (`/audio/transcriptions`)             |
@@ -1151,6 +2160,10 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `skills`            | Skill: publish → version → promote → zip (`/skills`) |
 | `chatkit`           | ChatKit session secret + thread transcript (`/chatkit`)|
 | `realtime`          | Live Realtime session over a WebSocket (`/realtime`)  |
+
+`realtime` is the one example that needs the optional `QtOpenAi::Realtime`
+module, so it is built only when `Qt6::WebSockets` is available; the rest need
+nothing beyond `QtOpenAi::Client`.
 
 ## Building
 

@@ -132,13 +132,20 @@ namespace QtOpenAi {
 namespace Client {
 
 class ClientPrivate;
+class Interceptor;
+class ProviderProfile;
+class RateLimiter;
 
-// The entry point for talking to an OpenAI-compatible chat API.
+// The entry point for talking to the OpenAI API, or anything that speaks it.
 //
-// Configure a base URL and API key, then call createChatCompletion() to obtain
-// an asynchronous ChatCompletionReply. The client works with any endpoint that
-// speaks the OpenAI /chat/completions protocol (OpenAI, Azure OpenAI, Ollama,
-// vLLM, LM Studio, ...).
+// Configure a base URL and API key, then call one of the endpoint methods —
+// createChatCompletion() for the classic case — to obtain an asynchronous
+// reply. The whole REST surface hangs off this one object; only the Realtime
+// WebSocket channel lives elsewhere, in QtOpenAi::Realtime.
+//
+// A provider that implements a subset works just as well: nothing here assumes
+// more of the server than the endpoint being called (OpenAI, Azure OpenAI,
+// Ollama, vLLM, LM Studio, ...).
 class QTOPENAI_CLIENT_EXPORT Client : public QObject
 {
     Q_OBJECT
@@ -179,6 +186,13 @@ public:
     QString apiVersion() const;
     void setApiVersion(const QString &apiVersion);
 
+    // Point this client at a provider in one call: base URL, auth scheme,
+    // api-version and any headers it wants. The key is not part of a profile
+    // and is left alone -- see ProviderProfile. Declared on a forward
+    // declaration so Client.h stays free of the profile header, which needs
+    // AuthScheme from here.
+    void setProfile(const ProviderProfile &profile);
+
     // Automatic-retry policy for transient failures (429/5xx/network).
     RetryPolicy retryPolicy() const;
     void setRetryPolicy(const RetryPolicy &policy);
@@ -203,6 +217,29 @@ public:
     void setDefaultHeader(const QByteArray &name, const QByteArray &value);
     void removeDefaultHeader(const QByteArray &name);
     QHash<QByteArray, QByteArray> defaultHeaders() const;
+
+    // Install a hook around every request this client makes: redacting logs,
+    // per-request headers, a response cache. Interceptors run in installation
+    // order on the way out and in reverse on the way back, so the first one
+    // installed is the outermost.
+    //
+    // The client does not take ownership -- an interceptor is usually shared or
+    // lives on the stack of a test -- but it does keep track: a destroyed
+    // interceptor removes itself, so it can never be called after it is gone.
+    // Installing the same one twice does nothing the second time.
+    void addInterceptor(Interceptor *interceptor);
+    void removeInterceptor(Interceptor *interceptor);
+    QList<Interceptor *> interceptors() const;
+
+    // Throttle this client so the provider does not have to. Requests over
+    // budget queue and are released in order; a call still returns its reply
+    // immediately, the reply simply has not started yet.
+    //
+    // Nothing is queued without a limiter, and the client does not take
+    // ownership -- a destroyed limiter detaches itself. Passing nullptr removes
+    // the limit; requests already waiting are released rather than stranded.
+    void setRateLimiter(RateLimiter *limiter);
+    RateLimiter *rateLimiter() const;
 
     // Inject a custom QNetworkAccessManager (e.g. for proxies or test doubles).
     // The client does not take ownership.
@@ -891,6 +928,17 @@ Q_SIGNALS:
     void apiKeyChanged();
     void organizationChanged();
 
+    // Every reply this client creates, announced the moment it exists and
+    // before it can have finished. It is the hook an observer such as
+    // MetricsCollector attaches to, which is why it lives here rather than the
+    // observer reaching into the request path: nothing below this line knows
+    // what is watching, and an unconnected signal costs a comparison.
+    //
+    // QObject rather than RestReplyBase because the streaming replies are not
+    // one -- they sit outside the retry machinery -- and they are exactly the
+    // ones worth timing.
+    void replyCreated(QObject *reply);
+
 private:
     // cancel/pause/resume differ only in the path segment they POST to.
     FineTuningJobReply *postFineTuningJobAction(const QString &jobId, const QString &action);
@@ -898,12 +946,14 @@ private:
     // Every reply type keeps its constructor private and names Client as its
     // only friend, so a reply cannot be created from outside the library. The
     // request helpers that build them live in ClientPrivate, which reaches the
-    // constructors through here instead of being befriended by all ~55 of them.
+    // constructors through here instead of being befriended by all ~70 of them.
     // Defined in Client.cpp; not part of the public API.
     template <typename Reply, typename... Args>
-    static Reply *makeReply(Args &&...args)
+    static Reply *makeReply(Client *client, Args &&...args)
     {
-        return new Reply(std::forward<Args>(args)...);
+        Reply *reply = new Reply(std::forward<Args>(args)...);
+        Q_EMIT client->replyCreated(reply);
+        return reply;
     }
 
     Q_DECLARE_PRIVATE(Client)

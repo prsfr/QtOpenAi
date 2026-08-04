@@ -4,6 +4,7 @@
 #include <QtOpenAi/Core/GlobalCore.h>
 
 #include <QtCore/QJsonObject>
+#include <QtCore/QMetaObject>
 #include <QtCore/QSharedDataPointer>
 #include <QtCore/QString>
 
@@ -57,6 +58,18 @@ public:
     static ResponseFormat jsonObject();
     static ResponseFormat jsonSchema(const QString &name, const QJsonObject &schema,
                                      bool strict = true, const QString &description = {});
+
+    // A json_schema format for a Q_GADGET/QObject, with the schema derived from
+    // its Q_PROPERTYs by Core::MetaSchema. The name defaults to the class name
+    // and the description to its Q_CLASSINFO("doc"), so the type carries its
+    // whole contract and MetaJson::parse<T>() reads the answer straight back.
+    static ResponseFormat forMetaObject(const QMetaObject *meta, const QString &name = {});
+
+    template <typename T>
+    static ResponseFormat forType(const QString &name = {})
+    {
+        return forMetaObject(&T::staticMetaObject, name);
+    }
 
     // Chat Completions `response_format` shape (schema nested under json_schema).
     QJsonObject toJson() const;

@@ -8,8 +8,6 @@ function(qtopenai_add_test name)
     # Lets tests share helpers via #include "support/....h".
     target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME ${name} COMMAND ${name})
-    set_tests_properties(${name} PROPERTIES
-        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endfunction()
 
 # --- Core module tests ---
@@ -141,9 +139,65 @@ qtopenai_add_test(tst_core_realtime
     SOURCES core/tst_realtime.cpp
     LIBS QtOpenAi::Core)
 
+qtopenai_add_test(tst_core_metaschema
+    SOURCES core/tst_metaschema.cpp
+    LIBS QtOpenAi::Core)
+
+qtopenai_add_test(tst_core_schemavalidator
+    SOURCES core/tst_schemavalidator.cpp
+    LIBS QtOpenAi::Core)
+
+qtopenai_add_test(tst_core_metajson
+    SOURCES core/tst_metajson.cpp
+    LIBS QtOpenAi::Core)
+
+qtopenai_add_test(tst_core_modelcatalog
+    SOURCES core/tst_modelcatalog.cpp
+    LIBS QtOpenAi::Core)
+
+qtopenai_add_test(tst_core_vectorindex
+    SOURCES core/tst_vectorindex.cpp
+    LIBS QtOpenAi::Core)
+
+qtopenai_add_test(tst_core_tokencounter
+    SOURCES core/tst_tokencounter.cpp
+    LIBS QtOpenAi::Core)
+
 # --- Client module tests ---
 qtopenai_add_test(tst_client_toolregistry
     SOURCES client/tst_toolregistry.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_metrics
+    SOURCES client/tst_metrics.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_interceptor
+    SOURCES client/tst_interceptor.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_responsecache
+    SOURCES client/tst_responsecache.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_ratelimiter
+    SOURCES client/tst_ratelimiter.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_guardrail
+    SOURCES client/tst_guardrail.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_chatmap
+    SOURCES client/tst_chatmap.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_semanticindex
+    SOURCES client/tst_semanticindex.cpp
+    LIBS QtOpenAi::Client)
+
+qtopenai_add_test(tst_client_providerprofile
+    SOURCES client/tst_providerprofile.cpp
     LIBS QtOpenAi::Client)
 
 qtopenai_add_test(tst_client_reply
@@ -261,6 +315,36 @@ qtopenai_add_test(tst_client_chatkit
 qtopenai_add_test(tst_client_realtime
     SOURCES client/tst_realtime.cpp
     LIBS QtOpenAi::Client)
+
+# --- Tools module tests ---
+qtopenai_add_test(tst_tools_filesandbox
+    SOURCES tools/tst_filesandbox.cpp
+    LIBS QtOpenAi::Tools)
+
+qtopenai_add_test(tst_tools_utility
+    SOURCES tools/tst_utility.cpp
+    LIBS QtOpenAi::Tools)
+
+qtopenai_add_test(tst_tools_http
+    SOURCES tools/tst_http.cpp
+    LIBS QtOpenAi::Tools)
+
+qtopenai_add_test(tst_tools_defaults
+    SOURCES tools/tst_defaults.cpp
+    LIBS QtOpenAi::Tools)
+
+# --- Chat module tests ---
+qtopenai_add_test(tst_chat_transcript
+    SOURCES chat/tst_transcript.cpp
+    LIBS QtOpenAi::Chat)
+
+qtopenai_add_test(tst_chat_trimpolicy
+    SOURCES chat/tst_trimpolicy.cpp
+    LIBS QtOpenAi::Chat)
+
+qtopenai_add_test(tst_chat_agent
+    SOURCES chat/tst_agent.cpp
+    LIBS QtOpenAi::Chat)
 
 # --- Realtime module tests (built with the module) ---
 if(QTOPENAI_BUILD_REALTIME)

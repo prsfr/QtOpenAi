@@ -95,6 +95,8 @@ StatementMacros:
   - Q_ENUM
   - Q_ENUM_NS
   - Q_PROPERTY
+  - Q_DECLARE_LOGGING_CATEGORY
+  - Q_LOGGING_CATEGORY
 
 Standard: c++17
 ---

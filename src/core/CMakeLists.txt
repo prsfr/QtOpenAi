@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# QtOpenAi::Core — value types and (de)serialisation for the chat API.
+# QtOpenAi::Core — value types and (de)serialisation for the OpenAI API.
 # ---------------------------------------------------------------------------
 
 set(QTOPENAI_CORE_PUBLIC_HEADERS
@@ -80,6 +80,13 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/RealtimeSessionConfig.h
     include/QtOpenAi/Core/RealtimeClientSecret.h
     include/QtOpenAi/Core/RealtimeEvent.h
+    include/QtOpenAi/Core/MetaSchema.h
+    include/QtOpenAi/Core/MetaJson.h
+    include/QtOpenAi/Core/ModelInfo.h
+    include/QtOpenAi/Core/ModelCatalog.h
+    include/QtOpenAi/Core/TokenCounter.h
+    include/QtOpenAi/Core/VectorIndex.h
+    include/QtOpenAi/Core/SchemaValidator.h
 )
 
 add_library(QtOpenAiCore
@@ -158,6 +165,13 @@ add_library(QtOpenAiCore
     src/RealtimeSessionConfig.cpp
     src/RealtimeClientSecret.cpp
     src/RealtimeEvent.cpp
+    src/MetaSchema.cpp
+    src/MetaJson.cpp
+    src/ModelInfo.cpp
+    src/ModelCatalog.cpp
+    src/TokenCounter.cpp
+    src/VectorIndex.cpp
+    src/SchemaValidator.cpp
 )
 
 # Namespaced alias so consumers can link QtOpenAi::Core.

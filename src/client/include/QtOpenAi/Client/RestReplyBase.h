@@ -47,6 +47,14 @@ public:
     void abort();
 
 Q_SIGNALS:
+    // The raw exchange, emitted once when the request settles and before any of
+    // the signals below -- on a 2xx, an HTTP error and a transport failure
+    // alike, so an observer needs one connection rather than two. `httpStatus`
+    // is 0 when no response arrived. This is what Client's interceptor chain
+    // watches; it is public because reading the body verbatim is also the first
+    // thing one wants when a decode goes wrong.
+    void responseReceived(const QByteArray &body, int httpStatus);
+
     void failed(const QtOpenAi::Client::ClientError &error);
     void done();
     void retrying(int attempt, int delayMs);
@@ -79,6 +87,11 @@ protected:
     QScopedPointer<RestReplyBasePrivate> d_ptr;
 
 private:
+    // Installs the rate limiter's dispatch gate on the transport engine before
+    // its first attempt runs. The engine is deliberately not reachable any
+    // other way -- it is the library's, not the caller's.
+    friend class ClientPrivate;
+
     Q_DECLARE_PRIVATE(RestReplyBase)
 };
 

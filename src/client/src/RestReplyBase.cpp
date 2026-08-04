@@ -19,6 +19,7 @@ RestReplyBase::RestReplyBase(RestReplyBasePrivate &dd,
     d->engine = new RestReply(std::move(requestFactory), std::move(policy), this);
 
     connect(d->engine, &RestReply::retrying, this, &RestReplyBase::retrying);
+    connect(d->engine, &RestReply::settled, this, &RestReplyBase::responseReceived);
 
     connect(d->engine, &RestReply::succeeded, this, [this](const QByteArray &body, int status) {
         Q_D(RestReplyBase);
