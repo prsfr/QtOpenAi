@@ -40,13 +40,13 @@ using namespace QtOpenAi;
 class WeatherService : public QObject
 {
     Q_OBJECT
-    QTOPENAI_DOC_METHOD(forecast, "Get the weather forecast for a city.", location,
-                        "City name, e.g. Berlin", days, "How many days ahead to forecast, 1 to 7")
 public:
     using QObject::QObject;
 
     // Returning a QJsonObject is enough; the registry serialises it into the
     // tool result.
+    QTOPENAI_DOC_METHOD(forecast, "Get the weather forecast for a city.", location,
+                        "City name, e.g. Berlin", days, "How many days ahead to forecast, 1 to 7")
     Q_INVOKABLE QJsonObject forecast(const QString &location, int days)
     {
         return QJsonObject {

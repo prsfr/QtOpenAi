@@ -168,13 +168,30 @@ identifiers rather than a path and expand to the `Q_CLASSINFO` the schema reads
 prefix to forget and no colon to misplace.
 
 `QTOPENAI_DOC_METHOD` names the method **once** and takes its arguments after
-the description, one `name, "description"` pair each:
+the description, one `name, "description"` pair each. Put it **directly above
+the declaration it describes** — the placement
+[Cutelyst's `C_ATTR`](https://github.com/cutelyst/cutelyst/wiki/Tutorial_02_CutelystBasics)
+uses, and the better one, because the description then lives where the signature
+does:
 
 ```cpp
-QTOPENAI_DOC_METHOD(write_file, "Write UTF-8 text to a file.",
-                    path,    "Path to the file to write.",
-                    content, "The text to write.")
+class FileTools : public QObject
+{
+    Q_OBJECT
+    QTOPENAI_DOC("Read and inspect files inside an allowed set of directories.")
+public:
+    QTOPENAI_DOC_METHOD(write_file, "Write UTF-8 text to a file.",
+                        path,    "Path to the file to write.",
+                        content, "The text to write.")
+    Q_INVOKABLE QString write_file(const QString &path, const QString &content);
+};
 ```
+
+`Q_CLASSINFO` does not care where in the class body it appears, so grouping the
+annotations at the top still works and produces exactly the same meta-object — a
+test pins that. Adjacent is the convention because renaming an argument and
+forgetting its description then becomes a change in one place rather than two
+screens apart.
 
 One invocation, three `Q_CLASSINFO`. A method with no arguments is the same
 macro with nothing after the description, so there is one macro to know rather

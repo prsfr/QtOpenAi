@@ -95,6 +95,30 @@ public:
     }
 };
 
+// The same descriptions as Grouped, written next to the methods they describe
+// rather than in a block at the top -- the placement Cutelyst's C_ATTR uses.
+// Q_CLASSINFO is legal anywhere in a class body, so this has to produce exactly
+// the same meta-object; if it ever stops doing so, the convention has become a
+// requirement and callers need to know.
+class Adjacent : public QObject
+{
+    Q_OBJECT
+    QTOPENAI_DOC("Everything described in one invocation per method")
+public:
+    QTOPENAI_DOC_METHOD(nothing, "No arguments at all.")
+    Q_INVOKABLE void nothing() { }
+
+    QTOPENAI_DOC_METHOD(one, "One argument.", only, "The only one.")
+    Q_INVOKABLE void one(const QString &only) { Q_UNUSED(only) }
+
+private:
+    int unrelated = 0; // an access change between annotations must not matter
+
+public:
+    QTOPENAI_DOC_METHOD(two, "Two arguments.", first, "The first.", second, "The second.")
+    Q_INVOKABLE void two(const QString &first, int second) { Q_UNUSED(first) Q_UNUSED(second) }
+};
+
 // Every way a `doc` key can name something that is not there.
 class Misannotated : public QObject
 {
@@ -151,6 +175,7 @@ private slots:
     void unknownTypesStayUnconstrained();
     void theMacrosBuildTheSameKeysAsHandWrittenOnes();
     void aMethodAndItsArgumentsAreOneInvocation();
+    void anAnnotationMaySitNextToWhatItDescribes();
     void theShippedAnnotationsAllDescribeSomething();
     void findsAnnotationsThatDescribeNothing();
 };
@@ -344,6 +369,37 @@ void TestMetaSchema::aMethodAndItsArgumentsAreOneInvocation()
     QCOMPARE(MetaSchema::danglingAnnotations<Grouped>(), QStringList());
 }
 
+void TestMetaSchema::anAnnotationMaySitNextToWhatItDescribes()
+{
+    // Cutelyst's C_ATTR sits on the line above the method it annotates, and it
+    // is the better place: the description is where the signature is, so
+    // renaming an argument and forgetting its description is a change in one
+    // place rather than two screens apart.
+    //
+    // Q_CLASSINFO does not care where in the class body it appears, and this
+    // pins that: same keys, same values, whether grouped at the top or written
+    // next to each method -- including across an access specifier in between.
+    const QMetaObject &grouped = Grouped::staticMetaObject;
+    const QMetaObject &adjacent = Adjacent::staticMetaObject;
+
+    const auto info = [](const QMetaObject &meta, const char *key) {
+        const int index = meta.indexOfClassInfo(key);
+        return index < 0 ? QByteArray() : QByteArray(meta.classInfo(index).value());
+    };
+
+    for (const char *key : {"doc", "doc:nothing", "doc:one", "doc:one:only", "doc:two",
+                            "doc:two:first", "doc:two:second"}) {
+        QVERIFY2(!info(adjacent, key).isEmpty(), key);
+        QCOMPARE(info(adjacent, key), info(grouped, key));
+    }
+
+    // And the schema built from either is the same object, which is the only
+    // thing that actually reaches the model.
+    QCOMPARE(MetaSchema::fromMethod(&adjacent, QStringLiteral("two")),
+             MetaSchema::fromMethod(&grouped, QStringLiteral("two")));
+    QCOMPARE(MetaSchema::danglingAnnotations<Adjacent>(), QStringList());
+}
+
 void TestMetaSchema::theShippedAnnotationsAllDescribeSomething()
 {
     // The macros make a typo a lone mistake rather than one hidden among
@@ -358,6 +414,7 @@ void TestMetaSchema::theShippedAnnotationsAllDescribeSomething()
     QCOMPARE(MetaSchema::danglingAnnotations<Person>(), QStringList());
     QCOMPARE(MetaSchema::danglingAnnotations<Weather>(), QStringList());
     QCOMPARE(MetaSchema::danglingAnnotations<Grouped>(), QStringList());
+    QCOMPARE(MetaSchema::danglingAnnotations<Adjacent>(), QStringList());
 }
 
 void TestMetaSchema::findsAnnotationsThatDescribeNothing()

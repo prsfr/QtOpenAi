@@ -28,14 +28,6 @@ class QTOPENAI_TOOLS_EXPORT FileTools : public QObject
 {
     Q_OBJECT
     QTOPENAI_DOC("Read and inspect files inside an allowed set of directories.")
-    QTOPENAI_DOC_METHOD(read_file, "Read a UTF-8 text file and return its contents.", path,
-                        "Path to the file to read.")
-    QTOPENAI_DOC_METHOD(write_file, "Write UTF-8 text to a file, replacing it if it exists.", path,
-                        "Path to the file to write.", content, "The text to write.")
-    QTOPENAI_DOC_METHOD(list_directory, "List the names of the entries in a directory.", path,
-                        "Path to the directory to list.")
-    QTOPENAI_DOC_METHOD(file_exists, "Report whether a path exists and is readable.", path,
-                        "Path to check.")
 public:
     explicit FileTools(QObject *parent = nullptr);
     explicit FileTools(const FileSandbox &sandbox, QObject *parent = nullptr);
@@ -44,9 +36,20 @@ public:
     FileSandbox sandbox() const;
     void setSandbox(const FileSandbox &sandbox);
 
+    QTOPENAI_DOC_METHOD(read_file, "Read a UTF-8 text file and return its contents.", path,
+                        "Path to the file to read.")
     Q_INVOKABLE QString read_file(const QString &path);
+
+    QTOPENAI_DOC_METHOD(write_file, "Write UTF-8 text to a file, replacing it if it exists.", path,
+                        "Path to the file to write.", content, "The text to write.")
     Q_INVOKABLE QString write_file(const QString &path, const QString &content);
+
+    QTOPENAI_DOC_METHOD(list_directory, "List the names of the entries in a directory.", path,
+                        "Path to the directory to list.")
     Q_INVOKABLE QString list_directory(const QString &path);
+
+    QTOPENAI_DOC_METHOD(file_exists, "Report whether a path exists and is readable.", path,
+                        "Path to check.")
     Q_INVOKABLE QString file_exists(const QString &path);
 
     // The names of the read-only tools, and of the ones that change something.

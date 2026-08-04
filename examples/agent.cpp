@@ -36,11 +36,11 @@ using namespace QtOpenAi;
 class WeatherService : public QObject
 {
     Q_OBJECT
-    QTOPENAI_DOC_METHOD(forecast, "Get the current weather for a city.", location,
-                        "City name, e.g. Berlin")
 public:
     using QObject::QObject;
 
+    QTOPENAI_DOC_METHOD(forecast, "Get the current weather for a city.", location,
+                        "City name, e.g. Berlin")
     Q_INVOKABLE QJsonObject forecast(const QString &location)
     {
         return QJsonObject {
