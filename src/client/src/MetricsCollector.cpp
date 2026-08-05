@@ -236,5 +236,11 @@ void MetricsCollector::reset()
     // Requests already in flight are still timed; only what was counted goes.
 }
 
+void MetricsCollector::restore(const MetricsSnapshot &snapshot)
+{
+    Q_D(MetricsCollector);
+    d->snapshot = snapshot;
+}
+
 } // namespace Client
 } // namespace QtOpenAi

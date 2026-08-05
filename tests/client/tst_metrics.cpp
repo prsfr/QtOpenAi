@@ -104,6 +104,8 @@ private slots:
     void keepsTheLatestRateLimitHeadroom();
     void stopsRecordingOnceDetached();
     void resetClearsTheCounts();
+    void restoreReplacesTheCountsRatherThanAddingToThem();
+    void aSnapshotRoundTripsThroughJson();
 };
 
 void TestMetrics::timesEveryRequestAClientMakes()
@@ -312,6 +314,69 @@ void TestMetrics::resetClearsTheCounts()
     QCOMPARE(metrics.snapshot().requests, 0);
     QCOMPARE(metrics.snapshot().models.size(), 0);
     QCOMPARE(metrics.metrics(QStringLiteral("gpt-4o-mini")).promptTokens, 0);
+}
+
+void TestMetrics::restoreReplacesTheCountsRatherThanAddingToThem()
+{
+    // The shape restore() exists for is "load at startup, save at exit", and
+    // in that shape the snapshot being restored already contains this
+    // collector's history. Adding would double every request in it.
+    MetricsSnapshot saved;
+    saved.requests = 10;
+    saved.successes = 9;
+    saved.failures = 1;
+    ModelMetrics model;
+    model.requests = 10;
+    model.promptTokens = 500;
+    saved.models.insert(QStringLiteral("gpt-4o-mini"), model);
+
+    MetricsCollector metrics;
+    RequestMetrics request;
+    request.ok = true;
+    metrics.recordRequest(request);
+    QCOMPARE(metrics.snapshot().requests, 1);
+
+    metrics.restore(saved);
+    QCOMPARE(metrics.snapshot().requests, 10);
+    QCOMPARE(metrics.metrics(QStringLiteral("gpt-4o-mini")).promptTokens, 500);
+
+    // And counting carries on from there, which is the point of restoring.
+    metrics.recordRequest(request);
+    QCOMPARE(metrics.snapshot().requests, 11);
+    QCOMPARE(metrics.snapshot().successes, 10);
+}
+
+void TestMetrics::aSnapshotRoundTripsThroughJson()
+{
+    MetricsSnapshot snapshot;
+    snapshot.requests = 3;
+    snapshot.failures = 1;
+    snapshot.failuresByStatus.insert(503, 1);
+    snapshot.totalDurationMs = 900;
+    snapshot.rateLimit.remainingRequests = 42;
+
+    ModelMetrics model;
+    model.requests = 3;
+    model.promptTokens = 120;
+    model.cost = 0.5;
+    snapshot.models.insert(QStringLiteral("gpt-4o-mini"), model);
+
+    const MetricsSnapshot restored = MetricsSnapshot::fromJson(snapshot.toJson());
+    QCOMPARE(restored.requests, 3);
+    QCOMPARE(restored.failures, 1);
+    QCOMPARE(restored.failuresByStatus.value(503), 1);
+    QCOMPARE(restored.totalDurationMs, qint64(900));
+    QCOMPARE(restored.models.value(QStringLiteral("gpt-4o-mini")).promptTokens, qint64(120));
+    QCOMPARE(restored.cost(), 0.5);
+    QCOMPARE(restored.rateLimit.remainingRequests, 42);
+    // A header the provider never sent stays absent rather than becoming zero,
+    // because "no limit reported" and "no requests left" are different states.
+    QCOMPARE(restored.rateLimit.remainingTokens, -1);
+
+    // An empty snapshot writes no rate limit at all, and reads back empty.
+    const MetricsSnapshot empty = MetricsSnapshot::fromJson(MetricsSnapshot().toJson());
+    QVERIFY(!empty.rateLimit.isValid());
+    QCOMPARE(empty.requests, 0);
 }
 
 QTEST_MAIN(TestMetrics)

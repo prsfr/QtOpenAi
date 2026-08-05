@@ -27,22 +27,32 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
 | `QtOpenAi::Client`   | `QtOpenAiClient`  | Async networking `Client`, replies, and the `ToolRegistry`.|
 | `QtOpenAi::Chat`     | `QtOpenAiChat`    | Conversation history, branching, trimming, and the agent loop. |
 | `QtOpenAi::Tools`    | `QtOpenAiTools`   | Ready-made tools for the `ToolRegistry`, sandboxed and opt-in. |
+| `QtOpenAi::Storage`  | `QtOpenAiStorage` | Persisting conversations, cached responses and metrics.    |
 | `QtOpenAi::Realtime` | `QtOpenAiRealtime`| The Realtime WebSocket channel (optional).                 |
+| `QtOpenAi::Sql`      | `QtOpenAiSql`     | The SQLite backend for `Storage` (optional).               |
 
 `QtOpenAi::Client` depends on `QtOpenAi::Core`; `Core` has no dependency beyond
 `Qt6::Core`. `QtOpenAi::Chat` sits on top of both, because `Agent` drives the
 request loop — though `Transcript` and `TrimPolicy` themselves touch no
 networking, so history can be built, trimmed and persisted with no `Client` in
-sight. `QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets` — the one dependency
-nothing else needs, which is why it is a module of its own and is built only when
-that component is found (`QTOPENAI_BUILD_REALTIME`).
+sight. `QtOpenAi::Storage` is the one place that touches all three of
+`Transcript`, `MetricsSnapshot` and `ResponseCache`, which is why it is its own
+module rather than living in `Chat` or `Client` — either choice would have made
+that module depend on the other.
+
+The two optional modules are each a single Qt dependency that nothing else
+needs. `QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets`, and is built
+only when that component is found (`QTOPENAI_BUILD_REALTIME`). `QtOpenAi::Sql`
+depends on `Storage` and `Qt6::Sql`, same arrangement
+(`QTOPENAI_BUILD_SQL`) — so an application that persists to JSON files, or does
+not persist at all, links no database driver to get there.
 
 ### Headless, not UI-hostile
 
 **The library does not depend on a GUI stack. Your application is free to.**
 
 Those are two different statements and both matter. `Qt6::Core`, `Qt6::Network`
-and — for the optional Realtime module — `Qt6::WebSockets` are the whole
+and — for the optional modules — `Qt6::WebSockets` and `Qt6::Sql` are the whole
 dependency list; no module links `Qt6::Gui`, `Qt6::Widgets`, `Qt6::Quick`,
 `Qt6::Qml` or `Qt6::OpenGL`, and none ever will. That is what lets the same
 library run inside a daemon, a CLI, a test harness or a container with no
@@ -1953,6 +1963,115 @@ shorter vector.
 
 See [`examples/semantic_search.cpp`](examples/semantic_search.cpp).
 
+## Persistence (`QtOpenAi::Storage`)
+
+A desktop application closed at the end of the day should open tomorrow with
+yesterday's conversations in it. `Store` is where a conversation tree, the
+response cache and a metrics snapshot go to survive that:
+
+```cpp
+Storage::JsonFileStore store(directory);
+if (!store.open())
+    qWarning() << store.lastError();
+
+store.saveConversation(QStringLiteral("chat-1"), transcript, tr("Sky colours"));
+// ... next launch:
+if (const auto saved = store.loadConversation(QStringLiteral("chat-1")))
+    transcript = *saved;
+```
+
+**A conversation is stored as the tree it is**, not as the messages currently on
+screen. The branch a user made by editing an earlier question is still there
+after a restart, and `siblings()` still finds it — a store that kept only the
+active path would look correct in every test but the one that matters.
+
+Listing is separate from loading, because listing is what an application does
+on every start for every conversation it has:
+
+```cpp
+for (const Storage::ConversationRecord &record : store.conversations())
+    ui->addRow(record.title, record.updatedAt, record.messageCount);   // no trees read
+```
+
+### Two backends, one interface
+
+| Backend | Module | When it is the right one |
+|---|---|---|
+| `Storage::JsonFileStore` | always built | The data should stay legible: readable in an editor, diffable, `cp -r`-able, recoverable one conversation at a time. |
+| `Sql::SqliteStore` | optional (`Qt6::Sql`) | There are thousands of conversations: listing is an index scan, pruning the cache is one statement, and the history is one file to back up. |
+
+Swapping them is the one line that constructs the store; everything else is
+written against `Store`. Both keep a **versioned schema**: a store written by a
+newer build is refused rather than read on a guess — that is how the newer
+version's data gets lost — and the migration hook for older ones is in place
+with nothing yet below version 1 to run.
+
+The SQLite backend is SQLite specifically, not "a database". The schema uses
+`INSERT OR REPLACE` and a `LIMIT` inside a `DELETE ... NOT IN` subquery, the
+file needs no server, and it is the driver Qt ships built in. Taking a
+`QSqlDatabase` from the caller would have made the class nominally portable and
+actually tested against exactly one engine.
+
+### A cache that outlives the process
+
+`PersistentResponseCache` is a `ResponseCache` whose bodies live in a store, so
+`CachingInterceptor` keeps working across a restart:
+
+```cpp
+Storage::PersistentResponseCache cache(&store);
+Client::CachingInterceptor caching;
+caching.setCache(&cache);                          // not owned
+client.addInterceptor(&caching);
+```
+
+Everything `CachingInterceptor` decides stays where it was — what may be cached
+at all, what the key hashes, that errors are never stored. This adds only what a
+store cannot decide for itself: a time limit (300 s by default, because an
+answer from the last session is by definition from a while ago) and a count
+ceiling (1024, higher than the in-memory 128 because the cost here is disk, not
+resident memory). Both are applied on insert, in one call into the store.
+
+### Metrics that are the user's, not the process's
+
+```cpp
+if (const auto saved = store.loadMetrics(QStringLiteral("all-time")))
+    metrics.restore(*saved);                       // carry on from there
+...
+store.saveMetrics(QStringLiteral("all-time"), metrics.snapshot());
+```
+
+`restore()` *replaces* what has been counted rather than adding to it: in the
+"restore at startup, save at exit" shape the snapshot already contains those
+requests, and adding would double every one of them. Snapshots are keyed, so
+"this month" and "all time" can sit side by side.
+
+### Autosave
+
+Saving on every change is a file write per streamed fragment; saving on exit is
+the save that is missing after the crash. `Autosave` sits between:
+
+```cpp
+Storage::Autosave autosave(&store);
+autosave.setIntervalMs(2000);
+autosave.setConversation(id, [&] { return transcript; });
+autosave.setMetrics(QStringLiteral("all-time"), &metrics);   // hooks the collector itself
+connect(&agent, &Chat::Agent::finished, &autosave, &Storage::Autosave::touch);
+```
+
+`touch()` says something changed; the store is written at most once per
+interval. The conversation is fetched through a callback at save time rather
+than copied in, so an application that keeps editing its transcript does not
+hand over a new copy on every change — which is the per-change work the class
+exists to avoid.
+
+**The destructor does not save.** Tempting, but the source is a callback into
+the application, and calling it while that application is being torn down reads
+objects that may already be gone. Call `flush()` at shutdown, where the caller
+still knows what is alive. A failed save leaves the state dirty and emits
+`failed()` — a silent autosave failure is data loss nobody hears about.
+
+See [`examples/persistence.cpp`](examples/persistence.cpp); run it twice.
+
 ## Ready-made tools
 
 `QtOpenAi::Tools` is a set of tools a model can be given — the filesystem, one
@@ -2160,16 +2279,19 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `skills`            | Skill: publish → version → promote → zip (`/skills`) |
 | `chatkit`           | ChatKit session secret + thread transcript (`/chatkit`)|
 | `realtime`          | Live Realtime session over a WebSocket (`/realtime`)  |
+| `persistence`       | Conversation, cache and metrics kept across runs     |
 
 `realtime` is the one example that needs the optional `QtOpenAi::Realtime`
-module, so it is built only when `Qt6::WebSockets` is available; the rest need
-nothing beyond `QtOpenAi::Client`.
+module, so it is built only when `Qt6::WebSockets` is available. `persistence`
+uses the optional `QtOpenAi::Sql` module when it is there and falls back to the
+JSON-files store when it is not. The rest need nothing beyond
+`QtOpenAi::Client`.
 
 ## Building
 
 Requirements: CMake ≥ 3.21, a C++17 compiler, and Qt 6 (`Core`, `Network`,
-plus `Test` for the test suite and `WebSockets` for the optional
-`QtOpenAi::Realtime` module).
+plus `Test` for the test suite, `WebSockets` for the optional
+`QtOpenAi::Realtime` module and `Sql` for the optional `QtOpenAi::Sql` module).
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -2185,13 +2307,16 @@ ctest --test-dir build --output-on-failure
 | `QTOPENAI_BUILD_EXAMPLES` | `ON` top-level | Build the example programs.          |
 | `QTOPENAI_BUILD_SHARED`   | `ON`           | Build shared (vs. static) libraries. |
 | `QTOPENAI_BUILD_REALTIME` | Qt WebSockets  | Build `QtOpenAi::Realtime`; on when `Qt6::WebSockets` is found. |
+| `QTOPENAI_BUILD_SQL`      | Qt Sql         | Build `QtOpenAi::Sql`; on when `Qt6::Sql` is found. |
 
 ### Using it from another CMake project
 
 ```cmake
 add_subdirectory(QtOpenAi)
 target_link_libraries(myapp PRIVATE QtOpenAi::Client)     # pulls in Core
+target_link_libraries(myapp PRIVATE QtOpenAi::Storage)    # pulls in Chat + Client
 target_link_libraries(myapp PRIVATE QtOpenAi::Realtime)   # optional; adds WebSockets
+target_link_libraries(myapp PRIVATE QtOpenAi::Sql)        # optional; adds Sql
 ```
 
 ## Testing

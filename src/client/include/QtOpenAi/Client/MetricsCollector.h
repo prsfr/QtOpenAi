@@ -86,6 +86,16 @@ public:
 
     void reset();
 
+    // Carry on from a saved snapshot, which is the point of storing one: the
+    // totals a user sees are for their usage, not for this run of the process.
+    //
+    // Replaces what has been counted so far rather than adding to it. Adding
+    // would double every request in the common shape -- restore at startup,
+    // save at exit -- because the snapshot being restored already contains
+    // them. Requests in flight are unaffected; they are timed, not counted,
+    // until they finish.
+    void restore(const MetricsSnapshot &snapshot);
+
 Q_SIGNALS:
     // One completed request, whatever its outcome.
     void requestRecorded(const QtOpenAi::Client::RequestMetrics &metrics);

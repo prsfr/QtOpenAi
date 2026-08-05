@@ -58,6 +58,16 @@ qtopenai_add_example(assistant assistant.cpp)
 qtopenai_add_example(skills skills.cpp)
 qtopenai_add_example(chatkit chatkit.cpp)
 
+# --- Persistence ---
+qtopenai_add_example(persistence persistence.cpp)
+target_link_libraries(persistence PRIVATE QtOpenAi::Chat QtOpenAi::Storage)
+# The SQLite backend is optional, so the example demonstrates it only when the
+# module was built -- and falls back to the JSON-files store when it was not.
+if(QTOPENAI_BUILD_SQL)
+    target_link_libraries(persistence PRIVATE QtOpenAi::Sql)
+    target_compile_definitions(persistence PRIVATE QTOPENAI_EXAMPLES_HAVE_SQL)
+endif()
+
 # The Realtime example needs the optional WebSocket module as well as the client.
 if(QTOPENAI_BUILD_REALTIME)
     qtopenai_add_example(realtime realtime.cpp)

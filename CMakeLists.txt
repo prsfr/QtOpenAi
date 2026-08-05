@@ -62,6 +62,18 @@ if(QTOPENAI_BUILD_REALTIME AND NOT Qt6WebSockets_FOUND)
         "QTOPENAI_BUILD_REALTIME is ON but Qt6::WebSockets was not found.")
 endif()
 
+# The same arrangement for QtOpenAi::Sql, which is the SQLite backend of
+# QtOpenAi::Storage and the only module that needs Qt6::Sql. Storage itself,
+# and its JSON-files backend, are always built and need nothing beyond
+# Qt6::Core.
+find_package(Qt6 6.4 QUIET COMPONENTS Sql)
+option(QTOPENAI_BUILD_SQL "Build the QtOpenAi::Sql module (needs Qt6::Sql)"
+       ${Qt6Sql_FOUND})
+if(QTOPENAI_BUILD_SQL AND NOT Qt6Sql_FOUND)
+    message(FATAL_ERROR
+        "QTOPENAI_BUILD_SQL is ON but Qt6::Sql was not found.")
+endif()
+
 qt_standard_project_setup()
 
 # --------------------------------------------------------------------------
@@ -105,11 +117,14 @@ function(qtopenai_assert_headless target)
     endforeach()
 endfunction()
 
-foreach(module QtOpenAiCore QtOpenAiClient QtOpenAiChat QtOpenAiTools)
+foreach(module QtOpenAiCore QtOpenAiClient QtOpenAiChat QtOpenAiTools QtOpenAiStorage)
     qtopenai_assert_headless(${module})
 endforeach()
 if(QTOPENAI_BUILD_REALTIME)
     qtopenai_assert_headless(QtOpenAiRealtime)
+endif()
+if(QTOPENAI_BUILD_SQL)
+    qtopenai_assert_headless(QtOpenAiSql)
 endif()
 
 if(QTOPENAI_BUILD_TESTS)

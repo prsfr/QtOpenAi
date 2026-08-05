@@ -346,6 +346,26 @@ qtopenai_add_test(tst_chat_agent
     SOURCES chat/tst_agent.cpp
     LIBS QtOpenAi::Chat)
 
+# --- Storage module tests ---
+# tst_store runs every case against every backend, so it picks up the SQLite
+# one whenever that module was built. The define is what adds those rows; the
+# JSON-files backend is always there.
+qtopenai_add_test(tst_storage_store
+    SOURCES storage/tst_store.cpp
+    LIBS QtOpenAi::Storage)
+if(QTOPENAI_BUILD_SQL)
+    target_link_libraries(tst_storage_store PRIVATE QtOpenAi::Sql)
+    target_compile_definitions(tst_storage_store PRIVATE QTOPENAI_TESTS_HAVE_SQL)
+endif()
+
+qtopenai_add_test(tst_storage_persistentcache
+    SOURCES storage/tst_persistentcache.cpp
+    LIBS QtOpenAi::Storage)
+
+qtopenai_add_test(tst_storage_autosave
+    SOURCES storage/tst_autosave.cpp
+    LIBS QtOpenAi::Storage)
+
 # --- Realtime module tests (built with the module) ---
 if(QTOPENAI_BUILD_REALTIME)
     qtopenai_add_test(tst_realtime_connection
