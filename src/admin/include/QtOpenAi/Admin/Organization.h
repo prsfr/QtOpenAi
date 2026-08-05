@@ -3,15 +3,19 @@
 
 #include <QtOpenAi/Admin/CostsReply.h>
 #include <QtOpenAi/Admin/GlobalAdmin.h>
+#include <QtOpenAi/Admin/InviteReply.h>
 #include <QtOpenAi/Admin/ProjectListReply.h>
 #include <QtOpenAi/Admin/UsageQuery.h>
 #include <QtOpenAi/Admin/UsageReply.h>
+#include <QtOpenAi/Admin/UserReply.h>
 #include <QtOpenAi/Client/ListParams.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
+#include <QtOpenAi/Core/CreateInviteRequest.h>
 
 #include <QtCore/QObject>
 #include <QtCore/QScopedPointer>
 #include <QtCore/QString>
+#include <QtCore/QStringList>
 #include <QtCore/QUrl>
 
 namespace QtOpenAi {
@@ -116,6 +120,37 @@ public:
     // `endTime`, `bucketWidth`, `limit`, `page`, `projectIds` and a `groupBy` of
     // "project_id" and/or "line_item".
     CostsReply *costs(const UsageQuery &query);
+
+    // --- Members (/organization/users) -------------------------------------
+    // One page of the organization's members. `emails` restricts the page to
+    // those addresses, which is how an administration UI answers "is this
+    // person already in?" without walking every page.
+    UserListReply *listUsers(const Client::ListParams &params = {}, const QStringList &emails = {});
+
+    UserReply *getUser(const QString &userId);
+
+    // Change a member's organization role ("owner" or "reader"). Named for the
+    // one thing POST /organization/users/{id} can change, rather than a generic
+    // "modify": the request body has exactly one field.
+    UserReply *modifyUserRole(const QString &userId, const QString &role);
+
+    // Remove a member from the organization. The acknowledgement decodes into
+    // the same OrganizationUser, reporting the object as
+    // "organization.user.deleted".
+    UserReply *deleteUser(const QString &userId);
+
+    // --- Invitations (/organization/invites) --------------------------------
+    InviteListReply *listInvites(const Client::ListParams &params = {});
+
+    InviteReply *getInvite(const QString &inviteId);
+
+    // Invite someone to the organization. Sending an invitation is what adds a
+    // member: there is no endpoint that creates an OrganizationUser directly.
+    InviteReply *createInvite(const Core::CreateInviteRequest &request);
+
+    // Withdraw a pending invitation. This does not remove a member who has
+    // already accepted — that is deleteUser().
+    InviteReply *deleteInvite(const QString &inviteId);
 
 Q_SIGNALS:
     void baseUrlChanged();

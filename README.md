@@ -2047,6 +2047,35 @@ caller. Costs are the exception that earns its own type: `Core::CostResult`
 carries money — a value *and its currency*, never one without the other — which
 would not have survived that map.
 
+### Members and invitations
+
+Membership has two halves, and the API keeps them apart on purpose:
+
+```cpp
+organization.listUsers();                            // who is in
+organization.listInvites();                          // who has been asked
+organization.createInvite({email, QStringLiteral("reader")});
+organization.modifyUserRole(userId, QStringLiteral("owner"));
+organization.deleteUser(userId);
+```
+
+**An invitation is the pending half.** It exists until it is accepted, expires,
+or is withdrawn, and only then does a `Core::OrganizationUser` appear — there is
+no endpoint that creates a member directly. `deleteInvite()` withdraws an offer;
+`deleteUser()` removes someone who already accepted. They are not the same
+operation and this library does not pretend they are.
+
+Two roles are in play and they are *not* the same field. `Invite::role` and
+`OrganizationUser::role` are the organization role — "owner" or "reader" —
+while each `Core::InviteProject` carries a project role of its own. A reader in
+the organization can still own a project, which is exactly why flattening the two
+would have been wrong.
+
+Both are kept as the string the server sent, like `Project::status`: a role this
+build has never heard of has to survive a round trip rather than decay to the
+first enumerator — and on *this* field the wrong guess reports a reader as an
+owner.
+
 ### The request path, from another module
 
 That reuse is what `Client::planRequest()`, `adoptReply()` and the
@@ -2062,11 +2091,13 @@ The alternative was a second request path in the new module, kept in step with
 the first by hand. `ClientPrivate::issue()` now runs through the same two halves,
 so there is still exactly one implementation of *how a request is made*.
 
-Coverage so far is `GET /organization/projects`, the ten usage reports and
-`GET /organization/costs`; the rest of the surface is tracked in
+Coverage so far is `GET /organization/projects`, the ten usage reports,
+`GET /organization/costs`, and `/organization/users` and `/organization/invites`
+in full; the rest of the surface is tracked in
 [#28](https://github.com/prsfr/QtOpenAi/issues/28) and its sub-issues. See
-[`examples/organization.cpp`](examples/organization.cpp) and
-[`examples/organization_usage.cpp`](examples/organization_usage.cpp).
+[`examples/organization.cpp`](examples/organization.cpp),
+[`examples/organization_usage.cpp`](examples/organization_usage.cpp) and
+[`examples/organization_members.cpp`](examples/organization_members.cpp).
 
 ## Persistence (`QtOpenAi::Storage`)
 

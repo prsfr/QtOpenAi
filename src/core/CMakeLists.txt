@@ -74,6 +74,9 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/BucketPage.h
     include/QtOpenAi/Core/OrganizationUsage.h
     include/QtOpenAi/Core/OrganizationCosts.h
+    include/QtOpenAi/Core/OrganizationUser.h
+    include/QtOpenAi/Core/Invite.h
+    include/QtOpenAi/Core/CreateInviteRequest.h
     include/QtOpenAi/Core/Skill.h
     include/QtOpenAi/Core/SkillVersion.h
     include/QtOpenAi/Core/CreateSkillRequest.h
@@ -162,6 +165,9 @@ add_library(QtOpenAiCore
     src/Project.cpp
     src/OrganizationUsage.cpp
     src/OrganizationCosts.cpp
+    src/OrganizationUser.cpp
+    src/Invite.cpp
+    src/CreateInviteRequest.cpp
     src/Skill.cpp
     src/SkillVersion.cpp
     src/CreateSkillRequest.cpp
