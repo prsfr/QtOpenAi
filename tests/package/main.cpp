@@ -75,9 +75,13 @@ int main(int argc, char **argv)
     Admin::UsageQuery usageQuery;
     usageQuery.startTime = 1730419200;
     Core::CreateInviteRequest invitation(QStringLiteral("a@example.com"), QStringLiteral("reader"));
+    Core::ProjectRateLimit rateLimit;
+    rateLimit.setMaxRequestsPerMinute(600);
     const bool adminReady = organization.adminKey() == QStringLiteral("sk-admin-test")
                             && usageQuery.toQuery().hasQueryItem(QStringLiteral("start_time"))
-                            && invitation.toJson().contains(QStringLiteral("role"));
+                            && invitation.toJson().contains(QStringLiteral("role"))
+                            // Only the limit that was set, not the other five.
+                            && rateLimit.toJson().size() == 1;
 
     // The Storage module, against a directory that goes away with this process.
     QTemporaryDir storeRoot;

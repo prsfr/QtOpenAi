@@ -15,7 +15,10 @@
 set(QTOPENAI_ADMIN_PUBLIC_HEADERS
     include/QtOpenAi/Admin/GlobalAdmin.h
     include/QtOpenAi/Admin/Organization.h
-    include/QtOpenAi/Admin/ProjectListReply.h
+    include/QtOpenAi/Admin/ProjectReply.h
+    include/QtOpenAi/Admin/ProjectServiceAccountReply.h
+    include/QtOpenAi/Admin/ProjectApiKeyReply.h
+    include/QtOpenAi/Admin/ProjectRateLimitReply.h
     include/QtOpenAi/Admin/UsageQuery.h
     include/QtOpenAi/Admin/UsageReply.h
     include/QtOpenAi/Admin/CostsReply.h

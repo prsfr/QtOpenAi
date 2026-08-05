@@ -1996,6 +1996,51 @@ Client::LoggingInterceptor logger;
 organization.addInterceptor(&logger);            // covers /organization too
 ```
 
+### Projects and what lives inside them
+
+```cpp
+organization.listProjects();
+organization.createProject(QStringLiteral("Staging"));
+organization.archiveProject(projectId);              // a POST, not a DELETE
+
+organization.listProjectUsers(projectId);            // and service accounts,
+organization.listProjectApiKeys(projectId);          // API keys, rate limits
+```
+
+**Archiving is not deleting, and there is no `deleteProject()`.** A project is
+what usage and cost records point at, so the API has no way to remove one:
+archiving sets `status` and stamps `archivedAt`, and the billing history keeps
+explaining itself. It reads like a delete at the call site, which is why the
+method is named for what it does.
+
+The nested collections all repeat one shape under a project id, so their paths
+are composed from the collection constants rather than spelled out per call
+site — and the data-driven test asserts every composed path, because a wrong one
+is a 404 rather than a wrong answer.
+
+**Secrets appear exactly once.** `createProjectServiceAccount()` is the only
+reply that carries a usable key (`Core::ServiceAccountApiKey::value`); every
+later read is a `Core::ProjectApiKey`, which has a `redactedValue()` and no
+`value` at all. There is no endpoint that creates a project API key — a listing
+that handed out live credentials would make the admin key a master key.
+
+`Core::ProjectApiKey::owner()` keeps the API's tagged union rather than
+flattening it to one name: which kind of principal holds a key — a person or a
+service account — is the question an audit asks first.
+
+A rate limit update is **partial**, and `Core::ProjectRateLimit` makes that
+structural: every limit is a `std::optional`, so only what the caller set goes on
+the wire.
+
+```cpp
+Core::ProjectRateLimit limits;
+limits.setMaxRequestsPerMinute(600);        // the only field sent
+organization.modifyProjectRateLimit(projectId, rateLimitId, limits);
+```
+
+A plain `int` would have made "leave this alone" and "set this to zero" the same
+value — and zero here means the model is unusable in that project.
+
 ### Usage and costs
 
 What did last week cost, and what spent it? Eleven endpoints answer that — ten
@@ -2091,13 +2136,16 @@ The alternative was a second request path in the new module, kept in step with
 the first by hand. `ClientPrivate::issue()` now runs through the same two halves,
 so there is still exactly one implementation of *how a request is made*.
 
-Coverage so far is `GET /organization/projects`, the ten usage reports,
-`GET /organization/costs`, and `/organization/users` and `/organization/invites`
-in full; the rest of the surface is tracked in
+Coverage so far is the ten usage reports and `/organization/costs`,
+`/organization/users` and `/organization/invites` in full, and
+`/organization/projects` with its members, service accounts, API keys and rate
+limits; the rest of the surface — groups, certificates, model and hosted-tool
+permissions, audit logs, spend alerts — is tracked in
 [#28](https://github.com/prsfr/QtOpenAi/issues/28) and its sub-issues. See
 [`examples/organization.cpp`](examples/organization.cpp),
-[`examples/organization_usage.cpp`](examples/organization_usage.cpp) and
-[`examples/organization_members.cpp`](examples/organization_members.cpp).
+[`examples/organization_usage.cpp`](examples/organization_usage.cpp),
+[`examples/organization_members.cpp`](examples/organization_members.cpp) and
+[`examples/organization_projects.cpp`](examples/organization_projects.cpp).
 
 ## Persistence (`QtOpenAi::Storage`)
 
