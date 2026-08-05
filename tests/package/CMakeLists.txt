@@ -12,7 +12,7 @@ find_package(QtOpenAi REQUIRED)
 
 add_executable(consumer main.cpp)
 target_link_libraries(consumer
-    PRIVATE QtOpenAi::Client QtOpenAi::Chat QtOpenAi::Tools QtOpenAi::Storage)
+    PRIVATE QtOpenAi::Client QtOpenAi::Chat QtOpenAi::Tools QtOpenAi::Storage QtOpenAi::Admin)
 
 # QtOpenAi::Realtime is optional (it needs Qt6::WebSockets), so the consumer
 # exercises it only when the installed package actually carries it.

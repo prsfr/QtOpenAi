@@ -28,6 +28,7 @@ follows Qt conventions throughout: implicitly-shared value types, `d`-pointer
 | `QtOpenAi::Chat`     | `QtOpenAiChat`    | Conversation history, branching, trimming, and the agent loop. |
 | `QtOpenAi::Tools`    | `QtOpenAiTools`   | Ready-made tools for the `ToolRegistry`, sandboxed and opt-in. |
 | `QtOpenAi::Storage`  | `QtOpenAiStorage` | Persisting conversations, cached responses and metrics.    |
+| `QtOpenAi::Admin`    | `QtOpenAiAdmin`   | The `/organization` administration surface (admin key).    |
 | `QtOpenAi::Realtime` | `QtOpenAiRealtime`| The Realtime WebSocket channel (optional).                 |
 | `QtOpenAi::Sql`      | `QtOpenAiSql`     | The SQLite backend for `Storage` (optional).               |
 
@@ -38,7 +39,9 @@ networking, so history can be built, trimmed and persisted with no `Client` in
 sight. `QtOpenAi::Storage` is the one place that touches all three of
 `Transcript`, `MetricsSnapshot` and `ResponseCache`, which is why it is its own
 module rather than living in `Chat` or `Client` — either choice would have made
-that module depend on the other.
+that module depend on the other. `QtOpenAi::Admin` is separate for a different
+reason: it takes a different *credential*, and the type system is what keeps the
+two apart — see [Administration](#administration-qtopenaiadmin).
 
 The two optional modules are each a single Qt dependency that nothing else
 needs. `QtOpenAi::Realtime` depends on `Core` and `Qt6::WebSockets`, and is built
@@ -1963,6 +1966,56 @@ shorter vector.
 
 See [`examples/semantic_search.cpp`](examples/semantic_search.cpp).
 
+## Administration (`QtOpenAi::Admin`)
+
+The `/organization` surface — usage and costs, users and invites, projects,
+roles, certificates, admin keys, audit logs — uses an **admin** API key, and
+that is why it is a separate object rather than more methods on `Client`:
+
+```cpp
+Admin::Organization organization(baseUrl, adminKey);
+Admin::ProjectListReply *reply = organization.listProjects();
+```
+
+An admin key can archive a project or revoke a colleague's access; a standard
+key can only spend money answering questions. Putting these endpoints on
+`Client::Client` would have meant one object type carrying either kind of
+credential, with nothing to stop the admin key from being sent to
+`/chat/completions`. Two types, two keys, and the compiler keeps them apart.
+`Organization` deliberately does not hand out the client it uses inside, because
+that would give the ability back.
+
+**It is not a second networking stack.** Requests go through `Client`'s
+documented request path, so the administration surface gets the same retry
+policy, the same interceptor chain — including the credential redaction in
+`LoggingInterceptor`, which matters more here than anywhere else — and the same
+rate limiter, from one implementation rather than a copy:
+
+```cpp
+Client::LoggingInterceptor logger;
+organization.addInterceptor(&logger);            // covers /organization too
+```
+
+### The request path, from another module
+
+That reuse is what `Client::planRequest()`, `adoptReply()` and the
+`issueRequest<Reply>()` template that composes them exist for. They are the
+extension point for a module adding an endpoint family — not the way to call an
+endpoint, which is what the ~165 named methods on `Client` are for:
+
+```cpp
+return client.issueRequest<ProjectListReply>(Client::Verb::Get, "/organization/projects", query);
+```
+
+The alternative was a second request path in the new module, kept in step with
+the first by hand. `ClientPrivate::issue()` now runs through the same two halves,
+so there is still exactly one implementation of *how a request is made*.
+
+Coverage so far is the module itself plus `GET /organization/projects`; the rest
+of the surface is tracked in [#28](https://github.com/prsfr/QtOpenAi/issues/28)
+and its sub-issues. See
+[`examples/organization.cpp`](examples/organization.cpp).
+
 ## Persistence (`QtOpenAi::Storage`)
 
 A desktop application closed at the end of the day should open tomorrow with
@@ -2280,6 +2333,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `chatkit`           | ChatKit session secret + thread transcript (`/chatkit`)|
 | `realtime`          | Live Realtime session over a WebSocket (`/realtime`)  |
 | `persistence`       | Conversation, cache and metrics kept across runs     |
+| `organization`      | List the organization's projects (`/organization`)   |
 
 `realtime` is the one example that needs the optional `QtOpenAi::Realtime`
 module, so it is built only when `Qt6::WebSockets` is available. `persistence`
@@ -2315,6 +2369,7 @@ ctest --test-dir build --output-on-failure
 add_subdirectory(QtOpenAi)
 target_link_libraries(myapp PRIVATE QtOpenAi::Client)     # pulls in Core
 target_link_libraries(myapp PRIVATE QtOpenAi::Storage)    # pulls in Chat + Client
+target_link_libraries(myapp PRIVATE QtOpenAi::Admin)      # the /organization surface
 target_link_libraries(myapp PRIVATE QtOpenAi::Realtime)   # optional; adds WebSockets
 target_link_libraries(myapp PRIVATE QtOpenAi::Sql)        # optional; adds Sql
 ```

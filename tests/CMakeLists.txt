@@ -366,6 +366,11 @@ qtopenai_add_test(tst_storage_autosave
     SOURCES storage/tst_autosave.cpp
     LIBS QtOpenAi::Storage)
 
+# --- Admin module tests ---
+qtopenai_add_test(tst_admin_organization
+    SOURCES admin/tst_organization.cpp
+    LIBS QtOpenAi::Admin)
+
 # --- Realtime module tests (built with the module) ---
 if(QTOPENAI_BUILD_REALTIME)
     qtopenai_add_test(tst_realtime_connection
