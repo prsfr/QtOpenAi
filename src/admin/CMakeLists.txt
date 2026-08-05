@@ -16,11 +16,15 @@ set(QTOPENAI_ADMIN_PUBLIC_HEADERS
     include/QtOpenAi/Admin/GlobalAdmin.h
     include/QtOpenAi/Admin/Organization.h
     include/QtOpenAi/Admin/ProjectListReply.h
+    include/QtOpenAi/Admin/UsageQuery.h
+    include/QtOpenAi/Admin/UsageReply.h
+    include/QtOpenAi/Admin/CostsReply.h
 )
 
 add_library(QtOpenAiAdmin
     ${QTOPENAI_ADMIN_PUBLIC_HEADERS}
     src/Organization.cpp
+    src/UsageQuery.cpp
 )
 
 add_library(QtOpenAi::Admin ALIAS QtOpenAiAdmin)

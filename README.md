@@ -1996,6 +1996,57 @@ Client::LoggingInterceptor logger;
 organization.addInterceptor(&logger);            // covers /organization too
 ```
 
+### Usage and costs
+
+What did last week cost, and what spent it? Eleven endpoints answer that — ten
+usage reports and `/organization/costs` — and they all take the same query and
+answer in the same shape:
+
+```cpp
+Admin::UsageQuery query;
+query.startTime = QDateTime::currentSecsSinceEpoch() - 7 * 24 * 3600;   // required
+query.bucketWidth = QStringLiteral("1d");
+query.groupBy = {QStringLiteral("model")};
+
+organization.usage(Admin::Organization::UsageKind::Completions, query);
+organization.costs(query);
+```
+
+So they are **one method with an enumerator, not ten methods**, and **one query
+type, not eleven signatures spelling out the same six parameters**. That second
+one is the part worth getting right: a query the server does not understand does
+not fail, it comes back as a perfectly valid report of the wrong thing — which is
+why the tests assert the query string that goes on the wire rather than the
+reply.
+
+A report is a page of time buckets, and a bucket is a time range plus rows:
+
+```cpp
+for (const Core::UsageBucket &bucket : usage.data)        // one per day here
+    for (const Core::UsageResult &row : bucket.results)   // one per model
+        chart.add(bucket.startTime, row.model(), row.totalTokens());
+```
+
+An **empty bucket is a bucket**. The server sends the quiet days too, and keeping
+them is what lets a caller plot the series without inventing the gaps.
+
+`Core::UsageResult` is likewise one type for all ten reports rather than ten that
+differ by an integer. The grouping keys — project, user, key, model — are the
+same everywhere and are typed members; the counters differ per endpoint
+(`input_tokens` for completions, `characters` for speech, `usage_bytes` for
+vector stores) and live in a map behind named accessors:
+
+```cpp
+row.inputTokens();                                  // the documented ones, typed
+row.metric(QStringLiteral("reasoning_tokens"));     // and one added after this build
+```
+
+Ten near-identical classes would have been ten places to keep in step, and any
+counter guessed wrong would have decoded as a silent zero instead of reaching the
+caller. Costs are the exception that earns its own type: `Core::CostResult`
+carries money — a value *and its currency*, never one without the other — which
+would not have survived that map.
+
 ### The request path, from another module
 
 That reuse is what `Client::planRequest()`, `adoptReply()` and the
@@ -2011,10 +2062,11 @@ The alternative was a second request path in the new module, kept in step with
 the first by hand. `ClientPrivate::issue()` now runs through the same two halves,
 so there is still exactly one implementation of *how a request is made*.
 
-Coverage so far is the module itself plus `GET /organization/projects`; the rest
-of the surface is tracked in [#28](https://github.com/prsfr/QtOpenAi/issues/28)
-and its sub-issues. See
-[`examples/organization.cpp`](examples/organization.cpp).
+Coverage so far is `GET /organization/projects`, the ten usage reports and
+`GET /organization/costs`; the rest of the surface is tracked in
+[#28](https://github.com/prsfr/QtOpenAi/issues/28) and its sub-issues. See
+[`examples/organization.cpp`](examples/organization.cpp) and
+[`examples/organization_usage.cpp`](examples/organization_usage.cpp).
 
 ## Persistence (`QtOpenAi::Storage`)
 
