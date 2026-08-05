@@ -44,6 +44,7 @@
 #include <QtOpenAi/Client/GlobalClient.h>
 #include <QtOpenAi/Client/ImageReply.h>
 #include <QtOpenAi/Client/InputTokensReply.h>
+#include <QtOpenAi/Client/Interceptor.h>
 #include <QtOpenAi/Client/ListParams.h>
 #include <QtOpenAi/Client/ModelListReply.h>
 #include <QtOpenAi/Client/ModelReply.h>
@@ -122,11 +123,14 @@
 #include <QtCore/QString>
 #include <QtCore/QStringList>
 #include <QtCore/QUrl>
+#include <QtCore/QUrlQuery>
 
+#include <functional>
 #include <utility>
 
 class QIODevice;
 class QNetworkAccessManager;
+class QNetworkReply;
 
 namespace QtOpenAi {
 namespace Client {
@@ -922,6 +926,69 @@ public:
 
     // Retrieve a single model by id.
     ModelReply *getModel(const QString &modelId);
+
+    // --- The request path, for an endpoint surface in another module -------
+    //
+    // Everything above is one call into the same private plumbing: build the
+    // request, run the interceptor chain, capture a retry factory, attach the
+    // rate-limit gate. That plumbing is what makes a change to *how* requests
+    // are made reach every endpoint at once, and it is deliberately the only
+    // path there is.
+    //
+    // A module that adds its own endpoint family -- QtOpenAi::Admin, whose
+    // /organization surface uses a different credential and therefore a
+    // different client object -- needs that same plumbing, and the alternative
+    // was for it to grow a second request path that would have to be kept in
+    // step with this one by hand. So the path is reachable from outside
+    // instead, in the two halves it naturally has: plan the request, then adopt
+    // the reply the caller built from the plan.
+    //
+    //     Reply *reply = client.issueRequest<Reply>(Verb::Get, "/organization/projects");
+    //
+    // This is not the API for calling an endpoint -- there is a named method
+    // above for every one of those. It is the API for *adding* endpoints from a
+    // module that cannot see ClientPrivate.
+    enum class Verb {
+        Get,
+        Post,
+        Delete
+    };
+    Q_ENUM(Verb)
+
+    // What the transport needs for one non-streaming request. Opaque to the
+    // caller: produced by planRequest(), consumed by adoptReply(), and carried
+    // between them only so the two halves need not share private state.
+    struct RequestPlan
+    {
+        std::function<QNetworkReply *()> factory;
+        RetryPolicy policy;
+        InterceptedRequest sent;
+        // An interceptor answered instead of the network, so the request spends
+        // no rate-limit budget and made no round trip.
+        bool answeredLocally = false;
+    };
+
+    // The outgoing half: URL, credential and headers from this client, then the
+    // interceptor chain. `beta` is the OpenAI-Beta header value for an endpoint
+    // family behind a beta flag, or nullptr.
+    RequestPlan planRequest(Verb verb, const QString &path, const QUrlQuery &query = {},
+                            const QByteArray &body = {}, const char *beta = nullptr);
+
+    // The returning half: hook the interceptor chain's afterResponse to the
+    // reply and hold it behind the rate limiter until there is budget.
+    void adoptReply(RestReplyBase *reply, const RequestPlan &plan);
+
+    // Both halves with the reply built in between. The reply type is the
+    // caller's; everything else is this client's.
+    template <typename Reply>
+    Reply *issueRequest(Verb verb, const QString &path, const QUrlQuery &query = {},
+                        const QByteArray &body = {}, const char *beta = nullptr)
+    {
+        RequestPlan plan = planRequest(verb, path, query, body, beta);
+        Reply *reply = makeReply<Reply>(this, plan.factory, plan.policy);
+        adoptReply(reply, plan);
+        return reply;
+    }
 
 Q_SIGNALS:
     void baseUrlChanged();

@@ -4,6 +4,7 @@
 // the namespaced imported targets to prove headers, libraries and the config
 // package all resolve.
 
+#include <QtOpenAi/Admin/Organization.h>
 #include <QtOpenAi/Chat/Transcript.h>
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/ToolRegistry.h>
@@ -67,6 +68,12 @@ int main(int argc, char **argv)
     Core::VectorIndex index;
     index.add(QStringLiteral("a"), {1.0, 0.0});
 
+    // The Admin module. Configured but not called: the administration surface
+    // needs an admin key and a server, and this smoke test has neither.
+    Admin::Organization organization(QUrl(QStringLiteral("http://localhost:1234/v1")),
+                                     QStringLiteral("sk-admin-test"));
+    const bool adminReady = organization.adminKey() == QStringLiteral("sk-admin-test");
+
     // The Storage module, against a directory that goes away with this process.
     QTemporaryDir storeRoot;
     Storage::JsonFileStore store(storeRoot.path());
@@ -86,6 +93,7 @@ int main(int argc, char **argv)
             = request.toJson().value(QStringLiteral("model")).toString() == QStringLiteral("gpt-4o")
               && registry.tools().size() == 1 && granted == 0 && index.size() == 1
               && index.search({1.0, 0.0}, 1).size() == 1
-              && transcript.buildRequest(QStringLiteral("gpt-4o")).messages().size() == 2 && stored;
+              && transcript.buildRequest(QStringLiteral("gpt-4o")).messages().size() == 2 && stored
+              && adminReady;
     return ok ? 0 : 1;
 }

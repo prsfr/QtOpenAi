@@ -117,7 +117,7 @@ function(qtopenai_assert_headless target)
     endforeach()
 endfunction()
 
-foreach(module QtOpenAiCore QtOpenAiClient QtOpenAiChat QtOpenAiTools QtOpenAiStorage)
+foreach(module QtOpenAiCore QtOpenAiClient QtOpenAiChat QtOpenAiTools QtOpenAiStorage QtOpenAiAdmin)
     qtopenai_assert_headless(${module})
 endforeach()
 if(QTOPENAI_BUILD_REALTIME)

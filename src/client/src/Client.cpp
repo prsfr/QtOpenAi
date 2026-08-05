@@ -86,6 +86,15 @@ public:
     Reply *issue(const QByteArray &method, QNetworkRequest request, const QByteArray &body,
                  MakeFactory makeFactory) const;
 
+    // The outgoing half of issue(), with the reply type factored out. It has to
+    // be a non-template so that Client::planRequest() -- reachable from a
+    // module that never sees this class -- runs this exact code rather than a
+    // second copy of it. The factory maker is type-erased for the same reason;
+    // one std::function hop per request buys the single implementation.
+    using FactoryMaker = std::function<std::function<QNetworkReply *()>(QNetworkRequest)>;
+    Client::RequestPlan plan(const QByteArray &method, QNetworkRequest request,
+                             const QByteArray &body, const FactoryMaker &makeFactory) const;
+
     // The outgoing half on its own, for the streaming path.
     std::optional<InterceptedResponse> runBeforeRequest(InterceptedRequest &request) const;
     // The returning half, hung off the reply that is about to run.
@@ -708,28 +717,73 @@ template <typename Reply, typename MakeFactory>
 Reply *ClientPrivate::issue(const QByteArray &method, QNetworkRequest request,
                             const QByteArray &body, MakeFactory makeFactory) const
 {
-    InterceptedRequest outgoing {method, std::move(request), body};
-    const std::optional<InterceptedResponse> answer = runBeforeRequest(outgoing);
+    const Client::RequestPlan planned = plan(method, std::move(request), body, makeFactory);
+    Reply *reply = Client::makeReply<Reply>(q, planned.factory, planned.policy);
+    q->adoptReply(reply, planned);
+    return reply;
+}
 
-    std::function<QNetworkReply *()> factory;
+Client::RequestPlan ClientPrivate::plan(const QByteArray &method, QNetworkRequest request,
+                                        const QByteArray &body,
+                                        const FactoryMaker &makeFactory) const
+{
+    Client::RequestPlan planned;
+    planned.sent = InterceptedRequest {method, std::move(request), body};
+    const std::optional<InterceptedResponse> answer = runBeforeRequest(planned.sent);
+    planned.answeredLocally = answer.has_value();
+
     if (answer) {
         // Answered locally. It still becomes a QNetworkReply, so everything
-        // below -- retry engine, rate-limit parsing, typed decoding -- runs
-        // exactly as it does for a real response instead of via a second path
-        // that would have to be kept in step with the first.
-        factory = [sent = outgoing.request, answered = *answer]() {
+        // downstream -- retry engine, rate-limit parsing, typed decoding --
+        // runs exactly as it does for a real response instead of via a second
+        // path that would have to be kept in step with the first.
+        planned.factory = [sent = planned.sent.request, answered = *answer]() {
             return new CannedReply(sent, answered.body, answered.httpStatus, "application/json");
         };
     } else {
-        factory = makeFactory(outgoing.request);
+        planned.factory = makeFactory(planned.sent.request);
     }
+    planned.policy = retryPolicy;
+    return planned;
+}
 
-    Reply *reply = Client::makeReply<Reply>(q, std::move(factory), retryPolicy);
-    runAfterResponse(reply, outgoing, answer.has_value());
+Client::RequestPlan Client::planRequest(Verb verb, const QString &path, const QUrlQuery &query,
+                                        const QByteArray &body, const char *beta)
+{
+    Q_D(Client);
+    QNetworkRequest request = apiRequest(d, path, beta);
+    applyQuery(request, query);
+    QNetworkAccessManager *manager = networkAccessManager();
+
+    switch (verb) {
+    case Verb::Post:
+        return d->plan("POST", std::move(request), body, [d, manager, body](QNetworkRequest sent) {
+            return postFactory(d, manager, std::move(sent), body);
+        });
+    case Verb::Delete:
+        // The body is dropped rather than passed along: a DELETE sends none, and
+        // handing one to the interceptor chain would show it a payload that
+        // never reaches the wire.
+        return d->plan("DELETE", std::move(request), {}, [manager](QNetworkRequest sent) {
+            return deleteFactory(manager, std::move(sent));
+        });
+    case Verb::Get:
+        break;
+    }
+    return d->plan("GET", std::move(request), {}, [manager](QNetworkRequest sent) {
+        return getFactory(manager, std::move(sent));
+    });
+}
+
+void Client::adoptReply(RestReplyBase *reply, const RequestPlan &plan)
+{
+    Q_D(Client);
+    if (!reply)
+        return;
+    d->runAfterResponse(reply, plan.sent, plan.answeredLocally);
     // A request answered locally spends no budget, because it makes no request.
-    if (!answer)
-        gateDispatch(reply, outgoing.body);
-    return reply;
+    if (!plan.answeredLocally)
+        d->gateDispatch(reply, plan.sent.body);
 }
 
 template <typename Reply>
