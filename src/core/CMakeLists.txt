@@ -71,6 +71,9 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/RunStep.h
     include/QtOpenAi/Core/CreateRunRequest.h
     include/QtOpenAi/Core/Project.h
+    include/QtOpenAi/Core/BucketPage.h
+    include/QtOpenAi/Core/OrganizationUsage.h
+    include/QtOpenAi/Core/OrganizationCosts.h
     include/QtOpenAi/Core/Skill.h
     include/QtOpenAi/Core/SkillVersion.h
     include/QtOpenAi/Core/CreateSkillRequest.h
@@ -157,6 +160,8 @@ add_library(QtOpenAiCore
     src/RunStep.cpp
     src/CreateRunRequest.cpp
     src/Project.cpp
+    src/OrganizationUsage.cpp
+    src/OrganizationCosts.cpp
     src/Skill.cpp
     src/SkillVersion.cpp
     src/CreateSkillRequest.cpp

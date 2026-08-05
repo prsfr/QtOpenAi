@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Admin/CostsReply.h>
 #include <QtOpenAi/Admin/GlobalAdmin.h>
 #include <QtOpenAi/Admin/ProjectListReply.h>
+#include <QtOpenAi/Admin/UsageQuery.h>
+#include <QtOpenAi/Admin/UsageReply.h>
 #include <QtOpenAi/Client/ListParams.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
 
@@ -84,6 +87,35 @@ public:
     // what an administration UI shows first.
     ProjectListReply *listProjects(const Client::ListParams &params = {},
                                    bool includeArchived = false);
+
+    // --- Usage and costs (/organization/usage/*, /organization/costs) ------
+    // Which usage report to ask for. The ten endpoints under
+    // /organization/usage differ only in their last path segment and in which
+    // counters a row carries, so they are one method with an enumerator rather
+    // than ten identically-shaped methods: the list of endpoints then lives in
+    // one place, and adding the next one is an enumerator and a path.
+    enum class UsageKind {
+        Completions,
+        Embeddings,
+        Images,
+        Moderations,
+        AudioSpeeches,
+        AudioTranscriptions,
+        VectorStores,
+        CodeInterpreterSessions,
+        FileSearchCalls,
+        WebSearchCalls,
+    };
+    Q_ENUM(UsageKind)
+
+    // One page of usage buckets. `query.startTime` is required by the API; see
+    // UsageQuery for which of its filters each report honours.
+    UsageReply *usage(UsageKind kind, const UsageQuery &query);
+
+    // One page of cost buckets. Same query type, and it honours `startTime`,
+    // `endTime`, `bucketWidth`, `limit`, `page`, `projectIds` and a `groupBy` of
+    // "project_id" and/or "line_item".
+    CostsReply *costs(const UsageQuery &query);
 
 Q_SIGNALS:
     void baseUrlChanged();

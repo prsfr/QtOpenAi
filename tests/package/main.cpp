@@ -72,7 +72,10 @@ int main(int argc, char **argv)
     // needs an admin key and a server, and this smoke test has neither.
     Admin::Organization organization(QUrl(QStringLiteral("http://localhost:1234/v1")),
                                      QStringLiteral("sk-admin-test"));
-    const bool adminReady = organization.adminKey() == QStringLiteral("sk-admin-test");
+    Admin::UsageQuery usageQuery;
+    usageQuery.startTime = 1730419200;
+    const bool adminReady = organization.adminKey() == QStringLiteral("sk-admin-test")
+                            && usageQuery.toQuery().hasQueryItem(QStringLiteral("start_time"));
 
     // The Storage module, against a directory that goes away with this process.
     QTemporaryDir storeRoot;

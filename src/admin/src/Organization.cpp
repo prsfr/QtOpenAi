@@ -8,9 +8,42 @@ namespace Admin {
 
 namespace {
 
-// The collection this module's first endpoint family hangs off. Spelled once,
-// as the endpoint paths in Client are.
-constexpr auto kProjects = "/organization/projects";
+// The collections this module's endpoint families hang off. Spelled once, as
+// the endpoint paths in Client are.
+constexpr QLatin1String kProjects("/organization/projects");
+constexpr QLatin1String kUsage("/organization/usage/");
+constexpr QLatin1String kCosts("/organization/costs");
+
+// The last path segment of each usage report. A switch rather than a table
+// indexed by the enumerator, so that adding an enumerator without a path is a
+// compiler warning rather than a lookup past the end of an array. Completions
+// falls out of the switch, as the default verb does in Client::planRequest.
+QLatin1String usageSegment(Organization::UsageKind kind)
+{
+    switch (kind) {
+    case Organization::UsageKind::Completions:
+        break;
+    case Organization::UsageKind::Embeddings:
+        return QLatin1String("embeddings");
+    case Organization::UsageKind::Images:
+        return QLatin1String("images");
+    case Organization::UsageKind::Moderations:
+        return QLatin1String("moderations");
+    case Organization::UsageKind::AudioSpeeches:
+        return QLatin1String("audio_speeches");
+    case Organization::UsageKind::AudioTranscriptions:
+        return QLatin1String("audio_transcriptions");
+    case Organization::UsageKind::VectorStores:
+        return QLatin1String("vector_stores");
+    case Organization::UsageKind::CodeInterpreterSessions:
+        return QLatin1String("code_interpreter_sessions");
+    case Organization::UsageKind::FileSearchCalls:
+        return QLatin1String("file_search_calls");
+    case Organization::UsageKind::WebSearchCalls:
+        return QLatin1String("web_search_calls");
+    }
+    return QLatin1String("completions");
+}
 
 } // namespace
 
@@ -112,8 +145,21 @@ ProjectListReply *Organization::listProjects(const Client::ListParams &params, b
     if (includeArchived)
         query.addQueryItem(QStringLiteral("include_archived"), QStringLiteral("true"));
 
-    return d->client.issueRequest<ProjectListReply>(Client::Client::Verb::Get,
-                                                    QLatin1String(kProjects), query);
+    return d->client.issueRequest<ProjectListReply>(Client::Client::Verb::Get, kProjects, query);
+}
+
+UsageReply *Organization::usage(UsageKind kind, const UsageQuery &query)
+{
+    Q_D(Organization);
+    QString path(kUsage);
+    path += usageSegment(kind);
+    return d->client.issueRequest<UsageReply>(Client::Client::Verb::Get, path, query.toQuery());
+}
+
+CostsReply *Organization::costs(const UsageQuery &query)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<CostsReply>(Client::Client::Verb::Get, kCosts, query.toQuery());
 }
 
 } // namespace Admin

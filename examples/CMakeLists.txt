@@ -61,6 +61,8 @@ qtopenai_add_example(chatkit chatkit.cpp)
 # --- Administration (v1.0) ---
 qtopenai_add_example(organization organization.cpp)
 target_link_libraries(organization PRIVATE QtOpenAi::Admin)
+qtopenai_add_example(organization_usage organization_usage.cpp)
+target_link_libraries(organization_usage PRIVATE QtOpenAi::Admin)
 
 # --- Persistence ---
 qtopenai_add_example(persistence persistence.cpp)
