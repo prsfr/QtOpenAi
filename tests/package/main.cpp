@@ -74,8 +74,10 @@ int main(int argc, char **argv)
                                      QStringLiteral("sk-admin-test"));
     Admin::UsageQuery usageQuery;
     usageQuery.startTime = 1730419200;
+    Core::CreateInviteRequest invitation(QStringLiteral("a@example.com"), QStringLiteral("reader"));
     const bool adminReady = organization.adminKey() == QStringLiteral("sk-admin-test")
-                            && usageQuery.toQuery().hasQueryItem(QStringLiteral("start_time"));
+                            && usageQuery.toQuery().hasQueryItem(QStringLiteral("start_time"))
+                            && invitation.toJson().contains(QStringLiteral("role"));
 
     // The Storage module, against a directory that goes away with this process.
     QTemporaryDir storeRoot;

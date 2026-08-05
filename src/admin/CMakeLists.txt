@@ -19,6 +19,8 @@ set(QTOPENAI_ADMIN_PUBLIC_HEADERS
     include/QtOpenAi/Admin/UsageQuery.h
     include/QtOpenAi/Admin/UsageReply.h
     include/QtOpenAi/Admin/CostsReply.h
+    include/QtOpenAi/Admin/UserReply.h
+    include/QtOpenAi/Admin/InviteReply.h
 )
 
 add_library(QtOpenAiAdmin

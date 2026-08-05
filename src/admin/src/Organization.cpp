@@ -3,6 +3,9 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
+
 namespace QtOpenAi {
 namespace Admin {
 
@@ -13,6 +16,24 @@ namespace {
 constexpr QLatin1String kProjects("/organization/projects");
 constexpr QLatin1String kUsage("/organization/usage/");
 constexpr QLatin1String kCosts("/organization/costs");
+constexpr QLatin1String kUsers("/organization/users");
+constexpr QLatin1String kInvites("/organization/invites");
+
+// One member of a collection, e.g. ("/organization/users", "user_1"). The same
+// helper Client.cpp composes its nested paths with, kept here so the endpoint
+// methods stay free of string arithmetic.
+QString resourcePath(QLatin1String collection, const QString &id)
+{
+    QString path(collection);
+    path += QLatin1Char('/') + id;
+    return path;
+}
+
+// Serialise a request body object into a compact JSON payload, as Client does.
+QByteArray compactJson(const QJsonObject &json)
+{
+    return QJsonDocument(json).toJson(QJsonDocument::Compact);
+}
 
 // The last path segment of each usage report. A switch rather than a table
 // indexed by the enumerator, so that adding an enumerator without a path is a
@@ -160,6 +181,70 @@ CostsReply *Organization::costs(const UsageQuery &query)
 {
     Q_D(Organization);
     return d->client.issueRequest<CostsReply>(Client::Client::Verb::Get, kCosts, query.toQuery());
+}
+
+UserListReply *Organization::listUsers(const Client::ListParams &params, const QStringList &emails)
+{
+    Q_D(Organization);
+    QUrlQuery query = params.toQuery();
+    // Repeated items rather than comma-joined, the same convention UsageQuery
+    // sends its array parameters with -- and an address is free to contain a
+    // comma in the quoted form the RFC allows.
+    for (const QString &email : emails)
+        query.addQueryItem(QStringLiteral("emails"), email);
+
+    return d->client.issueRequest<UserListReply>(Client::Client::Verb::Get, kUsers, query);
+}
+
+UserReply *Organization::getUser(const QString &userId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<UserReply>(Client::Client::Verb::Get,
+                                             resourcePath(kUsers, userId));
+}
+
+UserReply *Organization::modifyUserRole(const QString &userId, const QString &role)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("role"), role);
+    return d->client.issueRequest<UserReply>(Client::Client::Verb::Post,
+                                             resourcePath(kUsers, userId), {}, compactJson(body));
+}
+
+UserReply *Organization::deleteUser(const QString &userId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<UserReply>(Client::Client::Verb::Delete,
+                                             resourcePath(kUsers, userId));
+}
+
+InviteListReply *Organization::listInvites(const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<InviteListReply>(Client::Client::Verb::Get, kInvites,
+                                                   params.toQuery());
+}
+
+InviteReply *Organization::getInvite(const QString &inviteId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<InviteReply>(Client::Client::Verb::Get,
+                                               resourcePath(kInvites, inviteId));
+}
+
+InviteReply *Organization::createInvite(const Core::CreateInviteRequest &request)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<InviteReply>(Client::Client::Verb::Post, kInvites, {},
+                                               compactJson(request.toJson()));
+}
+
+InviteReply *Organization::deleteInvite(const QString &inviteId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<InviteReply>(Client::Client::Verb::Delete,
+                                               resourcePath(kInvites, inviteId));
 }
 
 } // namespace Admin

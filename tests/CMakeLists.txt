@@ -375,6 +375,10 @@ qtopenai_add_test(tst_admin_usage
     SOURCES admin/tst_usage.cpp
     LIBS QtOpenAi::Admin)
 
+qtopenai_add_test(tst_admin_users
+    SOURCES admin/tst_users.cpp
+    LIBS QtOpenAi::Admin)
+
 # --- Realtime module tests (built with the module) ---
 if(QTOPENAI_BUILD_REALTIME)
     qtopenai_add_test(tst_realtime_connection
