@@ -19,14 +19,33 @@ constexpr QLatin1String kCosts("/organization/costs");
 constexpr QLatin1String kUsers("/organization/users");
 constexpr QLatin1String kInvites("/organization/invites");
 
-// One member of a collection, e.g. ("/organization/users", "user_1"). The same
-// helper Client.cpp composes its nested paths with, kept here so the endpoint
-// methods stay free of string arithmetic.
-QString resourcePath(QLatin1String collection, const QString &id)
+// The sub-resources that hang off a project. Every one of them repeats the same
+// list/create/get/delete shape under a project id, so they are segments composed
+// onto kProjects rather than eleven more full paths.
+constexpr QLatin1String kProjectUsers("/users");
+constexpr QLatin1String kServiceAccounts("/service_accounts");
+constexpr QLatin1String kApiKeys("/api_keys");
+constexpr QLatin1String kRateLimits("/rate_limits");
+constexpr QLatin1String kArchive("/archive");
+
+// Compose a resource path: a collection, optionally one member of it, optionally
+// a sub-resource below that -- e.g. ("/organization/projects", "proj_1",
+// "/api_keys"). The same helper Client.cpp composes its nested paths with, so
+// the endpoint methods stay free of string arithmetic and every path is built
+// from the constants above rather than retyped.
+QString resourcePath(QLatin1String collection, const QString &id, const QString &suffix = {})
 {
     QString path(collection);
-    path += QLatin1Char('/') + id;
-    return path;
+    if (!id.isEmpty())
+        path += QLatin1Char('/') + id;
+    return path + suffix;
+}
+
+// A member of a project's sub-collection, which is two levels of the above:
+// ("proj_1", "/api_keys", "key_1") -> "/organization/projects/proj_1/api_keys/key_1".
+QString projectPath(const QString &projectId, QLatin1String collection, const QString &id = {})
+{
+    return resourcePath(kProjects, projectId, resourcePath(collection, id));
 }
 
 // Serialise a request body object into a compact JSON payload, as Client does.
@@ -167,6 +186,174 @@ ProjectListReply *Organization::listProjects(const Client::ListParams &params, b
         query.addQueryItem(QStringLiteral("include_archived"), QStringLiteral("true"));
 
     return d->client.issueRequest<ProjectListReply>(Client::Client::Verb::Get, kProjects, query);
+}
+
+ProjectReply *Organization::getProject(const QString &projectId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectReply>(Client::Client::Verb::Get,
+                                                resourcePath(kProjects, projectId));
+}
+
+ProjectReply *Organization::createProject(const QString &name)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("name"), name);
+    return d->client.issueRequest<ProjectReply>(Client::Client::Verb::Post, kProjects, {},
+                                                compactJson(body));
+}
+
+ProjectReply *Organization::modifyProject(const QString &projectId, const QString &name)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("name"), name);
+    return d->client.issueRequest<ProjectReply>(
+            Client::Client::Verb::Post, resourcePath(kProjects, projectId), {}, compactJson(body));
+}
+
+ProjectReply *Organization::archiveProject(const QString &projectId)
+{
+    Q_D(Organization);
+    // A POST with no body, not a DELETE: archiving changes the project's status
+    // rather than removing it, because usage and cost records point at it. See
+    // the declaration.
+    return d->client.issueRequest<ProjectReply>(Client::Client::Verb::Post,
+                                                resourcePath(kProjects, projectId, kArchive));
+}
+
+UserListReply *Organization::listProjectUsers(const QString &projectId,
+                                              const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<UserListReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kProjectUsers), params.toQuery());
+}
+
+UserReply *Organization::getProjectUser(const QString &projectId, const QString &userId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<UserReply>(Client::Client::Verb::Get,
+                                             projectPath(projectId, kProjectUsers, userId));
+}
+
+UserReply *Organization::createProjectUser(const QString &projectId, const QString &userId,
+                                           const QString &role)
+{
+    Q_D(Organization);
+    // The id goes in the body rather than the path: this adds an existing
+    // organization member to the project, it does not create a person.
+    QJsonObject body;
+    body.insert(QStringLiteral("user_id"), userId);
+    body.insert(QStringLiteral("role"), role);
+    return d->client.issueRequest<UserReply>(Client::Client::Verb::Post,
+                                             projectPath(projectId, kProjectUsers), {},
+                                             compactJson(body));
+}
+
+UserReply *Organization::modifyProjectUserRole(const QString &projectId, const QString &userId,
+                                               const QString &role)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("role"), role);
+    return d->client.issueRequest<UserReply>(Client::Client::Verb::Post,
+                                             projectPath(projectId, kProjectUsers, userId), {},
+                                             compactJson(body));
+}
+
+UserReply *Organization::deleteProjectUser(const QString &projectId, const QString &userId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<UserReply>(Client::Client::Verb::Delete,
+                                             projectPath(projectId, kProjectUsers, userId));
+}
+
+ProjectServiceAccountListReply *
+Organization::listProjectServiceAccounts(const QString &projectId, const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectServiceAccountListReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kServiceAccounts), params.toQuery());
+}
+
+ProjectServiceAccountReply *Organization::getProjectServiceAccount(const QString &projectId,
+                                                                   const QString &serviceAccountId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectServiceAccountReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kServiceAccounts, serviceAccountId));
+}
+
+ProjectServiceAccountReply *Organization::createProjectServiceAccount(const QString &projectId,
+                                                                      const QString &name)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("name"), name);
+    return d->client.issueRequest<ProjectServiceAccountReply>(
+            Client::Client::Verb::Post, projectPath(projectId, kServiceAccounts), {},
+            compactJson(body));
+}
+
+ProjectServiceAccountReply *
+Organization::deleteProjectServiceAccount(const QString &projectId, const QString &serviceAccountId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectServiceAccountReply>(
+            Client::Client::Verb::Delete,
+            projectPath(projectId, kServiceAccounts, serviceAccountId));
+}
+
+ProjectApiKeyListReply *Organization::listProjectApiKeys(const QString &projectId,
+                                                         const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectApiKeyListReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kApiKeys), params.toQuery());
+}
+
+ProjectApiKeyReply *Organization::getProjectApiKey(const QString &projectId, const QString &keyId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectApiKeyReply>(Client::Client::Verb::Get,
+                                                      projectPath(projectId, kApiKeys, keyId));
+}
+
+ProjectApiKeyReply *Organization::deleteProjectApiKey(const QString &projectId,
+                                                      const QString &keyId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectApiKeyReply>(Client::Client::Verb::Delete,
+                                                      projectPath(projectId, kApiKeys, keyId));
+}
+
+ProjectRateLimitListReply *Organization::listProjectRateLimits(const QString &projectId,
+                                                               const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectRateLimitListReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kRateLimits), params.toQuery());
+}
+
+ProjectRateLimitReply *Organization::modifyProjectRateLimit(const QString &projectId,
+                                                            const QString &rateLimitId,
+                                                            const Core::ProjectRateLimit &limits)
+{
+    Q_D(Organization);
+    // Only the limits the caller set: ProjectRateLimit::toJson() leaves the rest
+    // out, so an unmentioned limit is untouched rather than zeroed. The id,
+    // object and model it may carry from a previous read are dropped here --
+    // they identify the limit rather than change it, and the id is already in
+    // the path.
+    QJsonObject body = limits.toJson();
+    body.remove(QStringLiteral("id"));
+    body.remove(QStringLiteral("object"));
+    body.remove(QStringLiteral("model"));
+    return d->client.issueRequest<ProjectRateLimitReply>(
+            Client::Client::Verb::Post, projectPath(projectId, kRateLimits, rateLimitId), {},
+            compactJson(body));
 }
 
 UsageReply *Organization::usage(UsageKind kind, const UsageQuery &query)

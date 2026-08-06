@@ -4,7 +4,10 @@
 #include <QtOpenAi/Admin/CostsReply.h>
 #include <QtOpenAi/Admin/GlobalAdmin.h>
 #include <QtOpenAi/Admin/InviteReply.h>
-#include <QtOpenAi/Admin/ProjectListReply.h>
+#include <QtOpenAi/Admin/ProjectApiKeyReply.h>
+#include <QtOpenAi/Admin/ProjectRateLimitReply.h>
+#include <QtOpenAi/Admin/ProjectReply.h>
+#include <QtOpenAi/Admin/ProjectServiceAccountReply.h>
 #include <QtOpenAi/Admin/UsageQuery.h>
 #include <QtOpenAi/Admin/UsageReply.h>
 #include <QtOpenAi/Admin/UserReply.h>
@@ -91,6 +94,75 @@ public:
     // what an administration UI shows first.
     ProjectListReply *listProjects(const Client::ListParams &params = {},
                                    bool includeArchived = false);
+
+    ProjectReply *getProject(const QString &projectId);
+    ProjectReply *createProject(const QString &name);
+    ProjectReply *modifyProject(const QString &projectId, const QString &name);
+
+    // **Archiving is a POST, not a DELETE**, and this method is named for what
+    // it does rather than for what it looks like. A project is what usage and
+    // cost records point at, so the API has no way to remove one: archiving sets
+    // `status` to "archived" and stamps `archivedAt`, and the billing history
+    // keeps explaining itself. There is deliberately no deleteProject().
+    ProjectReply *archiveProject(const QString &projectId);
+
+    // --- Project members (/organization/projects/{id}/users) ----------------
+    // A project member is the same six fields as an organization member, so it
+    // is the same Core::OrganizationUser -- with one difference worth knowing:
+    // `role` here is the *project* role, "owner" or "member", not the
+    // organization's "owner" or "reader". Both are free strings, so one class
+    // serves both rather than a copy that differs only in a comment.
+    UserListReply *listProjectUsers(const QString &projectId,
+                                    const Client::ListParams &params = {});
+
+    UserReply *getProjectUser(const QString &projectId, const QString &userId);
+
+    // Add an existing organization member to the project. It cannot invite: the
+    // person must already be in the organization, which is what createInvite()
+    // is for.
+    UserReply *createProjectUser(const QString &projectId, const QString &userId,
+                                 const QString &role);
+
+    UserReply *modifyProjectUserRole(const QString &projectId, const QString &userId,
+                                     const QString &role);
+
+    // Remove someone from the project. They stay in the organization.
+    UserReply *deleteProjectUser(const QString &projectId, const QString &userId);
+
+    // --- Service accounts (/organization/projects/{id}/service_accounts) -----
+    ProjectServiceAccountListReply *
+    listProjectServiceAccounts(const QString &projectId, const Client::ListParams &params = {});
+
+    ProjectServiceAccountReply *getProjectServiceAccount(const QString &projectId,
+                                                         const QString &serviceAccountId);
+
+    // **The reply carries the only copy of the new key's secret.** See
+    // Core::ServiceAccountApiKey: no later read returns it.
+    ProjectServiceAccountReply *createProjectServiceAccount(const QString &projectId,
+                                                            const QString &name);
+
+    ProjectServiceAccountReply *deleteProjectServiceAccount(const QString &projectId,
+                                                            const QString &serviceAccountId);
+
+    // --- API keys (/organization/projects/{id}/api_keys) --------------------
+    // Read and revoke only. There is no endpoint that creates a project API key
+    // here, and what is read back is redacted -- see Core::ProjectApiKey.
+    ProjectApiKeyListReply *listProjectApiKeys(const QString &projectId,
+                                               const Client::ListParams &params = {});
+
+    ProjectApiKeyReply *getProjectApiKey(const QString &projectId, const QString &keyId);
+
+    ProjectApiKeyReply *deleteProjectApiKey(const QString &projectId, const QString &keyId);
+
+    // --- Rate limits (/organization/projects/{id}/rate_limits) --------------
+    ProjectRateLimitListReply *listProjectRateLimits(const QString &projectId,
+                                                     const Client::ListParams &params = {});
+
+    // A **partial** update: only the limits set on `limits` are sent, so an
+    // unset one is left alone rather than reset. See Core::ProjectRateLimit.
+    ProjectRateLimitReply *modifyProjectRateLimit(const QString &projectId,
+                                                  const QString &rateLimitId,
+                                                  const Core::ProjectRateLimit &limits);
 
     // --- Usage and costs (/organization/usage/*, /organization/costs) ------
     // Which usage report to ask for. The ten endpoints under

@@ -77,6 +77,9 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/OrganizationUser.h
     include/QtOpenAi/Core/Invite.h
     include/QtOpenAi/Core/CreateInviteRequest.h
+    include/QtOpenAi/Core/ProjectServiceAccount.h
+    include/QtOpenAi/Core/ProjectApiKey.h
+    include/QtOpenAi/Core/ProjectRateLimit.h
     include/QtOpenAi/Core/Skill.h
     include/QtOpenAi/Core/SkillVersion.h
     include/QtOpenAi/Core/CreateSkillRequest.h
@@ -168,6 +171,9 @@ add_library(QtOpenAiCore
     src/OrganizationUser.cpp
     src/Invite.cpp
     src/CreateInviteRequest.cpp
+    src/ProjectServiceAccount.cpp
+    src/ProjectApiKey.cpp
+    src/ProjectRateLimit.cpp
     src/Skill.cpp
     src/SkillVersion.cpp
     src/CreateSkillRequest.cpp
