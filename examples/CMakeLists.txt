@@ -67,6 +67,8 @@ qtopenai_add_example(organization_members organization_members.cpp)
 target_link_libraries(organization_members PRIVATE QtOpenAi::Admin)
 qtopenai_add_example(organization_projects organization_projects.cpp)
 target_link_libraries(organization_projects PRIVATE QtOpenAi::Admin)
+qtopenai_add_example(organization_roles organization_roles.cpp)
+target_link_libraries(organization_roles PRIVATE QtOpenAi::Admin)
 
 # --- Persistence ---
 qtopenai_add_example(persistence persistence.cpp)

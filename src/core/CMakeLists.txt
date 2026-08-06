@@ -80,6 +80,11 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/ProjectServiceAccount.h
     include/QtOpenAi/Core/ProjectApiKey.h
     include/QtOpenAi/Core/ProjectRateLimit.h
+    include/QtOpenAi/Core/CursorPage.h
+    include/QtOpenAi/Core/OrganizationRole.h
+    include/QtOpenAi/Core/RoleRequest.h
+    include/QtOpenAi/Core/RoleAssignment.h
+    include/QtOpenAi/Core/Group.h
     include/QtOpenAi/Core/Skill.h
     include/QtOpenAi/Core/SkillVersion.h
     include/QtOpenAi/Core/CreateSkillRequest.h
@@ -174,6 +179,10 @@ add_library(QtOpenAiCore
     src/ProjectServiceAccount.cpp
     src/ProjectApiKey.cpp
     src/ProjectRateLimit.cpp
+    src/OrganizationRole.cpp
+    src/RoleRequest.cpp
+    src/RoleAssignment.cpp
+    src/Group.cpp
     src/Skill.cpp
     src/SkillVersion.cpp
     src/CreateSkillRequest.cpp

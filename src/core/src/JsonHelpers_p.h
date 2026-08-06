@@ -31,6 +31,15 @@ inline void insertIfNonZero(QJsonObject &object, const QString &key, qint64 valu
         object.insert(key, value);
 }
 
+// Insert a boolean flag only when it is set. For the fields that mean something
+// by being there at all -- an acknowledgement's `deleted` -- rather than the ones
+// whose `false` is a real answer.
+inline void insertIfTrue(QJsonObject &object, const QString &key, bool value)
+{
+    if (value)
+        object.insert(key, true);
+}
+
 // Insert a list of plain strings as a JSON array, only when it is non-empty.
 inline void insertIfNotEmpty(QJsonObject &object, const QString &key, const QStringList &values)
 {
