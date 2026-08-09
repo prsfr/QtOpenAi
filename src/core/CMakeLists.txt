@@ -85,6 +85,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/RoleRequest.h
     include/QtOpenAi/Core/RoleAssignment.h
     include/QtOpenAi/Core/Group.h
+    include/QtOpenAi/Core/Certificate.h
     include/QtOpenAi/Core/Skill.h
     include/QtOpenAi/Core/SkillVersion.h
     include/QtOpenAi/Core/CreateSkillRequest.h
@@ -183,6 +184,7 @@ add_library(QtOpenAiCore
     src/RoleRequest.cpp
     src/RoleAssignment.cpp
     src/Group.cpp
+    src/Certificate.cpp
     src/Skill.cpp
     src/SkillVersion.cpp
     src/CreateSkillRequest.cpp
