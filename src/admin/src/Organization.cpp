@@ -30,6 +30,8 @@ constexpr QLatin1String kCertificatesSegment("/certificates");
 constexpr QLatin1String kServiceAccounts("/service_accounts");
 constexpr QLatin1String kApiKeys("/api_keys");
 constexpr QLatin1String kRateLimits("/rate_limits");
+constexpr QLatin1String kModelPermissions("/model_permissions");
+constexpr QLatin1String kHostedToolPermissions("/hosted_tool_permissions");
 constexpr QLatin1String kArchive("/archive");
 
 // The activation toggles are path segments rather than a verb on one
@@ -734,6 +736,59 @@ CertificateListReply *Organization::deactivateProjectCertificates(const QString 
     return d->client.issueRequest<CertificateListReply>(
             Client::Client::Verb::Post, projectPath(projectId, kCertificatesSegment) + kDeactivate,
             {}, compactJson(certificateIdsBody(certificateIds)));
+}
+
+ProjectModelPermissionsReply *Organization::getProjectModelPermissions(const QString &projectId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectModelPermissionsReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kModelPermissions));
+}
+
+ProjectModelPermissionsReply *
+Organization::setProjectModelPermissions(const QString &projectId,
+                                         const Core::ProjectModelPermissions &permissions)
+{
+    Q_D(Organization);
+    // The policy is replaced whole, so both fields go every time -- unlike the
+    // rate limits above, an omitted `mode` here is not "leave it alone" but a
+    // request the server rejects. The object and the deletion flag a read may
+    // have left on the value identify it rather than change it, so they are
+    // dropped.
+    QJsonObject body = permissions.toJson();
+    body.remove(QStringLiteral("object"));
+    body.remove(QStringLiteral("deleted"));
+    return d->client.issueRequest<ProjectModelPermissionsReply>(
+            Client::Client::Verb::Post, projectPath(projectId, kModelPermissions), {},
+            compactJson(body));
+}
+
+ProjectModelPermissionsReply *Organization::deleteProjectModelPermissions(const QString &projectId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectModelPermissionsReply>(
+            Client::Client::Verb::Delete, projectPath(projectId, kModelPermissions));
+}
+
+ProjectHostedToolPermissionsReply *
+Organization::getProjectHostedToolPermissions(const QString &projectId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectHostedToolPermissionsReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kHostedToolPermissions));
+}
+
+ProjectHostedToolPermissionsReply *
+Organization::setProjectHostedToolPermissions(const QString &projectId,
+                                              const Core::ProjectHostedToolPermissions &permissions)
+{
+    Q_D(Organization);
+    // Only the tools the caller set: ProjectHostedToolPermissions::toJson()
+    // writes the ones it carries and no others, so an unmentioned tool keeps
+    // whatever it had.
+    return d->client.issueRequest<ProjectHostedToolPermissionsReply>(
+            Client::Client::Verb::Post, projectPath(projectId, kHostedToolPermissions), {},
+            compactJson(permissions.toJson()));
 }
 
 UsageReply *Organization::usage(UsageKind kind, const UsageQuery &query)

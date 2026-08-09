@@ -2141,6 +2141,61 @@ and `pemContent()`: that nesting groups nothing meaning anything on its own, and
 These lists paginate by `first_id`/`last_id` — `Core::ListPage`, not the
 `CursorPage` the roles and groups endpoints needed.
 
+### Model and hosted-tool permissions
+
+What a project is allowed to run, on two endpoints under it:
+
+```cpp
+organization.getProjectModelPermissions(projectId);        // a policy
+organization.getProjectHostedToolPermissions(projectId);   // five switches
+```
+
+**The model policy is not a grant list, and reading it as one fails open.**
+`mode` is `allow_list` or `deny_list`, and it inverts what the same `model_ids`
+mean: a caller who treats a deny list as an allow list hands out every model the
+policy was written to withhold. So the ids are not the answer —
+
+```cpp
+const std::optional<bool> allowed = policy.allowsModel(QStringLiteral("gpt-4.1"));
+if (!allowed)          // a mode this build cannot read — ask the server
+    ...
+else if (*allowed)     // mode and list, answered together
+```
+
+— and the empty answer is deliberate. A mode added after this build could not be
+answered `true` without failing open on exactly the case that matters, so it is
+not answered at all. For the same reason `mode()` stays the string the server
+sent rather than an enum: decaying an unknown mode to the first enumerator would
+turn a deny list into an allow list.
+
+**Two types, not one with a discriminator.** [#110](https://github.com/prsfr/QtOpenAi/issues/110)
+asked the question on the reading that both endpoints are "grant lists keyed by
+an identifier". They are not. The model side is a mode plus an open list of ids;
+the hosted-tool side is a fixed record of named `{"enabled": bool}` switches with
+no mode and no list. A shared type would have had to invent a mode for the hosted
+tools and per-key booleans for the models, leaving every caller reading past the
+half that does not apply to it.
+
+**A hosted-tool update is partial; a model update replaces the policy whole.**
+That asymmetry is the API's, and it is the difference between "leave it alone"
+and "switch it off":
+
+```cpp
+Core::ProjectHostedToolPermissions permissions;
+permissions.setWebSearch(false);       // the body is exactly this one tool
+organization.setProjectHostedToolPermissions(projectId, permissions);
+```
+
+The five documented tools — file search, web search, image generation, MCP, code
+interpreter — have typed accessors over a `QMap<QString, bool>` backing store,
+the shape `Core::UsageResult` gives its counters: the names in the document today
+are checked by the compiler, and a tool the API gains later round-trips through
+the map rather than being dropped. `knownTools()` tells the two apart.
+
+Deleting the model policy is how a project falls back to the organization's
+default; the acknowledgement decodes into the same type, with `isDeleted()` true
+and no policy in it.
+
 ### Usage and costs
 
 What did last week cost, and what spent it? Eleven endpoints answer that — ten
@@ -2240,16 +2295,18 @@ Coverage so far is the ten usage reports and `/organization/costs`,
 `/organization/users` and `/organization/invites` in full,
 `/organization/projects` with its members, service accounts, API keys and rate
 limits, `/organization/roles` and `/organization/groups` with their members
-and role assignments at both scopes, and `/organization/certificates` with its
-activation toggles at both scopes; the rest of the surface — model and
-hosted-tool permissions, audit logs, spend alerts, data retention — is tracked in
-[#28](https://github.com/prsfr/QtOpenAi/issues/28) and its sub-issues. See
+and role assignments at both scopes, `/organization/certificates` with its
+activation toggles at both scopes, and each project's model and hosted-tool
+permissions; the rest of the surface — audit logs, spend alerts, data retention —
+is tracked in [#28](https://github.com/prsfr/QtOpenAi/issues/28) and its
+sub-issues. See
 [`examples/organization.cpp`](examples/organization.cpp),
 [`examples/organization_usage.cpp`](examples/organization_usage.cpp),
 [`examples/organization_members.cpp`](examples/organization_members.cpp),
 [`examples/organization_projects.cpp`](examples/organization_projects.cpp),
-[`examples/organization_roles.cpp`](examples/organization_roles.cpp) and
-[`examples/organization_certificates.cpp`](examples/organization_certificates.cpp).
+[`examples/organization_roles.cpp`](examples/organization_roles.cpp),
+[`examples/organization_certificates.cpp`](examples/organization_certificates.cpp) and
+[`examples/organization_permissions.cpp`](examples/organization_permissions.cpp).
 
 ## Persistence (`QtOpenAi::Storage`)
 
