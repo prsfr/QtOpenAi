@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Admin/CertificateReply.h>
 #include <QtOpenAi/Admin/CostsReply.h>
 #include <QtOpenAi/Admin/GlobalAdmin.h>
 #include <QtOpenAi/Admin/GroupReply.h>
@@ -275,6 +276,57 @@ public:
                                        const QString &roleId);
 
     ProjectGroupReply *removeProjectGroup(const QString &projectId, const QString &groupId);
+
+    // --- Certificates (/organization/certificates) --------------------------
+    // Client certificates, uploaded once to the organization and then switched
+    // on per scope. **Unlike roles, these are not one set of methods with a
+    // scope argument**: only listing and the activation toggles exist at both
+    // scopes. A certificate is uploaded, read, renamed and deleted at
+    // organization scope alone, so a scope parameter on those would be a
+    // parameter with one legal value.
+    CertificateListReply *listCertificates(const Client::ListParams &params = {});
+
+    // The certificates a project has switched on. Note the path: these *are*
+    // under /organization/projects, where a project's roles are not.
+    CertificateListReply *listProjectCertificates(const QString &projectId,
+                                                  const Client::ListParams &params = {});
+
+    // Upload a certificate. `pemContent` is the PEM body; `name` is optional
+    // and the API accepts a certificate without one.
+    CertificateReply *uploadCertificate(const QString &pemContent, const QString &name = {});
+
+    // One certificate by id. `includeContent` asks for the PEM body as well,
+    // which is left out by default -- see Core::Certificate::pemContent().
+    //
+    // The reply's `active` is unset here whatever the certificate's state:
+    // activation belongs to a scope and this read has none.
+    CertificateReply *getCertificate(const QString &certificateId, bool includeContent = false);
+
+    // Rename a certificate. Named for the one thing the request body can
+    // change, as modifyUserRole() is.
+    CertificateReply *modifyCertificate(const QString &certificateId, const QString &name);
+
+    // The acknowledgement decodes into the same Core::Certificate, reporting the
+    // object as "certificate.deleted".
+    CertificateReply *deleteCertificate(const QString &certificateId);
+
+    // --- Activation (.../certificates/activate, .../deactivate) -------------
+    // **These take a batch, not a certificate.** Both are a POST to a path
+    // ending in the verb, carrying `certificate_ids` -- there is no
+    // POST /organization/certificates/{id}/activate, which is the shape the
+    // names suggest. The API accepts one to ten ids per call and answers with
+    // the certificates it changed, so the reply is a list.
+    //
+    //     organization.activateCertificates({certificateId});   // a batch of one
+    CertificateListReply *activateCertificates(const QStringList &certificateIds);
+
+    CertificateListReply *deactivateCertificates(const QStringList &certificateIds);
+
+    CertificateListReply *activateProjectCertificates(const QString &projectId,
+                                                      const QStringList &certificateIds);
+
+    CertificateListReply *deactivateProjectCertificates(const QString &projectId,
+                                                        const QStringList &certificateIds);
 
     // --- Usage and costs (/organization/usage/*, /organization/costs) ------
     // Which usage report to ask for. The ten endpoints under

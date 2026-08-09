@@ -27,6 +27,7 @@ set(QTOPENAI_ADMIN_PUBLIC_HEADERS
     include/QtOpenAi/Admin/RoleScope.h
     include/QtOpenAi/Admin/RoleReply.h
     include/QtOpenAi/Admin/GroupReply.h
+    include/QtOpenAi/Admin/CertificateReply.h
 )
 
 add_library(QtOpenAiAdmin

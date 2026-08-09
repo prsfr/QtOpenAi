@@ -3,6 +3,7 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 
@@ -25,10 +26,16 @@ constexpr QLatin1String kInvites("/organization/invites");
 constexpr QLatin1String kUsersSegment("/users");
 constexpr QLatin1String kGroupsSegment("/groups");
 constexpr QLatin1String kRolesSegment("/roles");
+constexpr QLatin1String kCertificatesSegment("/certificates");
 constexpr QLatin1String kServiceAccounts("/service_accounts");
 constexpr QLatin1String kApiKeys("/api_keys");
 constexpr QLatin1String kRateLimits("/rate_limits");
 constexpr QLatin1String kArchive("/archive");
+
+// The activation toggles are path segments rather than a verb on one
+// certificate -- see Organization::activateCertificates().
+constexpr QLatin1String kActivate("/activate");
+constexpr QLatin1String kDeactivate("/deactivate");
 
 // The two roots a role path hangs off. **A project's roles are not under
 // /organization/projects**, where its groups, users and keys are: the API serves
@@ -90,6 +97,22 @@ QString assignedRolePath(const RoleScope &scope, QLatin1String principals,
 {
     return scopeRoot(scope) + resourcePath(principals, principalId)
            + resourcePath(kRolesSegment, roleId);
+}
+
+// The organization's certificate collection, and one certificate or one of the
+// activation verbs below it.
+QString certificatePath(const QString &id = {}, const QString &suffix = {})
+{
+    return QString(kOrganizationRoot) + resourcePath(kCertificatesSegment, id, suffix);
+}
+
+// The batch body both activation toggles take, at either scope: a list of ids,
+// never a single one.
+QJsonObject certificateIdsBody(const QStringList &certificateIds)
+{
+    QJsonObject body;
+    body.insert(QStringLiteral("certificate_ids"), QJsonArray::fromStringList(certificateIds));
+    return body;
 }
 
 // Serialise a request body object into a compact JSON payload, as Client does.
@@ -617,6 +640,100 @@ ProjectGroupReply *Organization::removeProjectGroup(const QString &projectId,
     Q_D(Organization);
     return d->client.issueRequest<ProjectGroupReply>(
             Client::Client::Verb::Delete, projectPath(projectId, kGroupsSegment, groupId));
+}
+
+CertificateListReply *Organization::listCertificates(const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<CertificateListReply>(Client::Client::Verb::Get,
+                                                        certificatePath(), params.toQuery());
+}
+
+CertificateListReply *Organization::listProjectCertificates(const QString &projectId,
+                                                            const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<CertificateListReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kCertificatesSegment),
+            params.toQuery());
+}
+
+CertificateReply *Organization::uploadCertificate(const QString &pemContent, const QString &name)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("certificate"), pemContent);
+    // Only when the caller supplied one: the API accepts a certificate with no
+    // name, and an empty string is not the same request as an absent field.
+    if (!name.isEmpty())
+        body.insert(QStringLiteral("name"), name);
+    return d->client.issueRequest<CertificateReply>(Client::Client::Verb::Post, certificatePath(),
+                                                    {}, compactJson(body));
+}
+
+CertificateReply *Organization::getCertificate(const QString &certificateId, bool includeContent)
+{
+    Q_D(Organization);
+    QUrlQuery query;
+    // Sent only when asked for. The PEM body is the largest thing a certificate
+    // carries and the endpoint leaves it out unless `include` names it.
+    if (includeContent)
+        query.addQueryItem(QStringLiteral("include[]"), QStringLiteral("content"));
+
+    return d->client.issueRequest<CertificateReply>(Client::Client::Verb::Get,
+                                                    certificatePath(certificateId), query);
+}
+
+CertificateReply *Organization::modifyCertificate(const QString &certificateId, const QString &name)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("name"), name);
+    return d->client.issueRequest<CertificateReply>(
+            Client::Client::Verb::Post, certificatePath(certificateId), {}, compactJson(body));
+}
+
+CertificateReply *Organization::deleteCertificate(const QString &certificateId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<CertificateReply>(Client::Client::Verb::Delete,
+                                                    certificatePath(certificateId));
+}
+
+CertificateListReply *Organization::activateCertificates(const QStringList &certificateIds)
+{
+    Q_D(Organization);
+    // The verb is a path segment on the collection and the ids are the body --
+    // there is no per-certificate activate endpoint. See the declaration.
+    return d->client.issueRequest<CertificateListReply>(
+            Client::Client::Verb::Post, certificatePath({}, kActivate), {},
+            compactJson(certificateIdsBody(certificateIds)));
+}
+
+CertificateListReply *Organization::deactivateCertificates(const QStringList &certificateIds)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<CertificateListReply>(
+            Client::Client::Verb::Post, certificatePath({}, kDeactivate), {},
+            compactJson(certificateIdsBody(certificateIds)));
+}
+
+CertificateListReply *Organization::activateProjectCertificates(const QString &projectId,
+                                                                const QStringList &certificateIds)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<CertificateListReply>(
+            Client::Client::Verb::Post, projectPath(projectId, kCertificatesSegment) + kActivate,
+            {}, compactJson(certificateIdsBody(certificateIds)));
+}
+
+CertificateListReply *Organization::deactivateProjectCertificates(const QString &projectId,
+                                                                  const QStringList &certificateIds)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<CertificateListReply>(
+            Client::Client::Verb::Post, projectPath(projectId, kCertificatesSegment) + kDeactivate,
+            {}, compactJson(certificateIdsBody(certificateIds)));
 }
 
 UsageReply *Organization::usage(UsageKind kind, const UsageQuery &query)

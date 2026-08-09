@@ -2096,6 +2096,51 @@ two places. And `Core::RoleRequest` writes `role_name` where `Core::Organization
 reads `name` — the setter is named for the wire, so the mismatch is visible at
 the single place it exists.
 
+### Certificates
+
+```cpp
+organization.uploadCertificate(pem, QStringLiteral("Production"));
+organization.listCertificates();                              // uploaded to the org
+organization.listProjectCertificates(projectId);              // active in a project
+organization.activateCertificates({certificateId});           // a batch, always
+```
+
+**Activating is a batch operation, not a verb on a certificate.** `activate` and
+`deactivate` are POSTs to a path ending in the verb, carrying `certificate_ids` —
+there is no `POST /organization/certificates/{id}/activate`, which is exactly the
+reading the names invite. The API takes one to ten ids per call and answers with
+the certificates it changed, so the reply is a list even when you passed one id.
+All four paths are pinned in a data-driven test for that reason.
+
+One `Core::Certificate` covers the API's three certificate schemas. They differ
+only in which value `object` carries and whether the PEM body and the `active`
+flag are present — values, not types, the same call the roles surface makes for
+its two scopes. Unlike roles, though, the *methods* are not scope-parameterised:
+only listing and the two toggles exist at both scopes, so a scope argument on
+upload or delete would be a parameter with one legal value.
+
+**`active` is a `std::optional<bool>`, and the third state is the point.**
+Activation belongs to a scope; a certificate read by id belongs to none, so the
+API sends no `active` at all there. A plain `bool` would report every
+certificate fetched that way as switched off:
+
+```cpp
+if (!certificate.active())            // the question does not apply here
+    ...
+else if (*certificate.active())       // genuinely on, at the scope it came from
+```
+
+**The PEM body is asked for, never assumed.** Neither listing returns it, and a
+single read returns it only when `getCertificate(id, /*includeContent=*/true)`
+puts `include[]=content` on the query — a page of certificates should not drag a
+page of PEM bodies with it. The validity window, on the other hand, is flattened
+out of the API's `certificate_details` wrapper into `validAt()`, `expiresAt()`
+and `pemContent()`: that nesting groups nothing meaning anything on its own, and
+`toJson()` puts it back where the server expects it.
+
+These lists paginate by `first_id`/`last_id` — `Core::ListPage`, not the
+`CursorPage` the roles and groups endpoints needed.
+
 ### Usage and costs
 
 What did last week cost, and what spent it? Eleven endpoints answer that — ten
@@ -2194,15 +2239,17 @@ so there is still exactly one implementation of *how a request is made*.
 Coverage so far is the ten usage reports and `/organization/costs`,
 `/organization/users` and `/organization/invites` in full,
 `/organization/projects` with its members, service accounts, API keys and rate
-limits, and `/organization/roles` and `/organization/groups` with their members
-and role assignments at both scopes; the rest of the surface — certificates,
-model and hosted-tool permissions, audit logs, spend alerts — is tracked in
+limits, `/organization/roles` and `/organization/groups` with their members
+and role assignments at both scopes, and `/organization/certificates` with its
+activation toggles at both scopes; the rest of the surface — model and
+hosted-tool permissions, audit logs, spend alerts, data retention — is tracked in
 [#28](https://github.com/prsfr/QtOpenAi/issues/28) and its sub-issues. See
 [`examples/organization.cpp`](examples/organization.cpp),
 [`examples/organization_usage.cpp`](examples/organization_usage.cpp),
 [`examples/organization_members.cpp`](examples/organization_members.cpp),
-[`examples/organization_projects.cpp`](examples/organization_projects.cpp) and
-[`examples/organization_roles.cpp`](examples/organization_roles.cpp).
+[`examples/organization_projects.cpp`](examples/organization_projects.cpp),
+[`examples/organization_roles.cpp`](examples/organization_roles.cpp) and
+[`examples/organization_certificates.cpp`](examples/organization_certificates.cpp).
 
 ## Persistence (`QtOpenAi::Storage`)
 
