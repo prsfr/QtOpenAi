@@ -3,17 +3,21 @@
 
 #include <QtOpenAi/Admin/CostsReply.h>
 #include <QtOpenAi/Admin/GlobalAdmin.h>
+#include <QtOpenAi/Admin/GroupReply.h>
 #include <QtOpenAi/Admin/InviteReply.h>
 #include <QtOpenAi/Admin/ProjectApiKeyReply.h>
 #include <QtOpenAi/Admin/ProjectRateLimitReply.h>
 #include <QtOpenAi/Admin/ProjectReply.h>
 #include <QtOpenAi/Admin/ProjectServiceAccountReply.h>
+#include <QtOpenAi/Admin/RoleReply.h>
+#include <QtOpenAi/Admin/RoleScope.h>
 #include <QtOpenAi/Admin/UsageQuery.h>
 #include <QtOpenAi/Admin/UsageReply.h>
 #include <QtOpenAi/Admin/UserReply.h>
 #include <QtOpenAi/Client/ListParams.h>
 #include <QtOpenAi/Client/RetryPolicy.h>
 #include <QtOpenAi/Core/CreateInviteRequest.h>
+#include <QtOpenAi/Core/RoleRequest.h>
 
 #include <QtCore/QObject>
 #include <QtCore/QScopedPointer>
@@ -163,6 +167,114 @@ public:
     ProjectRateLimitReply *modifyProjectRateLimit(const QString &projectId,
                                                   const QString &rateLimitId,
                                                   const Core::ProjectRateLimit &limits);
+
+    // --- Roles (/organization/roles, /projects/{id}/roles) ------------------
+    // A role is a named set of permissions. Every method here takes a RoleScope
+    // saying whether it means the organization's roles or one project's,
+    // defaulting to the organization -- **one set of methods, not two**, because
+    // the two scopes send and receive the same payloads and differ only in the
+    // path. See RoleScope, which also explains why a project's roles are not
+    // where a project's other sub-resources are.
+    RoleListReply *listRoles(const RoleScope &scope = {}, const Client::ListParams &params = {});
+
+    RoleReply *getRole(const QString &roleId, const RoleScope &scope = {});
+
+    // Create a custom role. `request` needs at least a name and a set of
+    // permissions -- see Core::RoleRequest.
+    RoleReply *createRole(const Core::RoleRequest &request, const RoleScope &scope = {});
+
+    // A **partial** update: only the fields set on `request` are sent, so an
+    // unset one is left alone rather than cleared. Predefined roles cannot be
+    // changed; see Core::OrganizationRole::predefinedRole().
+    RoleReply *modifyRole(const QString &roleId, const Core::RoleRequest &request,
+                          const RoleScope &scope = {});
+
+    // The acknowledgement decodes into the same Core::OrganizationRole,
+    // reporting the object as "role.deleted".
+    RoleReply *deleteRole(const QString &roleId, const RoleScope &scope = {});
+
+    // --- Role assignments (.../groups/{id}/roles, .../users/{id}/roles) -----
+    // Which roles a principal holds, and granting or revoking one. Both
+    // principals and both scopes: four families that are one composed path and
+    // one set of payloads apart -- see RoleScope and Core::RoleAssignment.
+    //
+    // A listed role carries its provenance: a role a group gave a user reports
+    // that group in Core::OrganizationRole::assignmentSources(), and revoking
+    // it from the user does nothing. Check isInherited() before offering the
+    // button.
+    RoleListReply *listGroupRoles(const QString &groupId, const RoleScope &scope = {},
+                                  const Client::ListParams &params = {});
+
+    RoleReply *getGroupRole(const QString &groupId, const QString &roleId,
+                            const RoleScope &scope = {});
+
+    RoleAssignmentReply *assignGroupRole(const QString &groupId, const QString &roleId,
+                                         const RoleScope &scope = {});
+
+    RoleAssignmentReply *unassignGroupRole(const QString &groupId, const QString &roleId,
+                                           const RoleScope &scope = {});
+
+    RoleListReply *listUserRoles(const QString &userId, const RoleScope &scope = {},
+                                 const Client::ListParams &params = {});
+
+    RoleReply *getUserRole(const QString &userId, const QString &roleId,
+                           const RoleScope &scope = {});
+
+    RoleAssignmentReply *assignUserRole(const QString &userId, const QString &roleId,
+                                        const RoleScope &scope = {});
+
+    RoleAssignmentReply *unassignUserRole(const QString &userId, const QString &roleId,
+                                          const RoleScope &scope = {});
+
+    // --- Groups (/organization/groups) --------------------------------------
+    // Groups exist at organization scope only: there is no project-scoped group
+    // catalogue, only the groups a project grants access to (below). That is why
+    // these take no RoleScope.
+    GroupListReply *listGroups(const Client::ListParams &params = {});
+
+    GroupReply *getGroup(const QString &groupId);
+
+    GroupReply *createGroup(const QString &name);
+
+    GroupReply *modifyGroup(const QString &groupId, const QString &name);
+
+    // Unlike a project, a group really is deleted. The acknowledgement decodes
+    // into the same Core::Group, reporting the object as "group.deleted".
+    GroupReply *deleteGroup(const QString &groupId);
+
+    // --- Group members (/organization/groups/{id}/users) --------------------
+    // A SCIM-managed group's membership comes from an identity provider, and a
+    // change made here is undone by the next sync -- check
+    // Core::Group::isScimManaged() first.
+    GroupMemberListReply *listGroupUsers(const QString &groupId,
+                                         const Client::ListParams &params = {});
+
+    GroupMemberReply *getGroupUser(const QString &groupId, const QString &userId);
+
+    // Add an existing organization member to the group. As with a project, it
+    // cannot invite: the person must already be in the organization.
+    //
+    // The reply is an acknowledgement rather than the member -- the API answers
+    // with the two ids and nothing else. See Core::GroupMembership.
+    GroupMembershipReply *addGroupUser(const QString &groupId, const QString &userId);
+
+    // Remove someone from the group. They stay in the organization.
+    GroupMembershipReply *removeGroupUser(const QString &groupId, const QString &userId);
+
+    // --- Project groups (/organization/projects/{id}/groups) ----------------
+    // Which groups have access to a project. Note the path: these *are* under
+    // /organization/projects, where a project's roles are not.
+    ProjectGroupListReply *listProjectGroups(const QString &projectId,
+                                             const Client::ListParams &params = {});
+
+    ProjectGroupReply *getProjectGroup(const QString &projectId, const QString &groupId);
+
+    // Grant a group access to a project with a project role. `roleId` is the id
+    // of a role from listRoles(RoleScope::project(projectId)), not a role name.
+    ProjectGroupReply *addProjectGroup(const QString &projectId, const QString &groupId,
+                                       const QString &roleId);
+
+    ProjectGroupReply *removeProjectGroup(const QString &projectId, const QString &groupId);
 
     // --- Usage and costs (/organization/usage/*, /organization/costs) ------
     // Which usage report to ask for. The ten endpoints under

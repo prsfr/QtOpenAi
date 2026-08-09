@@ -19,21 +19,31 @@ constexpr QLatin1String kCosts("/organization/costs");
 constexpr QLatin1String kUsers("/organization/users");
 constexpr QLatin1String kInvites("/organization/invites");
 
-// The sub-resources that hang off a project. Every one of them repeats the same
-// list/create/get/delete shape under a project id, so they are segments composed
-// onto kProjects rather than eleven more full paths.
-constexpr QLatin1String kProjectUsers("/users");
+// The sub-resources that hang off a project, a group, or a scope. Every one of
+// them repeats the same list/create/get/delete shape under an id, so they are
+// segments composed onto a collection rather than a full path each.
+constexpr QLatin1String kUsersSegment("/users");
+constexpr QLatin1String kGroupsSegment("/groups");
+constexpr QLatin1String kRolesSegment("/roles");
 constexpr QLatin1String kServiceAccounts("/service_accounts");
 constexpr QLatin1String kApiKeys("/api_keys");
 constexpr QLatin1String kRateLimits("/rate_limits");
 constexpr QLatin1String kArchive("/archive");
+
+// The two roots a role path hangs off. **A project's roles are not under
+// /organization/projects**, where its groups, users and keys are: the API serves
+// them from /projects/{id}/roles, in its path table and in its own curl examples
+// alike. Spelling the two roots here is what keeps that quirk in one place --
+// see Admin::RoleScope.
+constexpr QLatin1String kOrganizationRoot("/organization");
+constexpr QLatin1String kProjectsRoot("/projects");
 
 // Compose a resource path: a collection, optionally one member of it, optionally
 // a sub-resource below that -- e.g. ("/organization/projects", "proj_1",
 // "/api_keys"). The same helper Client.cpp composes its nested paths with, so
 // the endpoint methods stay free of string arithmetic and every path is built
 // from the constants above rather than retyped.
-QString resourcePath(QLatin1String collection, const QString &id, const QString &suffix = {})
+QString resourcePath(const QString &collection, const QString &id, const QString &suffix = {})
 {
     QString path(collection);
     if (!id.isEmpty())
@@ -46,6 +56,40 @@ QString resourcePath(QLatin1String collection, const QString &id, const QString 
 QString projectPath(const QString &projectId, QLatin1String collection, const QString &id = {})
 {
     return resourcePath(kProjects, projectId, resourcePath(collection, id));
+}
+
+// A member of the organization's group collection, and optionally something
+// below it: ("group_1", "/users", "user_1") ->
+// "/organization/groups/group_1/users/user_1".
+QString groupPath(const QString &groupId = {}, QLatin1String collection = {},
+                  const QString &id = {})
+{
+    return QString(kOrganizationRoot)
+           + resourcePath(kGroupsSegment, groupId, resourcePath(collection, id));
+}
+
+// Where a role family hangs off: the organization, or one project.
+QString scopeRoot(const RoleScope &scope)
+{
+    return scope.isOrganization() ? QString(kOrganizationRoot)
+                                  : resourcePath(kProjectsRoot, scope.projectId());
+}
+
+// A scope's role catalogue, and one role of it.
+QString rolePath(const RoleScope &scope, const QString &roleId = {})
+{
+    return scopeRoot(scope) + resourcePath(kRolesSegment, roleId);
+}
+
+// The roles a principal holds within a scope, and one of those. `principals` is
+// kGroupsSegment or kUsersSegment: the four assignment families -- two
+// principals times two scopes -- differ in nothing but those two choices, so one
+// rule composes every path they have between them.
+QString assignedRolePath(const RoleScope &scope, QLatin1String principals,
+                         const QString &principalId, const QString &roleId = {})
+{
+    return scopeRoot(scope) + resourcePath(principals, principalId)
+           + resourcePath(kRolesSegment, roleId);
 }
 
 // Serialise a request body object into a compact JSON payload, as Client does.
@@ -228,14 +272,14 @@ UserListReply *Organization::listProjectUsers(const QString &projectId,
 {
     Q_D(Organization);
     return d->client.issueRequest<UserListReply>(
-            Client::Client::Verb::Get, projectPath(projectId, kProjectUsers), params.toQuery());
+            Client::Client::Verb::Get, projectPath(projectId, kUsersSegment), params.toQuery());
 }
 
 UserReply *Organization::getProjectUser(const QString &projectId, const QString &userId)
 {
     Q_D(Organization);
     return d->client.issueRequest<UserReply>(Client::Client::Verb::Get,
-                                             projectPath(projectId, kProjectUsers, userId));
+                                             projectPath(projectId, kUsersSegment, userId));
 }
 
 UserReply *Organization::createProjectUser(const QString &projectId, const QString &userId,
@@ -248,7 +292,7 @@ UserReply *Organization::createProjectUser(const QString &projectId, const QStri
     body.insert(QStringLiteral("user_id"), userId);
     body.insert(QStringLiteral("role"), role);
     return d->client.issueRequest<UserReply>(Client::Client::Verb::Post,
-                                             projectPath(projectId, kProjectUsers), {},
+                                             projectPath(projectId, kUsersSegment), {},
                                              compactJson(body));
 }
 
@@ -259,7 +303,7 @@ UserReply *Organization::modifyProjectUserRole(const QString &projectId, const Q
     QJsonObject body;
     body.insert(QStringLiteral("role"), role);
     return d->client.issueRequest<UserReply>(Client::Client::Verb::Post,
-                                             projectPath(projectId, kProjectUsers, userId), {},
+                                             projectPath(projectId, kUsersSegment, userId), {},
                                              compactJson(body));
 }
 
@@ -267,7 +311,7 @@ UserReply *Organization::deleteProjectUser(const QString &projectId, const QStri
 {
     Q_D(Organization);
     return d->client.issueRequest<UserReply>(Client::Client::Verb::Delete,
-                                             projectPath(projectId, kProjectUsers, userId));
+                                             projectPath(projectId, kUsersSegment, userId));
 }
 
 ProjectServiceAccountListReply *
@@ -354,6 +398,225 @@ ProjectRateLimitReply *Organization::modifyProjectRateLimit(const QString &proje
     return d->client.issueRequest<ProjectRateLimitReply>(
             Client::Client::Verb::Post, projectPath(projectId, kRateLimits, rateLimitId), {},
             compactJson(body));
+}
+
+RoleListReply *Organization::listRoles(const RoleScope &scope, const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<RoleListReply>(Client::Client::Verb::Get, rolePath(scope),
+                                                 params.toQuery());
+}
+
+RoleReply *Organization::getRole(const QString &roleId, const RoleScope &scope)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<RoleReply>(Client::Client::Verb::Get, rolePath(scope, roleId));
+}
+
+RoleReply *Organization::createRole(const Core::RoleRequest &request, const RoleScope &scope)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<RoleReply>(Client::Client::Verb::Post, rolePath(scope), {},
+                                             compactJson(request.toJson()));
+}
+
+RoleReply *Organization::modifyRole(const QString &roleId, const Core::RoleRequest &request,
+                                    const RoleScope &scope)
+{
+    Q_D(Organization);
+    // Only what the caller set: RoleRequest::toJson() leaves the rest out, so an
+    // unmentioned field is untouched rather than cleared.
+    return d->client.issueRequest<RoleReply>(Client::Client::Verb::Post, rolePath(scope, roleId),
+                                             {}, compactJson(request.toJson()));
+}
+
+RoleReply *Organization::deleteRole(const QString &roleId, const RoleScope &scope)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<RoleReply>(Client::Client::Verb::Delete, rolePath(scope, roleId));
+}
+
+RoleListReply *Organization::listGroupRoles(const QString &groupId, const RoleScope &scope,
+                                            const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<RoleListReply>(Client::Client::Verb::Get,
+                                                 assignedRolePath(scope, kGroupsSegment, groupId),
+                                                 params.toQuery());
+}
+
+RoleReply *Organization::getGroupRole(const QString &groupId, const QString &roleId,
+                                      const RoleScope &scope)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<RoleReply>(
+            Client::Client::Verb::Get, assignedRolePath(scope, kGroupsSegment, groupId, roleId));
+}
+
+RoleAssignmentReply *Organization::assignGroupRole(const QString &groupId, const QString &roleId,
+                                                   const RoleScope &scope)
+{
+    Q_D(Organization);
+    // The role id goes in the body rather than the path: this creates the
+    // assignment, and the path names the principal it is being created for.
+    QJsonObject body;
+    body.insert(QStringLiteral("role_id"), roleId);
+    return d->client.issueRequest<RoleAssignmentReply>(
+            Client::Client::Verb::Post, assignedRolePath(scope, kGroupsSegment, groupId), {},
+            compactJson(body));
+}
+
+RoleAssignmentReply *Organization::unassignGroupRole(const QString &groupId, const QString &roleId,
+                                                     const RoleScope &scope)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<RoleAssignmentReply>(
+            Client::Client::Verb::Delete, assignedRolePath(scope, kGroupsSegment, groupId, roleId));
+}
+
+RoleListReply *Organization::listUserRoles(const QString &userId, const RoleScope &scope,
+                                           const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<RoleListReply>(Client::Client::Verb::Get,
+                                                 assignedRolePath(scope, kUsersSegment, userId),
+                                                 params.toQuery());
+}
+
+RoleReply *Organization::getUserRole(const QString &userId, const QString &roleId,
+                                     const RoleScope &scope)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<RoleReply>(
+            Client::Client::Verb::Get, assignedRolePath(scope, kUsersSegment, userId, roleId));
+}
+
+RoleAssignmentReply *Organization::assignUserRole(const QString &userId, const QString &roleId,
+                                                  const RoleScope &scope)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("role_id"), roleId);
+    return d->client.issueRequest<RoleAssignmentReply>(
+            Client::Client::Verb::Post, assignedRolePath(scope, kUsersSegment, userId), {},
+            compactJson(body));
+}
+
+RoleAssignmentReply *Organization::unassignUserRole(const QString &userId, const QString &roleId,
+                                                    const RoleScope &scope)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<RoleAssignmentReply>(
+            Client::Client::Verb::Delete, assignedRolePath(scope, kUsersSegment, userId, roleId));
+}
+
+GroupListReply *Organization::listGroups(const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<GroupListReply>(Client::Client::Verb::Get, groupPath(),
+                                                  params.toQuery());
+}
+
+GroupReply *Organization::getGroup(const QString &groupId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<GroupReply>(Client::Client::Verb::Get, groupPath(groupId));
+}
+
+GroupReply *Organization::createGroup(const QString &name)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("name"), name);
+    return d->client.issueRequest<GroupReply>(Client::Client::Verb::Post, groupPath(), {},
+                                              compactJson(body));
+}
+
+GroupReply *Organization::modifyGroup(const QString &groupId, const QString &name)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("name"), name);
+    return d->client.issueRequest<GroupReply>(Client::Client::Verb::Post, groupPath(groupId), {},
+                                              compactJson(body));
+}
+
+GroupReply *Organization::deleteGroup(const QString &groupId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<GroupReply>(Client::Client::Verb::Delete, groupPath(groupId));
+}
+
+GroupMemberListReply *Organization::listGroupUsers(const QString &groupId,
+                                                   const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<GroupMemberListReply>(
+            Client::Client::Verb::Get, groupPath(groupId, kUsersSegment), params.toQuery());
+}
+
+GroupMemberReply *Organization::getGroupUser(const QString &groupId, const QString &userId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<GroupMemberReply>(Client::Client::Verb::Get,
+                                                    groupPath(groupId, kUsersSegment, userId));
+}
+
+GroupMembershipReply *Organization::addGroupUser(const QString &groupId, const QString &userId)
+{
+    Q_D(Organization);
+    // The id goes in the body rather than the path, as adding someone to a
+    // project does: this adds an existing organization member to the group, it
+    // does not create a person.
+    QJsonObject body;
+    body.insert(QStringLiteral("user_id"), userId);
+    return d->client.issueRequest<GroupMembershipReply>(
+            Client::Client::Verb::Post, groupPath(groupId, kUsersSegment), {}, compactJson(body));
+}
+
+GroupMembershipReply *Organization::removeGroupUser(const QString &groupId, const QString &userId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<GroupMembershipReply>(Client::Client::Verb::Delete,
+                                                        groupPath(groupId, kUsersSegment, userId));
+}
+
+ProjectGroupListReply *Organization::listProjectGroups(const QString &projectId,
+                                                       const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectGroupListReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kGroupsSegment), params.toQuery());
+}
+
+ProjectGroupReply *Organization::getProjectGroup(const QString &projectId, const QString &groupId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectGroupReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kGroupsSegment, groupId));
+}
+
+ProjectGroupReply *Organization::addProjectGroup(const QString &projectId, const QString &groupId,
+                                                 const QString &roleId)
+{
+    Q_D(Organization);
+    // `role` carries a role *id*, not a role name -- the API's field name is the
+    // shorter one, and sending a name here is a 404 on a role that does not
+    // exist rather than a validation error.
+    QJsonObject body;
+    body.insert(QStringLiteral("group_id"), groupId);
+    body.insert(QStringLiteral("role"), roleId);
+    return d->client.issueRequest<ProjectGroupReply>(Client::Client::Verb::Post,
+                                                     projectPath(projectId, kGroupsSegment), {},
+                                                     compactJson(body));
+}
+
+ProjectGroupReply *Organization::removeProjectGroup(const QString &projectId,
+                                                    const QString &groupId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<ProjectGroupReply>(
+            Client::Client::Verb::Delete, projectPath(projectId, kGroupsSegment, groupId));
 }
 
 UsageReply *Organization::usage(UsageKind kind, const UsageQuery &query)

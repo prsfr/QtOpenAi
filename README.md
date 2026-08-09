@@ -2041,6 +2041,61 @@ organization.modifyProjectRateLimit(projectId, rateLimitId, limits);
 A plain `int` would have made "leave this alone" and "set this to zero" the same
 value — and zero here means the model is unusable in that project.
 
+### Roles and groups
+
+```cpp
+organization.listRoles();                                  // the organization's
+organization.listRoles(Admin::RoleScope::project(id));     // one project's
+
+organization.createGroup(QStringLiteral("Support Team"));
+organization.addGroupUser(groupId, userId);
+organization.assignGroupRole(groupId, roleId);             // scope defaults again
+```
+
+**Scope is an argument, not a second set of methods.** Every role path exists
+twice, once for the organization and once for a project, and the OpenAPI document
+does not merely repeat the schemas across the pair — it points both at the same
+ones. Writing them out twice would have doubled thirteen methods and every test
+covering them, so that the second copy could differ from the first by a comment.
+`Core::OrganizationRole` is one class for both; which scope a role belongs to is
+its `resourceType()`, a value rather than a type.
+
+**The scope prefix is not the one you would guess.** A project's *groups* live
+under `/organization/projects/{id}/groups`, but a project's *roles* live under
+`/projects/{id}/roles` — no `/organization` in front. That is what the API serves,
+in its path table and its own curl examples alike. `Admin::RoleScope` is the one
+place that knows it, and the data-driven test pins down all thirteen composed
+paths on both sides of the inconsistency.
+
+**A role can be inherited, and that changes what revoking it does.** A role a
+group gave a user is listed for the user with the group named in
+`assignmentSources()`; taking it away from the user achieves nothing, because the
+user never had it directly:
+
+```cpp
+if (role.isInherited())                     // came through a group
+    disableTheRevokeButton();
+```
+
+`Core::OrganizationRole` is also one class for the catalogue and for an
+assignment. Listing the roles a principal holds returns the same fields plus
+provenance — when the role was made, by whom, and which group it comes through —
+and reading one out of the catalogue simply leaves those empty.
+
+These lists paginate differently from the rest of the library: `Core::CursorPage`
+instead of `Core::ListPage`, because the server sends a single opaque `next`
+cursor rather than the `first_id`/`last_id` item ids that walk a `ListPage` in
+either direction. Decoding one envelope into the other would have meant a
+`lastId` that quietly means something else here than everywhere else.
+
+Two smaller frictions are handled rather than passed on. A group's SCIM flag
+arrives as `is_scim_managed` from the groups endpoints and as `scim_managed` when
+the same group is embedded in a role assignment; `Core::Group` reads both and
+writes one, so a synchronised group is never reported as editable in one of the
+two places. And `Core::RoleRequest` writes `role_name` where `Core::OrganizationRole`
+reads `name` — the setter is named for the wire, so the mismatch is visible at
+the single place it exists.
+
 ### Usage and costs
 
 What did last week cost, and what spent it? Eleven endpoints answer that — ten
@@ -2137,15 +2192,17 @@ the first by hand. `ClientPrivate::issue()` now runs through the same two halves
 so there is still exactly one implementation of *how a request is made*.
 
 Coverage so far is the ten usage reports and `/organization/costs`,
-`/organization/users` and `/organization/invites` in full, and
+`/organization/users` and `/organization/invites` in full,
 `/organization/projects` with its members, service accounts, API keys and rate
-limits; the rest of the surface — groups, certificates, model and hosted-tool
-permissions, audit logs, spend alerts — is tracked in
+limits, and `/organization/roles` and `/organization/groups` with their members
+and role assignments at both scopes; the rest of the surface — certificates,
+model and hosted-tool permissions, audit logs, spend alerts — is tracked in
 [#28](https://github.com/prsfr/QtOpenAi/issues/28) and its sub-issues. See
 [`examples/organization.cpp`](examples/organization.cpp),
 [`examples/organization_usage.cpp`](examples/organization_usage.cpp),
-[`examples/organization_members.cpp`](examples/organization_members.cpp) and
-[`examples/organization_projects.cpp`](examples/organization_projects.cpp).
+[`examples/organization_members.cpp`](examples/organization_members.cpp),
+[`examples/organization_projects.cpp`](examples/organization_projects.cpp) and
+[`examples/organization_roles.cpp`](examples/organization_roles.cpp).
 
 ## Persistence (`QtOpenAi::Storage`)
 
