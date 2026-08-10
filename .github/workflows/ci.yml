@@ -47,10 +47,12 @@ jobs:
       - name: Install clang-format
         run: sudo apt-get update && sudo apt-get install -y clang-format
 
+      # The same script a contributor runs before pushing -- see the comment in
+      # it for why the file list is not just `git ls-files`. Keeping the command
+      # in one place is the point: when it lived here, the local version of it
+      # was free to drift, and did.
       - name: Check formatting
-        run: >
-          git ls-files '*.cpp' '*.h'
-          | xargs clang-format --dry-run --Werror
+        run: scripts/check-format.sh
 
   # Which platforms build-and-test runs on. Until 1.0 that is Linux only: this
   # is a Qt library with no platform-specific code, so macOS and Windows were
