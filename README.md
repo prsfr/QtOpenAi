@@ -2686,6 +2686,23 @@ workflow:
 Restoring all platforms unconditionally is tracked in
 [#92](https://github.com/prsfr/QtOpenAi/issues/92) for the 1.0 release.
 
+### Formatting
+
+`.clang-format` is the whole style guide. CI fails on any deviation, so run the
+check before pushing — it is the same script the workflow runs, against the same
+files:
+
+```sh
+scripts/check-format.sh          # report violations, non-zero on any
+scripts/check-format.sh --fix    # rewrite the files in place
+```
+
+Run the script rather than `clang-format` by hand. It enumerates
+`git ls-files --cached --others --exclude-standard`, which includes files you
+have added but not yet committed; plain `git ls-files` lists tracked files only,
+so a branch that *adds* sources would check everything except the code it is
+adding and pass.
+
 ## License
 
 [MIT](LICENSE).
