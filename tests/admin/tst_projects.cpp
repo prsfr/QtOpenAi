@@ -215,7 +215,12 @@ void TestProjects::nestedPathsAreComposedFromTheCollectionTable_data()
                                            "HTTP/1.1");
     QTest::newRow("rate_limits")
             << 6 << QByteArray("GET /v1/organization/projects/proj_1/rate_limits HTTP/1.1");
-    QTest::newRow("project") << 7 << QByteArray("GET /v1/organization/projects/proj_1 HTTP/1.1");
+    QTest::newRow("model_permissions")
+            << 7 << QByteArray("GET /v1/organization/projects/proj_1/model_permissions HTTP/1.1");
+    QTest::newRow("hosted_tool_permissions")
+            << 8
+            << QByteArray("GET /v1/organization/projects/proj_1/hosted_tool_permissions HTTP/1.1");
+    QTest::newRow("project") << 9 << QByteArray("GET /v1/organization/projects/proj_1 HTTP/1.1");
 }
 
 void TestProjects::nestedPathsAreComposedFromTheCollectionTable()
@@ -248,6 +253,12 @@ void TestProjects::nestedPathsAreComposedFromTheCollectionTable()
         break;
     case 6:
         QVERIFY(awaited(organization.listProjectRateLimits(project)));
+        break;
+    case 7:
+        QVERIFY(awaited(organization.getProjectModelPermissions(project)));
+        break;
+    case 8:
+        QVERIFY(awaited(organization.getProjectHostedToolPermissions(project)));
         break;
     default:
         QVERIFY(awaited(organization.getProject(project)));

@@ -7,6 +7,7 @@
 #include <QtOpenAi/Admin/GroupReply.h>
 #include <QtOpenAi/Admin/InviteReply.h>
 #include <QtOpenAi/Admin/ProjectApiKeyReply.h>
+#include <QtOpenAi/Admin/ProjectPermissionsReply.h>
 #include <QtOpenAi/Admin/ProjectRateLimitReply.h>
 #include <QtOpenAi/Admin/ProjectReply.h>
 #include <QtOpenAi/Admin/ProjectServiceAccountReply.h>
@@ -168,6 +169,39 @@ public:
     ProjectRateLimitReply *modifyProjectRateLimit(const QString &projectId,
                                                   const QString &rateLimitId,
                                                   const Core::ProjectRateLimit &limits);
+
+    // --- Model permissions (/organization/projects/{id}/model_permissions) --
+    // Which models the project may use. **A policy, not a list of grants**: the
+    // same model id means "permitted" under an allow list and "forbidden" under
+    // a deny list, so read it through Core::ProjectModelPermissions::allowsModel()
+    // rather than through the ids alone.
+    //
+    // The whole policy is replaced at once -- there is no per-model endpoint,
+    // despite the plural name.
+    ProjectModelPermissionsReply *getProjectModelPermissions(const QString &projectId);
+
+    ProjectModelPermissionsReply *
+    setProjectModelPermissions(const QString &projectId,
+                               const Core::ProjectModelPermissions &permissions);
+
+    // Remove the project's own policy, which is how it goes back to whatever
+    // the organization allows. The acknowledgement decodes into the same
+    // Core::ProjectModelPermissions, reporting the object as
+    // "project.model_permissions.deleted".
+    ProjectModelPermissionsReply *deleteProjectModelPermissions(const QString &projectId);
+
+    // --- Hosted tools (.../hosted_tool_permissions) -------------------------
+    // File search, web search, image generation, MCP and the code interpreter,
+    // each on or off. No mode and no list -- see Core::ProjectModelPermissions
+    // for why this is a separate type rather than the same one.
+    ProjectHostedToolPermissionsReply *getProjectHostedToolPermissions(const QString &projectId);
+
+    // A **partial** update: only the tools set on `permissions` are sent, so an
+    // unmentioned one is left alone rather than switched off. See
+    // Core::ProjectHostedToolPermissions.
+    ProjectHostedToolPermissionsReply *
+    setProjectHostedToolPermissions(const QString &projectId,
+                                    const Core::ProjectHostedToolPermissions &permissions);
 
     // --- Roles (/organization/roles, /projects/{id}/roles) ------------------
     // A role is a named set of permissions. Every method here takes a RoleScope
