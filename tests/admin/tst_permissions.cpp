@@ -65,8 +65,7 @@ void TestPermissions::theModeDecidesWhatTheIdsMean()
     QCOMPARE(permissions.allowsModel(QStringLiteral("gpt-4.1")),
              std::optional<bool>(listedIsAllowed));
     // And a model the policy never names is the opposite answer again.
-    QCOMPARE(permissions.allowsModel(QStringLiteral("o3")),
-             std::optional<bool>(!listedIsAllowed));
+    QCOMPARE(permissions.allowsModel(QStringLiteral("o3")), std::optional<bool>(!listedIsAllowed));
 }
 
 void TestPermissions::anUnreadableModeAnswersNothingRatherThanYes()
@@ -110,8 +109,10 @@ void TestPermissions::hostedToolPermissionsRoundTripThroughJson()
 
     // Each switch is its own object on the wire, not a bare boolean.
     const QJsonObject json = permissions.toJson();
-    QCOMPARE(json.value(QStringLiteral("web_search")).toObject().value(
-                     QStringLiteral("enabled")).toBool(),
+    QCOMPARE(json.value(QStringLiteral("web_search"))
+                     .toObject()
+                     .value(QStringLiteral("enabled"))
+                     .toBool(),
              false);
 
     // A tool nobody mentioned is unset rather than false -- on an update that is
@@ -161,8 +162,7 @@ void TestPermissions::getAndSetModelPermissions()
     const auto reply = awaited(organization.getProjectModelPermissions(QStringLiteral("proj_1")));
     QVERIFY(reply);
     QVERIFY2(reply->isSuccess(), qPrintable(reply->error().message()));
-    QCOMPARE(read.requestLine(),
-             "GET /v1/organization/projects/proj_1/model_permissions HTTP/1.1");
+    QCOMPARE(read.requestLine(), "GET /v1/organization/projects/proj_1/model_permissions HTTP/1.1");
     QVERIFY(read.requestHeaders().contains("Authorization: Bearer sk-admin-test"));
     QCOMPARE(reply->permissions().allowsModel(QStringLiteral("o3")), std::optional<bool>(true));
 
@@ -176,8 +176,8 @@ void TestPermissions::getAndSetModelPermissions()
     policy.setMode(QStringLiteral("deny_list"));
     policy.setModelIds({QStringLiteral("gpt-4.1")});
 
-    const auto updated =
-            awaited(other.setProjectModelPermissions(QStringLiteral("proj_1"), policy));
+    const auto updated
+            = awaited(other.setProjectModelPermissions(QStringLiteral("proj_1"), policy));
     QVERIFY(updated);
     QVERIFY2(updated->isSuccess(), qPrintable(updated->error().message()));
     QCOMPARE(written.requestLine(),
@@ -196,8 +196,8 @@ void TestPermissions::deletingTheModelPolicyIsAcknowledged()
     StubServer server(R"({"object":"project.model_permissions.deleted","deleted":true})");
     Organization organization(server.baseUrl(), QStringLiteral("sk-admin-test"));
 
-    const auto reply =
-            awaited(organization.deleteProjectModelPermissions(QStringLiteral("proj_1")));
+    const auto reply
+            = awaited(organization.deleteProjectModelPermissions(QStringLiteral("proj_1")));
     QVERIFY(reply);
     QVERIFY2(reply->isSuccess(), qPrintable(reply->error().message()));
     QCOMPARE(server.requestLine(),
@@ -219,8 +219,8 @@ void TestPermissions::listHostedToolPermissions()
         "code_interpreter":{"enabled":true}})");
     Organization organization(server.baseUrl(), QStringLiteral("sk-admin-test"));
 
-    const auto reply =
-            awaited(organization.getProjectHostedToolPermissions(QStringLiteral("proj_1")));
+    const auto reply
+            = awaited(organization.getProjectHostedToolPermissions(QStringLiteral("proj_1")));
     QVERIFY(reply);
     QVERIFY2(reply->isSuccess(), qPrintable(reply->error().message()));
     QCOMPARE(server.requestLine(),
@@ -245,8 +245,8 @@ void TestPermissions::aHostedToolUpdateSendsOnlyTheToolsThatWereSet()
     ProjectHostedToolPermissions permissions;
     permissions.setWebSearch(false);
 
-    const auto reply = awaited(organization.setProjectHostedToolPermissions(
-            QStringLiteral("proj_1"), permissions));
+    const auto reply = awaited(
+            organization.setProjectHostedToolPermissions(QStringLiteral("proj_1"), permissions));
     QVERIFY(reply);
     QVERIFY2(reply->isSuccess(), qPrintable(reply->error().message()));
     QCOMPARE(server.requestLine(),

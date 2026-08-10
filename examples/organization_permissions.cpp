@@ -79,40 +79,36 @@ int main(int argc, char **argv)
     // Second half of the run: the hosted-tool switches. Read after the model
     // policy so the two arrive in a fixed order.
     const auto readHostedTools = [&] {
-        Admin::ProjectHostedToolPermissionsReply *reply =
-                organization.getProjectHostedToolPermissions(projectId);
+        Admin::ProjectHostedToolPermissionsReply *reply
+                = organization.getProjectHostedToolPermissions(projectId);
         QObject::connect(reply, &Admin::ProjectHostedToolPermissionsReply::failed, onError);
-        QObject::connect(reply, &Admin::ProjectHostedToolPermissionsReply::finished,
-                         [&](const Core::ProjectHostedToolPermissions &tools) {
-                             out << "\nHosted tools\n";
-                             out << "  file_search:      " << switchState(tools.fileSearch())
-                                 << "\n";
-                             out << "  web_search:       " << switchState(tools.webSearch())
-                                 << "\n";
-                             out << "  image_generation: " << switchState(tools.imageGeneration())
-                                 << "\n";
-                             out << "  mcp:              " << switchState(tools.mcp()) << "\n";
-                             out << "  code_interpreter: " << switchState(tools.codeInterpreter())
-                                 << "\n";
+        QObject::connect(
+                reply, &Admin::ProjectHostedToolPermissionsReply::finished,
+                [&](const Core::ProjectHostedToolPermissions &tools) {
+                    out << "\nHosted tools\n";
+                    out << "  file_search:      " << switchState(tools.fileSearch()) << "\n";
+                    out << "  web_search:       " << switchState(tools.webSearch()) << "\n";
+                    out << "  image_generation: " << switchState(tools.imageGeneration()) << "\n";
+                    out << "  mcp:              " << switchState(tools.mcp()) << "\n";
+                    out << "  code_interpreter: " << switchState(tools.codeInterpreter()) << "\n";
 
-                             // A tool added to the API after this build has no
-                             // named accessor above, and is still carried.
-                             const QMap<QString, bool> all = tools.permissions();
-                             for (auto it = all.constBegin(); it != all.constEnd(); ++it) {
-                                 if (!tools.isKnownTool(it.key()))
-                                     out << "  " << it.key() << ": "
-                                         << (it.value() ? "on" : "off") << "  (not named by "
-                                         << "this build)\n";
-                             }
+                    // A tool added to the API after this build has no
+                    // named accessor above, and is still carried.
+                    const QMap<QString, bool> all = tools.permissions();
+                    for (auto it = all.constBegin(); it != all.constEnd(); ++it) {
+                        if (!tools.isKnownTool(it.key()))
+                            out << "  " << it.key() << ": " << (it.value() ? "on" : "off")
+                                << "  (not named by " << "this build)\n";
+                    }
 
-                             // Switching one tool off would send exactly that one
-                             // tool, leaving the other four untouched:
-                             //
-                             //   Core::ProjectHostedToolPermissions update;
-                             //   update.setWebSearch(false);
-                             //   organization.setProjectHostedToolPermissions(projectId, update);
-                             app.quit();
-                         });
+                    // Switching one tool off would send exactly that one
+                    // tool, leaving the other four untouched:
+                    //
+                    //   Core::ProjectHostedToolPermissions update;
+                    //   update.setWebSearch(false);
+                    //   organization.setProjectHostedToolPermissions(projectId, update);
+                    app.quit();
+                });
     };
 
     Admin::ProjectModelPermissionsReply *reply = organization.getProjectModelPermissions(projectId);

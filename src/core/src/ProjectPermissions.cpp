@@ -22,12 +22,13 @@ ProjectModelPermissions::ProjectModelPermissions()
 { }
 
 ProjectModelPermissions::ProjectModelPermissions(const ProjectModelPermissions &other) = default;
-ProjectModelPermissions::ProjectModelPermissions(ProjectModelPermissions &&other) noexcept =
-        default;
+ProjectModelPermissions::ProjectModelPermissions(ProjectModelPermissions &&other) noexcept
+        = default;
+ProjectModelPermissions &ProjectModelPermissions::operator=(const ProjectModelPermissions &other)
+        = default;
 ProjectModelPermissions &
-ProjectModelPermissions::operator=(const ProjectModelPermissions &other) = default;
-ProjectModelPermissions &
-ProjectModelPermissions::operator=(ProjectModelPermissions &&other) noexcept = default;
+ProjectModelPermissions::operator=(ProjectModelPermissions &&other) noexcept
+        = default;
 ProjectModelPermissions::~ProjectModelPermissions() = default;
 
 QString ProjectModelPermissions::object() const { return d->object; }
@@ -37,10 +38,7 @@ QString ProjectModelPermissions::mode() const { return d->mode; }
 void ProjectModelPermissions::setMode(const QString &mode) { d->mode = mode; }
 
 QStringList ProjectModelPermissions::modelIds() const { return d->modelIds; }
-void ProjectModelPermissions::setModelIds(const QStringList &modelIds)
-{
-    d->modelIds = modelIds;
-}
+void ProjectModelPermissions::setModelIds(const QStringList &modelIds) { d->modelIds = modelIds; }
 
 std::optional<bool> ProjectModelPermissions::allowsModel(const QString &modelId) const
 {
@@ -96,13 +94,17 @@ ProjectHostedToolPermissions::ProjectHostedToolPermissions()
 { }
 
 ProjectHostedToolPermissions::ProjectHostedToolPermissions(
-        const ProjectHostedToolPermissions &other) = default;
+        const ProjectHostedToolPermissions &other)
+        = default;
 ProjectHostedToolPermissions::ProjectHostedToolPermissions(
-        ProjectHostedToolPermissions &&other) noexcept = default;
+        ProjectHostedToolPermissions &&other) noexcept
+        = default;
 ProjectHostedToolPermissions &
-ProjectHostedToolPermissions::operator=(const ProjectHostedToolPermissions &other) = default;
+ProjectHostedToolPermissions::operator=(const ProjectHostedToolPermissions &other)
+        = default;
 ProjectHostedToolPermissions &
-ProjectHostedToolPermissions::operator=(ProjectHostedToolPermissions &&other) noexcept = default;
+ProjectHostedToolPermissions::operator=(ProjectHostedToolPermissions &&other) noexcept
+        = default;
 ProjectHostedToolPermissions::~ProjectHostedToolPermissions() = default;
 
 std::optional<bool> ProjectHostedToolPermissions::permission(const QString &tool) const
