@@ -19,6 +19,7 @@ constexpr QLatin1String kUsage("/organization/usage/");
 constexpr QLatin1String kCosts("/organization/costs");
 constexpr QLatin1String kUsers("/organization/users");
 constexpr QLatin1String kInvites("/organization/invites");
+constexpr QLatin1String kAdminApiKeys("/organization/admin_api_keys");
 
 // The sub-resources that hang off a project, a group, or a scope. Every one of
 // them repeats the same list/create/get/delete shape under an id, so they are
@@ -789,6 +790,40 @@ Organization::setProjectHostedToolPermissions(const QString &projectId,
     return d->client.issueRequest<ProjectHostedToolPermissionsReply>(
             Client::Client::Verb::Post, projectPath(projectId, kHostedToolPermissions), {},
             compactJson(permissions.toJson()));
+}
+
+AdminApiKeyListReply *Organization::listAdminApiKeys(const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<AdminApiKeyListReply>(Client::Client::Verb::Get,
+                                                        QString(kAdminApiKeys), params.toQuery());
+}
+
+AdminApiKeyReply *Organization::createAdminApiKey(const QString &name, int expiresInSeconds)
+{
+    Q_D(Organization);
+    QJsonObject body;
+    body.insert(QStringLiteral("name"), name);
+    // Omitted rather than sent as zero, which is the difference between "never
+    // expires" and a key that expired the moment it was made.
+    if (expiresInSeconds > 0)
+        body.insert(QStringLiteral("expires_in_seconds"), expiresInSeconds);
+    return d->client.issueRequest<AdminApiKeyReply>(Client::Client::Verb::Post,
+                                                    QString(kAdminApiKeys), {}, compactJson(body));
+}
+
+AdminApiKeyReply *Organization::getAdminApiKey(const QString &keyId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<AdminApiKeyReply>(Client::Client::Verb::Get,
+                                                    resourcePath(kAdminApiKeys, keyId));
+}
+
+AdminApiKeyReply *Organization::deleteAdminApiKey(const QString &keyId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<AdminApiKeyReply>(Client::Client::Verb::Delete,
+                                                    resourcePath(kAdminApiKeys, keyId));
 }
 
 UsageReply *Organization::usage(UsageKind kind, const UsageQuery &query)

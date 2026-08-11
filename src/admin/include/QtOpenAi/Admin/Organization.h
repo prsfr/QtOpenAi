@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Admin/AdminApiKeyReply.h>
 #include <QtOpenAi/Admin/CertificateReply.h>
 #include <QtOpenAi/Admin/CostsReply.h>
 #include <QtOpenAi/Admin/GlobalAdmin.h>
@@ -361,6 +362,28 @@ public:
 
     CertificateListReply *deactivateProjectCertificates(const QString &projectId,
                                                         const QStringList &certificateIds);
+
+    // --- Admin API keys (/organization/admin_api_keys) ---------------------
+    // The keys that reach this whole surface, including this endpoint: an admin
+    // key is what creates the next admin key.
+    //
+    // Nothing here is redacted away from the caller -- but note where the secret
+    // lives. Only createAdminApiKey()'s reply carries it, once; every listing
+    // and read gives back Core::AdminApiKey::redactedValue() and an empty
+    // value(). See Core::AdminApiKey.
+    AdminApiKeyListReply *listAdminApiKeys(const Client::ListParams &params = {});
+
+    // **The reply carries the only copy of the new key's secret.** Store it
+    // before the reply is destroyed; nothing can fetch it again.
+    //
+    // `expiresInSeconds` is capped by the API at a year; pass 0 -- the default
+    // -- for a key that does not expire, which omits the field rather than
+    // sending a zero the server would read as "already expired".
+    AdminApiKeyReply *createAdminApiKey(const QString &name, int expiresInSeconds = 0);
+
+    AdminApiKeyReply *getAdminApiKey(const QString &keyId);
+
+    AdminApiKeyReply *deleteAdminApiKey(const QString &keyId);
 
     // --- Usage and costs (/organization/usage/*, /organization/costs) ------
     // Which usage report to ask for. The ten endpoints under

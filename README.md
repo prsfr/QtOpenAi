@@ -2196,6 +2196,50 @@ Deleting the model policy is how a project falls back to the organization's
 default; the acknowledgement decodes into the same type, with `isDeleted()` true
 and no policy in it.
 
+### Admin API keys
+
+The credentials that reach everything above — including this endpoint, so an
+admin key is what mints the next admin key.
+
+```cpp
+organization.listAdminApiKeys();                        // never any secrets
+organization.createAdminApiKey(QStringLiteral("Deploy"), 2592000);
+organization.deleteAdminApiKey(keyId);                  // revoke
+```
+
+**The secret comes back exactly once, on creation.** No later list or read
+returns it — an endpoint that handed live credentials out on demand would turn
+one admin key into a master key. `Core::AdminApiKey` is one type for both shapes,
+because that is how the API defines it (`AdminApiKeyCreateResponse` *is* an
+`AdminApiKey` plus the one field), so the distinction lives in a value rather
+than in the type:
+
+```cpp
+created.hasValue();      // true — store value() now or lose it
+listed.hasValue();       // false, and that is the API answering, not a bad decode
+listed.redactedValue();  // "sk-admin...def", always there, safe to show
+```
+
+**A body can carry a credential, and the logger now knows that.** Header
+redaction never looked at bodies, so the one response that returns a live secret
+was being written out verbatim whenever `setLogBodies(true)` was on. The
+`LoggingInterceptor` redacts by JSON *field name* now, at any depth — `value`,
+`client_secret`, `api_key` and friends, configurable via `redactedBodyFields()`.
+Matching the key rather than the text is what keeps the rest of a logged body
+worth reading; `value` is a rare field name in this API (eight of ~1400 schemas),
+so the cost of over-redacting it is close to nothing and the cost of missing it
+is a live admin credential in every backup that log reaches.
+
+`expiresInSeconds` is capped by the API at a year. Passing 0 — the default —
+means a key that does not expire, and omits the field rather than sending a zero
+the server would read as *already expired*.
+
+Owner shapes differ between the two key families, and the library reconciles
+them rather than exposing both: a project key nests the principal under its kind
+(`{"type":"user","user":{…}}`, since it may be a service account), while an admin
+key inlines the user's fields beside the discriminator. Both answer
+`owner().isUser()` and `owner().user()`.
+
 ### Usage and costs
 
 What did last week cost, and what spent it? Eleven endpoints answer that — ten
@@ -2296,17 +2340,18 @@ Coverage so far is the ten usage reports and `/organization/costs`,
 `/organization/projects` with its members, service accounts, API keys and rate
 limits, `/organization/roles` and `/organization/groups` with their members
 and role assignments at both scopes, `/organization/certificates` with its
-activation toggles at both scopes, and each project's model and hosted-tool
-permissions; the rest of the surface — audit logs, spend alerts, data retention —
-is tracked in [#28](https://github.com/prsfr/QtOpenAi/issues/28) and its
-sub-issues. See
+activation toggles at both scopes, each project's model and hosted-tool
+permissions, and `/organization/admin_api_keys`; the rest of the surface — audit
+logs, spend alerts, data retention — is tracked in
+[#28](https://github.com/prsfr/QtOpenAi/issues/28) and its sub-issues. See
 [`examples/organization.cpp`](examples/organization.cpp),
 [`examples/organization_usage.cpp`](examples/organization_usage.cpp),
 [`examples/organization_members.cpp`](examples/organization_members.cpp),
 [`examples/organization_projects.cpp`](examples/organization_projects.cpp),
 [`examples/organization_roles.cpp`](examples/organization_roles.cpp),
-[`examples/organization_certificates.cpp`](examples/organization_certificates.cpp) and
-[`examples/organization_permissions.cpp`](examples/organization_permissions.cpp).
+[`examples/organization_certificates.cpp`](examples/organization_certificates.cpp),
+[`examples/organization_permissions.cpp`](examples/organization_permissions.cpp) and
+[`examples/organization_admin_keys.cpp`](examples/organization_admin_keys.cpp).
 
 ## Persistence (`QtOpenAi::Storage`)
 

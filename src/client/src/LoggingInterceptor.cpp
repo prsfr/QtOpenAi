@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/LoggingInterceptor.h"
 
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
 #include <QtCore/QStringList>
 #include <QtCore/QUrlQuery>
 
@@ -51,6 +54,53 @@ QString safeUrl(const QUrl &url)
     return safe.toString(QUrl::FullyEncoded);
 }
 
+// One JSON value with every secret-named field replaced, at any depth. Walks
+// rather than string-matches so it is the *key* that decides: a prompt that
+// happens to mention "value" is still readable, and a field called `value`
+// nested three objects down is still redacted.
+QJsonValue redactFields(const QJsonValue &value, const QStringList &fields)
+{
+    if (value.isObject()) {
+        QJsonObject object = value.toObject();
+        for (auto it = object.begin(); it != object.end(); ++it) {
+            // Compared case-insensitively, as the header list is: a provider
+            // that spells it `Value` is carrying the same secret.
+            if (fields.contains(it.key(), Qt::CaseInsensitive))
+                it.value() = QString(kRedacted);
+            else
+                it.value() = redactFields(it.value(), fields);
+        }
+        return object;
+    }
+    if (value.isArray()) {
+        QJsonArray array = value.toArray();
+        for (qsizetype i = 0; i < array.size(); ++i)
+            array.replace(i, redactFields(array.at(i), fields));
+        return array;
+    }
+    return value;
+}
+
+// The body as it is safe to write down. A body that is not JSON -- a stream, a
+// multipart upload -- is returned unchanged, because there is no field
+// structure to find a secret in and truncation already bounds it.
+QByteArray safeBody(const QByteArray &body, const QStringList &fields)
+{
+    if (fields.isEmpty() || body.isEmpty())
+        return body;
+
+    // Parsed before truncation: excerpting first would leave a half-object that
+    // no longer parses, and the secret in it unredacted.
+    const QJsonDocument document = QJsonDocument::fromJson(body);
+    if (document.isObject())
+        return QJsonDocument(redactFields(document.object(), fields).toObject())
+                .toJson(QJsonDocument::Compact);
+    if (document.isArray())
+        return QJsonDocument(redactFields(document.array(), fields).toArray())
+                .toJson(QJsonDocument::Compact);
+    return body;
+}
+
 QString excerpt(const QByteArray &body, int limit)
 {
     if (body.isEmpty())
@@ -70,6 +120,7 @@ public:
     bool logBodies = false;
     int maxBodyLength = 512;
     QList<QByteArray> redactedHeaders = LoggingInterceptor::defaultRedactedHeaders();
+    QStringList redactedBodyFields = LoggingInterceptor::defaultRedactedBodyFields();
 };
 
 LoggingInterceptor::LoggingInterceptor(QObject *parent)
@@ -88,6 +139,34 @@ QList<QByteArray> LoggingInterceptor::defaultRedactedHeaders()
     return {"authorization",       "api-key", "x-api-key",  "x-goog-api-key",
             "proxy-authorization", "cookie",  "set-cookie", "openai-organization",
             "openai-project"};
+}
+
+QStringList LoggingInterceptor::defaultRedactedBodyFields()
+{
+    // `value` is the one that matters and the one that reads like a false
+    // positive: it is how the API hands back a newly created admin key, a
+    // realtime client secret and an injected container secret. It is also rare
+    // -- eight of the API's ~1400 schemas have a field by that name -- so
+    // redacting it costs a debugger almost nothing and saves a live credential.
+    // The rest are the names a provider or a proxy in front of one uses for the
+    // same thing.
+    return {QStringLiteral("value"),         QStringLiteral("secret"),
+            QStringLiteral("client_secret"), QStringLiteral("api_key"),
+            QStringLiteral("apikey"),        QStringLiteral("access_token"),
+            QStringLiteral("refresh_token"), QStringLiteral("password"),
+            QStringLiteral("authorization")};
+}
+
+void LoggingInterceptor::setRedactedBodyFields(const QStringList &names)
+{
+    Q_D(LoggingInterceptor);
+    d->redactedBodyFields = names;
+}
+
+QStringList LoggingInterceptor::redactedBodyFields() const
+{
+    Q_D(const LoggingInterceptor);
+    return d->redactedBodyFields;
 }
 
 void LoggingInterceptor::setLogHeaders(bool enabled)
@@ -161,7 +240,8 @@ std::optional<InterceptedResponse> LoggingInterceptor::beforeRequest(Intercepted
         }
     }
     if (d->logBodies) {
-        const QString body = excerpt(request.body, d->maxBodyLength);
+        const QString body
+                = excerpt(safeBody(request.body, d->redactedBodyFields), d->maxBodyLength);
         if (!body.isEmpty())
             lines << QStringLiteral("    %1").arg(body);
     }
@@ -190,7 +270,8 @@ void LoggingInterceptor::afterResponse(const InterceptedResponse &response)
                           response.fromCache ? QStringLiteral(", cached") : QString());
 
     if (d->logBodies) {
-        const QString body = excerpt(response.body, d->maxBodyLength);
+        const QString body
+                = excerpt(safeBody(response.body, d->redactedBodyFields), d->maxBodyLength);
         if (!body.isEmpty())
             lines << QStringLiteral("    %1").arg(body);
     }
