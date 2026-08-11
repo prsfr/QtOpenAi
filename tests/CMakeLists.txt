@@ -395,6 +395,10 @@ qtopenai_add_test(tst_admin_permissions
     SOURCES admin/tst_permissions.cpp
     LIBS QtOpenAi::Admin)
 
+qtopenai_add_test(tst_admin_adminapikeys
+    SOURCES admin/tst_adminapikeys.cpp
+    LIBS QtOpenAi::Admin)
+
 # --- Realtime module tests (built with the module) ---
 if(QTOPENAI_BUILD_REALTIME)
     qtopenai_add_test(tst_realtime_connection

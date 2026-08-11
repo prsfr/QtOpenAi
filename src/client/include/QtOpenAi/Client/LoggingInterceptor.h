@@ -9,6 +9,7 @@
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QScopedPointer>
 #include <QtCore/QString>
+#include <QtCore/QStringList>
 
 namespace QtOpenAi {
 namespace Client {
@@ -40,7 +41,10 @@ class LoggingInterceptorPrivate;
 //
 // Bodies are off by default for a related reason: they hold the user's prompts,
 // which is data the user did not agree to have written to disk. Turning them on
-// truncates to maxBodyLength() so one large upload cannot fill a disk.
+// truncates to maxBodyLength() so one large upload cannot fill a disk -- and
+// redacts the JSON fields that carry a credential, because a handful of
+// responses hand back a live secret exactly once and a log is the last place it
+// should survive. See redactedBodyFields().
 class QTOPENAI_CLIENT_EXPORT LoggingInterceptor : public Interceptor
 {
     Q_OBJECT
@@ -72,6 +76,19 @@ public:
     void setRedactedHeaders(const QList<QByteArray> &names);
     QList<QByteArray> redactedHeaders() const;
     static QList<QByteArray> defaultRedactedHeaders();
+
+    // JSON field names whose value is replaced with `<redacted>` when a body is
+    // logged, matched on the key case-insensitively and at any depth. Header
+    // redaction does not cover this: a created key's secret arrives in the
+    // *response body*, which was written out verbatim.
+    //
+    // Applies to request and response bodies alike -- a secret goes up as well
+    // as down -- and only to bodies that parse as JSON; anything else (a stream,
+    // an upload) is logged as before. Setting this replaces the list rather than
+    // adding to it, so pass the defaults along if you mean to extend them.
+    void setRedactedBodyFields(const QStringList &names);
+    QStringList redactedBodyFields() const;
+    static QStringList defaultRedactedBodyFields();
 
     std::optional<InterceptedResponse> beforeRequest(InterceptedRequest &request) override;
     void afterResponse(const InterceptedResponse &response) override;

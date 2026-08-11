@@ -117,6 +117,7 @@ private slots:
     void aDestroyedInterceptorRemovesItself();
     void theLoggerNeverWritesTheApiKey();
     void theLoggerKeepsBodiesOutOfTheLogUnlessAsked();
+    void theLoggerRedactsSecretFieldsAtAnyDepth();
 };
 
 void TestInterceptor::noneIsInstalledByDefault()
@@ -381,6 +382,47 @@ void TestInterceptor::theLoggerKeepsBodiesOutOfTheLogUnlessAsked()
     // Asked for, and truncated: one large upload must not fill a disk.
     QVERIFY2(written.contains(QStringLiteral("bytes total")), qPrintable(written));
     QVERIFY2(!written.contains(QStringLiteral("a private prompt")), qPrintable(written));
+}
+
+void TestInterceptor::theLoggerRedactsSecretFieldsAtAnyDepth()
+{
+    // A few responses hand back a live credential in the body, once. Header
+    // redaction never looked at bodies, so this is what covers them.
+    LoggingInterceptor logger;
+    QStringList lines;
+    connect(&logger, &LoggingInterceptor::logged, &logger,
+            [&lines](const QString &line) { lines.append(line); });
+    logger.setLogBodies(true);
+    logger.setMaxBodyLength(0);
+
+    // Nested inside an object inside an array, and spelled with a capital, so
+    // that only a walk over the parsed JSON finds it.
+    StubServer server(R"({"object":"list","data":[
+        {"id":"key_1","redacted_value":"sk-admin...def",
+         "nested":{"Value":"sk-live-DEEPSECRET"}}]})");
+    Client client;
+    client.setBaseUrl(server.baseUrl());
+    client.addInterceptor(&logger);
+    QVERIFY(awaited(client.createChatCompletion(sampleRequest())));
+
+    const QString written = lines.join(QLatin1Char('\n'));
+    QVERIFY2(!written.contains(QStringLiteral("sk-live-DEEPSECRET")), qPrintable(written));
+    // The key decides, not the text: everything that is not a secret field is
+    // still there to be read, which is the point of logging a body at all.
+    QVERIFY2(written.contains(QStringLiteral("key_1")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("sk-admin...def")), qPrintable(written));
+
+    // A body that is not JSON has no fields to walk, and is left alone rather
+    // than dropped -- a caller debugging a stream still needs to see it.
+    lines.clear();
+    logger.setRedactedBodyFields({QStringLiteral("value")});
+    StubServer plain(QByteArray("not json at all"));
+    Client other;
+    other.setBaseUrl(plain.baseUrl());
+    other.addInterceptor(&logger);
+    awaited(other.createChatCompletion(sampleRequest()));
+    QVERIFY2(lines.join(QLatin1Char('\n')).contains(QStringLiteral("not json at all")),
+             qPrintable(lines.join(QLatin1Char('\n'))));
 }
 
 QTEST_MAIN(TestInterceptor)
