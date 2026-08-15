@@ -2,6 +2,8 @@
 #pragma once
 
 #include <QtOpenAi/Admin/AdminApiKeyReply.h>
+#include <QtOpenAi/Admin/AuditLogQuery.h>
+#include <QtOpenAi/Admin/AuditLogReply.h>
 #include <QtOpenAi/Admin/CertificateReply.h>
 #include <QtOpenAi/Admin/CostsReply.h>
 #include <QtOpenAi/Admin/GlobalAdmin.h>
@@ -384,6 +386,16 @@ public:
     AdminApiKeyReply *getAdminApiKey(const QString &keyId);
 
     AdminApiKeyReply *deleteAdminApiKey(const QString &keyId);
+
+    // --- Audit logs (/organization/audit_logs) -----------------------------
+    // What happened, who did it and what it happened to. Read-only and page at
+    // a time; there is no endpoint for a single entry.
+    //
+    // The filters are a struct rather than a dozen parameters -- see
+    // Admin::AuditLogQuery, and note that a filter the server does not
+    // recognise is ignored rather than refused, so a wrong query returns a
+    // valid page of the wrong events.
+    AuditLogListReply *listAuditLogs(const AuditLogQuery &query = {});
 
     // --- Usage and costs (/organization/usage/*, /organization/costs) ------
     // Which usage report to ask for. The ten endpoints under

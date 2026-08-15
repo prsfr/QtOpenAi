@@ -17,6 +17,8 @@ set(QTOPENAI_ADMIN_PUBLIC_HEADERS
     include/QtOpenAi/Admin/Organization.h
     include/QtOpenAi/Admin/ProjectReply.h
     include/QtOpenAi/Admin/ProjectServiceAccountReply.h
+    include/QtOpenAi/Admin/AuditLogQuery.h
+    include/QtOpenAi/Admin/AuditLogReply.h
     include/QtOpenAi/Admin/AdminApiKeyReply.h
     include/QtOpenAi/Admin/ProjectApiKeyReply.h
     include/QtOpenAi/Admin/ProjectRateLimitReply.h
@@ -35,6 +37,7 @@ set(QTOPENAI_ADMIN_PUBLIC_HEADERS
 add_library(QtOpenAiAdmin
     ${QTOPENAI_ADMIN_PUBLIC_HEADERS}
     src/Organization.cpp
+    src/AuditLogQuery.cpp
     src/UsageQuery.cpp
 )
 

@@ -78,6 +78,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/Invite.h
     include/QtOpenAi/Core/CreateInviteRequest.h
     include/QtOpenAi/Core/ProjectServiceAccount.h
+    include/QtOpenAi/Core/AuditLog.h
     include/QtOpenAi/Core/AdminApiKey.h
     include/QtOpenAi/Core/ProjectApiKey.h
     include/QtOpenAi/Core/ProjectRateLimit.h
@@ -180,6 +181,7 @@ add_library(QtOpenAiCore
     src/Invite.cpp
     src/CreateInviteRequest.cpp
     src/ProjectServiceAccount.cpp
+    src/AuditLog.cpp
     src/AdminApiKey.cpp
     src/ProjectApiKey.cpp
     src/ProjectRateLimit.cpp

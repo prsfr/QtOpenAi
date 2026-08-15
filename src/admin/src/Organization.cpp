@@ -20,6 +20,7 @@ constexpr QLatin1String kCosts("/organization/costs");
 constexpr QLatin1String kUsers("/organization/users");
 constexpr QLatin1String kInvites("/organization/invites");
 constexpr QLatin1String kAdminApiKeys("/organization/admin_api_keys");
+constexpr QLatin1String kAuditLogs("/organization/audit_logs");
 
 // The sub-resources that hang off a project, a group, or a scope. Every one of
 // them repeats the same list/create/get/delete shape under an id, so they are
@@ -824,6 +825,13 @@ AdminApiKeyReply *Organization::deleteAdminApiKey(const QString &keyId)
     Q_D(Organization);
     return d->client.issueRequest<AdminApiKeyReply>(Client::Client::Verb::Delete,
                                                     resourcePath(kAdminApiKeys, keyId));
+}
+
+AuditLogListReply *Organization::listAuditLogs(const AuditLogQuery &query)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<AuditLogListReply>(Client::Client::Verb::Get, QString(kAuditLogs),
+                                                     query.toQuery());
 }
 
 UsageReply *Organization::usage(UsageKind kind, const UsageQuery &query)
