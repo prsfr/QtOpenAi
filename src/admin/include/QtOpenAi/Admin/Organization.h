@@ -16,6 +16,7 @@
 #include <QtOpenAi/Admin/ProjectServiceAccountReply.h>
 #include <QtOpenAi/Admin/RoleReply.h>
 #include <QtOpenAi/Admin/RoleScope.h>
+#include <QtOpenAi/Admin/SpendAlertReply.h>
 #include <QtOpenAi/Admin/UsageQuery.h>
 #include <QtOpenAi/Admin/UsageReply.h>
 #include <QtOpenAi/Admin/UserReply.h>
@@ -386,6 +387,62 @@ public:
     AdminApiKeyReply *getAdminApiKey(const QString &keyId);
 
     AdminApiKeyReply *deleteAdminApiKey(const QString &keyId);
+
+    // --- Spend alerts (/organization/spend_alerts, and a project's) --------
+    // An email when spending crosses a threshold within an interval. The same
+    // five operations exist at both scopes.
+    //
+    // **The threshold is in cents** -- see Core::SpendAlert, where getting the
+    // factor wrong is the mistake worth guarding against.
+    //
+    // Scope is in the method name rather than a parameter, as it is for
+    // certificates, members and keys: these paths nest under
+    // /organization/projects/{id} like all of those. (Admin::RoleScope exists
+    // because the *role* endpoints do not -- they hang off /projects/{id} -- so
+    // reusing it here would name the wrong root.)
+    SpendAlertListReply *listSpendAlerts(const Client::ListParams &params = {});
+
+    SpendAlertReply *getSpendAlert(const QString &alertId);
+
+    SpendAlertReply *createSpendAlert(const Core::SpendAlert &alert);
+
+    // **Replaces the alert whole**, rather than patching it: the API takes the
+    // same four required fields a create does, so a field left off `alert` is
+    // sent as this type's default rather than kept as it was.
+    SpendAlertReply *updateSpendAlert(const QString &alertId, const Core::SpendAlert &alert);
+
+    SpendAlertReply *deleteSpendAlert(const QString &alertId);
+
+    SpendAlertListReply *listProjectSpendAlerts(const QString &projectId,
+                                                const Client::ListParams &params = {});
+
+    SpendAlertReply *getProjectSpendAlert(const QString &projectId, const QString &alertId);
+
+    SpendAlertReply *createProjectSpendAlert(const QString &projectId,
+                                             const Core::SpendAlert &alert);
+
+    SpendAlertReply *updateProjectSpendAlert(const QString &projectId, const QString &alertId,
+                                             const Core::SpendAlert &alert);
+
+    SpendAlertReply *deleteProjectSpendAlert(const QString &projectId, const QString &alertId);
+
+    // --- Data retention (/organization/data_retention, and a project's) -----
+    // How long the API keeps what is sent to it. Read and replace; there is no
+    // delete, because there is always some policy in force.
+    //
+    // The setters take the retention type directly rather than a
+    // Core::DataRetention, because the update body names the field
+    // `retention_type` while the resource reports it as `type` -- see
+    // Core::DataRetention. Passing the value keeps that mismatch in one place.
+    DataRetentionReply *getDataRetention();
+    DataRetentionReply *setDataRetention(const QString &retentionType);
+
+    DataRetentionReply *getProjectDataRetention(const QString &projectId);
+
+    // A project also accepts "organization_default" to defer to the
+    // organization's setting, and "none".
+    DataRetentionReply *setProjectDataRetention(const QString &projectId,
+                                                const QString &retentionType);
 
     // --- Audit logs (/organization/audit_logs) -----------------------------
     // What happened, who did it and what it happened to. Read-only and page at
