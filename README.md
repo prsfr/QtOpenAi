@@ -2240,6 +2240,52 @@ them rather than exposing both: a project key nests the principal under its kind
 key inlines the user's fields beside the discriminator. Both answer
 `owner().isUser()` and `owner().user()`.
 
+### Audit logs
+
+What happened, who did it, and to what. Read-only, and a page at a time — there
+is no endpoint for a single entry.
+
+```cpp
+Admin::AuditLogQuery query;
+query.effectiveAtGte = QDateTime::currentSecsSinceEpoch() - 24 * 3600;
+query.eventTypes = {QStringLiteral("project.archived")};
+
+organization.listAuditLogs(query);
+```
+
+**There is no event-type enum, and that is the design rather than a shortcut.**
+The API describes ~55 event types and adds more without notice — but it does not
+nest the payload under a `data` field. It puts the payload under a key *named
+after the type*:
+
+```json
+{"id": "audit_log-abc", "type": "project.archived",
+ "project.archived": {"id": "proj_abc"}}
+```
+
+So the payload is found by looking up `type()`, never by knowing it in advance.
+Modelling 55 C++ structs would have been a large surface that goes stale on the
+56th; this way an event type this build has never heard of arrives whole and
+readable, which is what #105 asked for and what the tests pin. `resourceId()`,
+`data()` and `changesRequested()` name the three fields that recur across nearly
+all the payloads — and the last two are *different claims*, one being what a
+creation was given and the other what an update asked to change.
+
+**A filter the server does not recognise is ignored, not refused.** That makes a
+wrong query return a valid page of the wrong events, which for an audit trail is
+worse than an error, so `Admin::AuditLogQuery` is one struct rather than a dozen
+parameters and the tests assert the query string on the wire rather than the
+reply. Two spellings matter there: every list filter carries `[]` in its own name
+(`project_ids[]=a&project_ids[]=b`), and the time bounds go out bracketed as
+`effective_at[gt]=…`.
+
+`AuditLogActor` keeps the API's two-level union — a session or an API key, and an
+API key belonging to a user or a service account — because *which kind of
+principal acted* is the first question an audit asks. `user()` answers across
+both halves, since "who was it" usually has one answer whichever route they came
+in by; a service-account key has no person behind it and leaves it empty, which
+is itself the answer.
+
 ### Usage and costs
 
 What did last week cost, and what spent it? Eleven endpoints answer that — ten
@@ -2341,8 +2387,8 @@ Coverage so far is the ten usage reports and `/organization/costs`,
 limits, `/organization/roles` and `/organization/groups` with their members
 and role assignments at both scopes, `/organization/certificates` with its
 activation toggles at both scopes, each project's model and hosted-tool
-permissions, and `/organization/admin_api_keys`; the rest of the surface — audit
-logs, spend alerts, data retention — is tracked in
+permissions, `/organization/admin_api_keys` and `/organization/audit_logs`; the
+rest of the surface — spend alerts and data retention — is tracked in
 [#28](https://github.com/prsfr/QtOpenAi/issues/28) and its sub-issues. See
 [`examples/organization.cpp`](examples/organization.cpp),
 [`examples/organization_usage.cpp`](examples/organization_usage.cpp),
@@ -2351,7 +2397,8 @@ logs, spend alerts, data retention — is tracked in
 [`examples/organization_roles.cpp`](examples/organization_roles.cpp),
 [`examples/organization_certificates.cpp`](examples/organization_certificates.cpp),
 [`examples/organization_permissions.cpp`](examples/organization_permissions.cpp) and
-[`examples/organization_admin_keys.cpp`](examples/organization_admin_keys.cpp).
+[`examples/organization_admin_keys.cpp`](examples/organization_admin_keys.cpp) and
+[`examples/organization_audit_logs.cpp`](examples/organization_audit_logs.cpp).
 
 ## Persistence (`QtOpenAi::Storage`)
 
