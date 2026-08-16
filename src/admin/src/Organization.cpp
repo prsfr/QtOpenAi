@@ -21,6 +21,8 @@ constexpr QLatin1String kUsers("/organization/users");
 constexpr QLatin1String kInvites("/organization/invites");
 constexpr QLatin1String kAdminApiKeys("/organization/admin_api_keys");
 constexpr QLatin1String kAuditLogs("/organization/audit_logs");
+constexpr QLatin1String kSpendAlerts("/organization/spend_alerts");
+constexpr QLatin1String kDataRetention("/organization/data_retention");
 
 // The sub-resources that hang off a project, a group, or a scope. Every one of
 // them repeats the same list/create/get/delete shape under an id, so they are
@@ -34,6 +36,8 @@ constexpr QLatin1String kApiKeys("/api_keys");
 constexpr QLatin1String kRateLimits("/rate_limits");
 constexpr QLatin1String kModelPermissions("/model_permissions");
 constexpr QLatin1String kHostedToolPermissions("/hosted_tool_permissions");
+constexpr QLatin1String kSpendAlertsSegment("/spend_alerts");
+constexpr QLatin1String kDataRetentionSegment("/data_retention");
 constexpr QLatin1String kArchive("/archive");
 
 // The activation toggles are path segments rather than a verb on one
@@ -825,6 +829,145 @@ AdminApiKeyReply *Organization::deleteAdminApiKey(const QString &keyId)
     Q_D(Organization);
     return d->client.issueRequest<AdminApiKeyReply>(Client::Client::Verb::Delete,
                                                     resourcePath(kAdminApiKeys, keyId));
+}
+
+namespace {
+
+// The body both the create and the update take: the same four required fields,
+// which is why updateSpendAlert() replaces rather than patches.
+QJsonObject spendAlertBody(const Core::SpendAlert &alert)
+{
+    QJsonObject body = alert.toJson();
+    // The server assigns these; sending them back would be describing the
+    // resource rather than requesting it.
+    body.remove(QStringLiteral("id"));
+    body.remove(QStringLiteral("object"));
+    body.remove(QStringLiteral("deleted"));
+    return body;
+}
+
+// The update body of either data-retention endpoint. The field is
+// `retention_type` here and `type` on the resource -- see Core::DataRetention.
+QJsonObject dataRetentionBody(const QString &retentionType)
+{
+    QJsonObject body;
+    body.insert(QStringLiteral("retention_type"), retentionType);
+    return body;
+}
+
+} // namespace
+
+SpendAlertListReply *Organization::listSpendAlerts(const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendAlertListReply>(Client::Client::Verb::Get,
+                                                       QString(kSpendAlerts), params.toQuery());
+}
+
+SpendAlertReply *Organization::getSpendAlert(const QString &alertId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendAlertReply>(Client::Client::Verb::Get,
+                                                   resourcePath(kSpendAlerts, alertId));
+}
+
+SpendAlertReply *Organization::createSpendAlert(const Core::SpendAlert &alert)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendAlertReply>(Client::Client::Verb::Post,
+                                                   QString(kSpendAlerts), {},
+                                                   compactJson(spendAlertBody(alert)));
+}
+
+SpendAlertReply *Organization::updateSpendAlert(const QString &alertId,
+                                                const Core::SpendAlert &alert)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendAlertReply>(Client::Client::Verb::Post,
+                                                   resourcePath(kSpendAlerts, alertId), {},
+                                                   compactJson(spendAlertBody(alert)));
+}
+
+SpendAlertReply *Organization::deleteSpendAlert(const QString &alertId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendAlertReply>(Client::Client::Verb::Delete,
+                                                   resourcePath(kSpendAlerts, alertId));
+}
+
+SpendAlertListReply *Organization::listProjectSpendAlerts(const QString &projectId,
+                                                          const Client::ListParams &params)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendAlertListReply>(Client::Client::Verb::Get,
+                                                       projectPath(projectId, kSpendAlertsSegment),
+                                                       params.toQuery());
+}
+
+SpendAlertReply *Organization::getProjectSpendAlert(const QString &projectId,
+                                                    const QString &alertId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendAlertReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kSpendAlertsSegment, alertId));
+}
+
+SpendAlertReply *Organization::createProjectSpendAlert(const QString &projectId,
+                                                       const Core::SpendAlert &alert)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendAlertReply>(Client::Client::Verb::Post,
+                                                   projectPath(projectId, kSpendAlertsSegment), {},
+                                                   compactJson(spendAlertBody(alert)));
+}
+
+SpendAlertReply *Organization::updateProjectSpendAlert(const QString &projectId,
+                                                       const QString &alertId,
+                                                       const Core::SpendAlert &alert)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendAlertReply>(
+            Client::Client::Verb::Post, projectPath(projectId, kSpendAlertsSegment, alertId), {},
+            compactJson(spendAlertBody(alert)));
+}
+
+SpendAlertReply *Organization::deleteProjectSpendAlert(const QString &projectId,
+                                                       const QString &alertId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendAlertReply>(
+            Client::Client::Verb::Delete, projectPath(projectId, kSpendAlertsSegment, alertId));
+}
+
+DataRetentionReply *Organization::getDataRetention()
+{
+    Q_D(Organization);
+    return d->client.issueRequest<DataRetentionReply>(Client::Client::Verb::Get,
+                                                      QString(kDataRetention));
+}
+
+DataRetentionReply *Organization::setDataRetention(const QString &retentionType)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<DataRetentionReply>(
+            Client::Client::Verb::Post, QString(kDataRetention), {},
+            compactJson(dataRetentionBody(retentionType)));
+}
+
+DataRetentionReply *Organization::getProjectDataRetention(const QString &projectId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<DataRetentionReply>(
+            Client::Client::Verb::Get, projectPath(projectId, kDataRetentionSegment));
+}
+
+DataRetentionReply *Organization::setProjectDataRetention(const QString &projectId,
+                                                          const QString &retentionType)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<DataRetentionReply>(
+            Client::Client::Verb::Post, projectPath(projectId, kDataRetentionSegment), {},
+            compactJson(dataRetentionBody(retentionType)));
 }
 
 AuditLogListReply *Organization::listAuditLogs(const AuditLogQuery &query)

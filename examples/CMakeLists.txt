@@ -77,6 +77,8 @@ qtopenai_add_example(organization_admin_keys organization_admin_keys.cpp)
 target_link_libraries(organization_admin_keys PRIVATE QtOpenAi::Admin)
 qtopenai_add_example(organization_audit_logs organization_audit_logs.cpp)
 target_link_libraries(organization_audit_logs PRIVATE QtOpenAi::Admin)
+qtopenai_add_example(organization_spend_alerts organization_spend_alerts.cpp)
+target_link_libraries(organization_spend_alerts PRIVATE QtOpenAi::Admin)
 
 # --- Persistence ---
 qtopenai_add_example(persistence persistence.cpp)

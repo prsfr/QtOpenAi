@@ -2286,6 +2286,54 @@ both halves, since "who was it" usually has one answer whichever route they came
 in by; a service-account key has no person behind it and leaves it empty, which
 is itself the answer.
 
+### Spend alerts and data retention
+
+An email when spending crosses a threshold, and how long the API keeps what is
+sent to it. Both exist at the organization and at a project, with every
+operation mirrored.
+
+```cpp
+Core::SpendAlertNotificationChannel channel;
+channel.setRecipients({QStringLiteral("finance@example.com")});
+
+Core::SpendAlert alert;
+alert.setThresholdAmount(100000);        // $1,000.00 — cents, not dollars
+alert.setNotificationChannel(channel);
+
+organization.createSpendAlert(alert);
+organization.setDataRetention(QStringLiteral("zero_data_retention"));
+```
+
+**The threshold is in cents, and the library keeps the API's unit rather than
+converting.** A converting accessor is somewhere for the factor of a hundred to
+be applied twice or not at all, and this is not a field where a rounding error
+is the worst case: at a hundredfold, an alert meant for $1,000 either fires on
+the first dollar of the month or never fires at all — and nobody notices the
+second kind until the invoice arrives. `currency` and `interval` each have one
+legal value today and default to it, so an alert built from scratch is accepted
+rather than refused for a field the caller never had a choice about. A threshold
+of **0** is legal and is sent rather than omitted.
+
+**Reading and writing data retention use different field names.** The resource
+reports `type`; the update body takes `retention_type`. That asymmetry is the
+API's — the same trick `Core::RoleRequest` deals with — so the setter takes the
+value directly rather than a `Core::DataRetention`, keeping the mismatch in one
+place instead of in every caller. Sending the resource's own shape back would be
+a request the server accepts and quietly ignores.
+
+The retention type stays a string for a sharper reason than usual: it is a
+compliance setting, and "the strictest policy" and "the default" are one enum
+position apart. A value this build has never heard of has to arrive as itself. A
+project accepts two the organization does not — `organization_default`, which
+`isOrganizationDefault()` names because it is a deferral rather than a policy,
+and `none`.
+
+Scope is in the method name here (`listSpendAlerts` / `listProjectSpendAlerts`)
+rather than in an `Admin::RoleScope` argument, matching certificates, members and
+keys: all of these nest under `/organization/projects/{id}`. The *role*
+endpoints do not — they hang off `/projects/{id}` — which is the quirk `RoleScope`
+exists to contain, so reusing it here would name the wrong root.
+
 ### Usage and costs
 
 What did last week cost, and what spent it? Eleven endpoints answer that — ten
@@ -2387,9 +2435,11 @@ Coverage so far is the ten usage reports and `/organization/costs`,
 limits, `/organization/roles` and `/organization/groups` with their members
 and role assignments at both scopes, `/organization/certificates` with its
 activation toggles at both scopes, each project's model and hosted-tool
-permissions, `/organization/admin_api_keys` and `/organization/audit_logs`; the
-rest of the surface — spend alerts and data retention — is tracked in
-[#28](https://github.com/prsfr/QtOpenAi/issues/28) and its sub-issues. See
+permissions, `/organization/admin_api_keys`, `/organization/audit_logs`, and
+spend alerts and data retention at both scopes. That completes the sub-issues of
+[#28](https://github.com/prsfr/QtOpenAi/issues/28); `/organization/spend_limit`,
+which enforces rather than notifies, is the one administration family still
+untracked. See
 [`examples/organization.cpp`](examples/organization.cpp),
 [`examples/organization_usage.cpp`](examples/organization_usage.cpp),
 [`examples/organization_members.cpp`](examples/organization_members.cpp),
@@ -2398,7 +2448,8 @@ rest of the surface — spend alerts and data retention — is tracked in
 [`examples/organization_certificates.cpp`](examples/organization_certificates.cpp),
 [`examples/organization_permissions.cpp`](examples/organization_permissions.cpp) and
 [`examples/organization_admin_keys.cpp`](examples/organization_admin_keys.cpp) and
-[`examples/organization_audit_logs.cpp`](examples/organization_audit_logs.cpp).
+[`examples/organization_audit_logs.cpp`](examples/organization_audit_logs.cpp) and
+[`examples/organization_spend_alerts.cpp`](examples/organization_spend_alerts.cpp).
 
 ## Persistence (`QtOpenAi::Storage`)
 
