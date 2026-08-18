@@ -78,6 +78,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/Invite.h
     include/QtOpenAi/Core/CreateInviteRequest.h
     include/QtOpenAi/Core/ProjectServiceAccount.h
+    include/QtOpenAi/Core/SpendLimit.h
     include/QtOpenAi/Core/SpendAlert.h
     include/QtOpenAi/Core/DataRetention.h
     include/QtOpenAi/Core/AuditLog.h
@@ -183,6 +184,7 @@ add_library(QtOpenAiCore
     src/Invite.cpp
     src/CreateInviteRequest.cpp
     src/ProjectServiceAccount.cpp
+    src/SpendLimit.cpp
     src/SpendAlert.cpp
     src/DataRetention.cpp
     src/AuditLog.cpp

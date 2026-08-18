@@ -23,6 +23,7 @@ constexpr QLatin1String kAdminApiKeys("/organization/admin_api_keys");
 constexpr QLatin1String kAuditLogs("/organization/audit_logs");
 constexpr QLatin1String kSpendAlerts("/organization/spend_alerts");
 constexpr QLatin1String kDataRetention("/organization/data_retention");
+constexpr QLatin1String kSpendLimit("/organization/spend_limit");
 
 // The sub-resources that hang off a project, a group, or a scope. Every one of
 // them repeats the same list/create/get/delete shape under an id, so they are
@@ -38,6 +39,7 @@ constexpr QLatin1String kModelPermissions("/model_permissions");
 constexpr QLatin1String kHostedToolPermissions("/hosted_tool_permissions");
 constexpr QLatin1String kSpendAlertsSegment("/spend_alerts");
 constexpr QLatin1String kDataRetentionSegment("/data_retention");
+constexpr QLatin1String kSpendLimitSegment("/spend_limit");
 constexpr QLatin1String kArchive("/archive");
 
 // The activation toggles are path segments rather than a verb on one
@@ -937,6 +939,65 @@ SpendAlertReply *Organization::deleteProjectSpendAlert(const QString &projectId,
     Q_D(Organization);
     return d->client.issueRequest<SpendAlertReply>(
             Client::Client::Verb::Delete, projectPath(projectId, kSpendAlertsSegment, alertId));
+}
+
+namespace {
+
+// The body both spend-limit writes take. `enforcement` is the server's report
+// of whether the limit is biting, not a setting, so it never goes out -- and
+// nor does the object or the deletion flag.
+QJsonObject spendLimitBody(const Core::SpendLimit &limit)
+{
+    QJsonObject body = limit.toJson();
+    body.remove(QStringLiteral("object"));
+    body.remove(QStringLiteral("enforcement"));
+    body.remove(QStringLiteral("deleted"));
+    return body;
+}
+
+} // namespace
+
+SpendLimitReply *Organization::getSpendLimit()
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendLimitReply>(Client::Client::Verb::Get, QString(kSpendLimit));
+}
+
+SpendLimitReply *Organization::setSpendLimit(const Core::SpendLimit &limit)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendLimitReply>(Client::Client::Verb::Post, QString(kSpendLimit),
+                                                   {}, compactJson(spendLimitBody(limit)));
+}
+
+SpendLimitReply *Organization::deleteSpendLimit()
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendLimitReply>(Client::Client::Verb::Delete,
+                                                   QString(kSpendLimit));
+}
+
+SpendLimitReply *Organization::getProjectSpendLimit(const QString &projectId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendLimitReply>(Client::Client::Verb::Get,
+                                                   projectPath(projectId, kSpendLimitSegment));
+}
+
+SpendLimitReply *Organization::setProjectSpendLimit(const QString &projectId,
+                                                    const Core::SpendLimit &limit)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendLimitReply>(Client::Client::Verb::Post,
+                                                   projectPath(projectId, kSpendLimitSegment), {},
+                                                   compactJson(spendLimitBody(limit)));
+}
+
+SpendLimitReply *Organization::deleteProjectSpendLimit(const QString &projectId)
+{
+    Q_D(Organization);
+    return d->client.issueRequest<SpendLimitReply>(Client::Client::Verb::Delete,
+                                                   projectPath(projectId, kSpendLimitSegment));
 }
 
 DataRetentionReply *Organization::getDataRetention()

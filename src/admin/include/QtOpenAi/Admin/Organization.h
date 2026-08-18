@@ -17,6 +17,7 @@
 #include <QtOpenAi/Admin/RoleReply.h>
 #include <QtOpenAi/Admin/RoleScope.h>
 #include <QtOpenAi/Admin/SpendAlertReply.h>
+#include <QtOpenAi/Admin/SpendLimitReply.h>
 #include <QtOpenAi/Admin/UsageQuery.h>
 #include <QtOpenAi/Admin/UsageReply.h>
 #include <QtOpenAi/Admin/UserReply.h>
@@ -425,6 +426,28 @@ public:
                                              const Core::SpendAlert &alert);
 
     SpendAlertReply *deleteProjectSpendAlert(const QString &projectId, const QString &alertId);
+
+    // --- Spend limits (/organization/spend_limit, and a project's) ---------
+    // **The hard limit, which stops requests** -- not the alert above, which
+    // only sends email. A scope has one limit or none, so there is no list and
+    // no id: read it, replace it, or delete it.
+    //
+    // Deleting is how spending becomes unlimited again; there is no way to
+    // express "no limit" by writing one. See Core::SpendLimit, and note that
+    // the API's minimum threshold is 1 cent rather than 0.
+    SpendLimitReply *getSpendLimit();
+
+    // **Replaces the limit whole.** Sends threshold, currency and interval; the
+    // enforcement state is the server's to report and is not sent.
+    SpendLimitReply *setSpendLimit(const Core::SpendLimit &limit);
+
+    SpendLimitReply *deleteSpendLimit();
+
+    SpendLimitReply *getProjectSpendLimit(const QString &projectId);
+
+    SpendLimitReply *setProjectSpendLimit(const QString &projectId, const Core::SpendLimit &limit);
+
+    SpendLimitReply *deleteProjectSpendLimit(const QString &projectId);
 
     // --- Data retention (/organization/data_retention, and a project's) -----
     // How long the API keeps what is sent to it. Read and replace; there is no
