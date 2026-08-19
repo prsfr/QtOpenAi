@@ -3,10 +3,14 @@
 // Spend alerts and data-retention settings, at the organization and at a
 // project.
 //
-//   organization.listSpendAlerts();
-//   organization.createSpendAlert(alert);
+//   organization.listSpendAlerts();     // notify
+//   organization.getSpendLimit();       // enforce
 //   organization.getDataRetention();
 //   organization.setProjectDataRetention(projectId, "organization_default");
+//
+// **An alert and a limit are not the same thing.** An alert sends email when
+// spending crosses a threshold and changes nothing; a hard limit stops requests.
+// This example reads both, and alters neither.
 //
 // **The threshold is in cents.** 100000 is $1,000.00. This example prints both
 // numbers so the factor is visible; getting it wrong by a hundred means an alert
@@ -112,6 +116,31 @@ int main(int argc, char **argv)
                          });
     };
 
+    // Between the alerts and the retention settings: the hard limit, which is
+    // the one that can take an organization off the air.
+    const auto readLimit = [&] {
+        Admin::SpendLimitReply *reply = organization.getSpendLimit();
+        QObject::connect(reply, &Admin::SpendLimitReply::failed, onError);
+        QObject::connect(
+                reply, &Admin::SpendLimitReply::finished, [&](const Core::SpendLimit &limit) {
+                    out << "\nHard spend limit: ";
+                    if (limit.thresholdAmount() == 0) {
+                        // No limit configured -- and there is no way to
+                        // write "unlimited", only to delete the limit.
+                        out << "none\n";
+                    } else {
+                        out << money(limit.thresholdAmount()) << " " << limit.currency() << " per "
+                            << limit.interval() << "\n";
+                        // "Configured" and "currently refusing requests"
+                        // are different facts; this is the second one.
+                        out << "      enforcement: " << limit.enforcementStatus()
+                            << (limit.isEnforcing() ? "  (requests are being refused)" : "")
+                            << "\n";
+                    }
+                    readRetention();
+                });
+    };
+
     Admin::SpendAlertListReply *reply = organization.listSpendAlerts();
     QObject::connect(reply, &Admin::SpendAlertListReply::failed, onError);
     QObject::connect(
@@ -139,7 +168,7 @@ int main(int argc, char **argv)
                 //
                 // currency and interval default to the only values the
                 // API accepts, so they need not be set.
-                readRetention();
+                readLimit();
             });
 
     return app.exec();

@@ -2328,6 +2328,41 @@ project accepts two the organization does not — `organization_default`, which
 `isOrganizationDefault()` names because it is a deferral rather than a policy,
 and `none`.
 
+### Hard spend limits
+
+The other half of the same story, and the half that bites:
+
+```cpp
+Core::SpendLimit limit;
+limit.setThresholdAmount(100000);        // $1,000.00, again in cents
+organization.setSpendLimit(limit);
+
+organization.getSpendLimit().isEnforcing();   // are requests being refused now?
+organization.deleteSpendLimit();              // the only way back to unlimited
+```
+
+**An alert notifies; a limit enforces.** They share four field names and are
+still separate types with separate methods, because setting one on the wrong
+scope — or with the factor of a hundred wrong — takes an organization off the
+air rather than filling an inbox.
+
+Three differences from the alert are worth knowing, and each is pinned by a
+test:
+
+- **The API's minimum threshold is 1 cent, not 0.** So an unset threshold is
+  *omitted* from a write here, where the alert *sends* its zero. A limit of zero
+  would mean "permit nothing", and there is no way to say "no limit" by writing
+  one — you delete it.
+- **`enforcement` is the server's report, not a setting**, so it is never sent.
+  `isEnforcing()` answers "are requests being refused right now", which is a
+  different question from "is a limit configured": a limit exists from the
+  moment it is set and only starts enforcing once spending reaches it.
+- **There is no list and no id.** A scope has one limit or none.
+
+An enforcement status this build has never heard of reads as itself and as *not*
+enforcing — reporting an unknown state as "business as usual" would be the wrong
+way round, so the raw string stays available.
+
 Scope is in the method name here (`listSpendAlerts` / `listProjectSpendAlerts`)
 rather than in an `Admin::RoleScope` argument, matching certificates, members and
 keys: all of these nest under `/organization/projects/{id}`. The *role*
@@ -2436,10 +2471,9 @@ limits, `/organization/roles` and `/organization/groups` with their members
 and role assignments at both scopes, `/organization/certificates` with its
 activation toggles at both scopes, each project's model and hosted-tool
 permissions, `/organization/admin_api_keys`, `/organization/audit_logs`, and
-spend alerts and data retention at both scopes. That completes the sub-issues of
-[#28](https://github.com/prsfr/QtOpenAi/issues/28); `/organization/spend_limit`,
-which enforces rather than notifies, is the one administration family still
-untracked. See
+and spend alerts, hard spend limits and data retention at both scopes — which is
+the whole of the administration surface described by
+[#28](https://github.com/prsfr/QtOpenAi/issues/28). See
 [`examples/organization.cpp`](examples/organization.cpp),
 [`examples/organization_usage.cpp`](examples/organization_usage.cpp),
 [`examples/organization_members.cpp`](examples/organization_members.cpp),
