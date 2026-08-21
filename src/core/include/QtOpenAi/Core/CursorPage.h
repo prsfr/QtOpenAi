@@ -77,5 +77,13 @@ struct CursorPage
     bool operator!=(const CursorPage &other) const { return !(*this == other); }
 };
 
+// See ListPage's overload: the cursor here is the opaque `next` the API sends
+// rather than an item id.
+template <typename T>
+QString nextPageCursor(const CursorPage<T> &page)
+{
+    return page.hasMore ? page.next : QString();
+}
+
 } // namespace Core
 } // namespace QtOpenAi

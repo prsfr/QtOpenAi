@@ -33,5 +33,14 @@ struct QTOPENAI_CLIENT_EXPORT ListParams
     }
 };
 
+// Put the next page's cursor where this query carries it.
+//
+// The other half of the pair that lets Client::PageWalker drive an endpoint it
+// was not written against; the reading half is Core::nextPageCursor(). Both are
+// found by argument-dependent lookup, so a query type in another module -- the
+// administration ones, say -- supplies its own overload beside itself rather
+// than this header having to know about it.
+inline void applyPageCursor(ListParams &params, const QString &cursor) { params.after = cursor; }
+
 } // namespace Client
 } // namespace QtOpenAi

@@ -411,6 +411,10 @@ qtopenai_add_test(tst_admin_spendlimits
     SOURCES admin/tst_spendlimits.cpp
     LIBS QtOpenAi::Admin)
 
+qtopenai_add_test(tst_admin_pagination
+    SOURCES admin/tst_pagination.cpp
+    LIBS QtOpenAi::Admin)
+
 # --- Realtime module tests (built with the module) ---
 if(QTOPENAI_BUILD_REALTIME)
     qtopenai_add_test(tst_realtime_connection

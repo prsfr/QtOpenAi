@@ -7,7 +7,6 @@ namespace Client {
 class PageWalkerBasePrivate
 {
 public:
-    ListParams params;
     int pageCount = 0;
     bool walking = false;
     bool finished = false;
@@ -20,18 +19,6 @@ PageWalkerBase::PageWalkerBase(QObject *parent)
 { }
 
 PageWalkerBase::~PageWalkerBase() = default;
-
-ListParams PageWalkerBase::params() const
-{
-    Q_D(const PageWalkerBase);
-    return d->params;
-}
-
-void PageWalkerBase::setParams(const ListParams &params)
-{
-    Q_D(PageWalkerBase);
-    d->params = params;
-}
 
 int PageWalkerBase::pageCount() const
 {
@@ -69,7 +56,8 @@ void PageWalkerBase::start()
     if (d->finished || d->walking)
         return;
     d->walking = true;
-    requestPage();
+    // An empty cursor is the first page: there is nothing to advance past yet.
+    requestPage(QString());
 }
 
 void PageWalkerBase::stop()
@@ -87,8 +75,9 @@ void PageWalkerBase::pageHandled(const QString &nextCursor)
         Q_EMIT finished();
         return;
     }
-    d->params.after = nextCursor;
-    requestPage();
+    // The cursor goes to the template, which knows which field of which query
+    // type it belongs in -- see PageWalker's class note.
+    requestPage(nextCursor);
 }
 
 void PageWalkerBase::finish()

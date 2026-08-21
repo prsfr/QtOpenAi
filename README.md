@@ -2087,6 +2087,8 @@ instead of `Core::ListPage`, because the server sends a single opaque `next`
 cursor rather than the `first_id`/`last_id` item ids that walk a `ListPage` in
 either direction. Decoding one envelope into the other would have meant a
 `lastId` that quietly means something else here than everywhere else.
+`PageWalker` reads the right cursor off either shape — see
+[Iterating a paginated endpoint](#iterating-a-paginated-endpoint).
 
 Two smaller frictions are handled rather than passed on. A group's SCIM flag
 arrives as `is_scim_managed` from the groups endpoints and as `scim_managed` when
@@ -2720,9 +2722,9 @@ connect(reply, &Client::ChatCompletionReply::finished, this, [reply] {
 
 ### Iterating a paginated endpoint
 
-List endpoints return one page at a time (`has_more` plus a `last_id` cursor).
-`PageWalker` turns any of them into an iterate-all — it feeds each page's last
-id back as the next `after` and stops when the server clears `has_more`:
+List endpoints return one page at a time. `PageWalker` turns any of them into an
+iterate-all — it feeds each page's cursor back into the query and stops when the
+cursor comes back empty:
 
 ```cpp
 auto *walker = new Client::PageWalker<Client::FileListReply, Core::FileList>(
@@ -2737,9 +2739,38 @@ connect(walker, &Client::PageWalkerBase::failed, this, [](const Client::ClientEr
 walker->start();   // deletes itself when it stops, unless setAutoDelete(false)
 ```
 
-Only the two template arguments and the fetch lambda change per endpoint; a
-handler that has seen enough can call `stop()` mid-walk. Every list endpoint
-returns a `ListPage`, so every one of them can be walked this way.
+A handler that has seen enough can call `stop()` mid-walk.
+
+**The library paginates in three spellings, and one walker drives all of them.**
+The three page types do not agree on where the cursor lives, and the endpoints do
+not agree on where it goes back:
+
+| page type | cursor on the page | goes back as | used by |
+|---|---|---|---|
+| `Core::ListPage<T>` | `lastId` | `after` | most list endpoints |
+| `Core::CursorPage<T>` | `next` (opaque) | `after` | roles, groups, role assignments |
+| `Core::BucketPage<T>` | `nextPage` | **`page`** | the usage and cost reports |
+
+Those two steps are free functions found by argument-dependent lookup —
+`Core::nextPageCursor(page)` reads the cursor, `applyPageCursor(query, cursor)`
+writes it — so the walker itself never branches on the shape. The first two rows
+need nothing but the usual two template arguments. An endpoint whose query is not
+`ListParams` names it as a third:
+
+```cpp
+// The usage reports: a different page shape *and* a query whose cursor is `page`
+new Client::PageWalker<Admin::UsageReply, Core::UsagePage, Admin::UsageQuery>(
+        [&](const Admin::UsageQuery &q) { return org.usage(kind, q); }, query);
+
+// The audit log: the right page shape, but its own query type
+new Client::PageWalker<Admin::AuditLogListReply, Core::AuditLogList, Admin::AuditLogQuery>(
+        [&](const Admin::AuditLogQuery &q) { return org.listAuditLogs(q); }, query);
+```
+
+Only the cursor field is overwritten between pages; every other filter the caller
+set is carried through unchanged. A query type defined elsewhere joins in by
+declaring its own `applyPageCursor` overload beside itself — nothing in
+`PageWalker` needs to know about it.
 
 **Azure OpenAI** (and other `api-key`-style providers):
 

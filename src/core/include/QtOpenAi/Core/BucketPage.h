@@ -122,5 +122,14 @@ struct BucketPage
     bool operator!=(const BucketPage &other) const { return !(*this == other); }
 };
 
+// See ListPage's overload. This one advances by `next_page`, and the query
+// parameter it goes back into is `page` rather than `after` -- see
+// Admin::UsageQuery's applyPageCursor().
+template <typename T>
+QString nextPageCursor(const BucketPage<T> &page)
+{
+    return page.hasMore ? page.nextPage : QString();
+}
+
 } // namespace Core
 } // namespace QtOpenAi

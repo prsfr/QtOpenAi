@@ -27,12 +27,6 @@ class QTOPENAI_CLIENT_EXPORT PageWalkerBase : public QObject
 public:
     ~PageWalkerBase() override;
 
-    // The query parameters the walk started from. `after` is overwritten per
-    // page with the previous page's last id; everything else (limit, order,
-    // before) is carried through unchanged.
-    ListParams params() const;
-    void setParams(const ListParams &params);
-
     // Pages successfully handed to the page handler so far.
     int pageCount() const;
 
@@ -63,14 +57,20 @@ protected:
     // Private is needed and PageWalkerBasePrivate stays out of this header.
     explicit PageWalkerBase(QObject *parent = nullptr);
 
-    // Issue the request for the next page and wire its reply. Implemented by
-    // the template.
-    virtual void requestPage() = 0;
+    // Issue the request for one page and wire its reply. Implemented by the
+    // template. An empty `cursor` is the first page; otherwise the template
+    // puts the cursor into its own query type before fetching.
+    //
+    // The cursor is passed through rather than stored here because the query
+    // type varies: ListParams for most endpoints, but the administration
+    // reports carry their own, and one of those advances by `page` rather than
+    // `after`.
+    virtual void requestPage(const QString &cursor) = 0;
 
-    // Called by the template once a page has been handled: `nextCursor` is the
-    // page's last id when another page follows, empty when the walk is over.
-    // An empty cursor always ends the walk — a server that claims has_more but
-    // sends no last_id gives nothing to advance on, and looping would spin.
+    // Called by the template once a page has been handled: `nextCursor` is
+    // whatever Core::nextPageCursor() read off the page, empty when the walk is
+    // over. An empty cursor always ends the walk — a server that claims has_more
+    // but sends no cursor gives nothing to advance on, and looping would spin.
     void pageHandled(const QString &nextCursor);
 
     // Mark the walk as finished and honour the auto-delete policy.
@@ -85,11 +85,9 @@ private:
     Q_DECLARE_PRIVATE(PageWalkerBase)
 };
 
-// Iterate a cursor-paginated endpoint page by page.
+// Iterate a paginated endpoint page by page.
 //
-// Every list endpoint answers with a ListPage<T> carrying `has_more` and
-// `last_id`, and takes the same ListParams — so one helper can drive them all.
-// Construct it with a factory that issues one request for a given ListParams:
+// Construct it with a factory that issues one request for a given query:
 //
 //     auto *walker = new PageWalker<FileListReply, Core::FileList>(
 //             [&client](const ListParams &p) { return client.listFiles(p); });
@@ -97,30 +95,55 @@ private:
 //     connect(walker, &PageWalkerBase::finished, ...);
 //     walker->start();
 //
-// The walker feeds the previous page's last id back as the next `after` cursor
-// and stops when the server clears `has_more`. It deletes itself once it stops
-// unless setAutoDelete(false) is used.
-template <typename Reply, typename Page>
+// The walker feeds each page's cursor back into the query and stops when the
+// cursor comes back empty. It deletes itself once it stops unless
+// setAutoDelete(false) is used.
+//
+// **Three page shapes, one walker.** The library paginates in three different
+// spellings -- Core::ListPage advances by `last_id`, Core::CursorPage by an
+// opaque `next`, Core::BucketPage by `next_page` -- and the endpoints carry
+// their cursor back in two different query fields. Rather than three walkers,
+// the two varying steps are free functions found by argument-dependent lookup:
+//
+//   * `Core::nextPageCursor(page)` reads the cursor off whichever page shape
+//   * `applyPageCursor(query, cursor)` writes it into whichever query type
+//
+// So walking the administration reports needs nothing but the third template
+// argument naming their query:
+//
+//     new PageWalker<UsageReply, Core::UsagePage, Admin::UsageQuery>(
+//             [&](const Admin::UsageQuery &q) { return org.usage(kind, q); }, query);
+//
+// A query type defined elsewhere joins in by declaring its own
+// `applyPageCursor` overload beside itself; nothing here needs to know of it.
+template <typename Reply, typename Page, typename Params = ListParams>
 class PageWalker : public PageWalkerBase
 {
 public:
-    using Fetch = std::function<Reply *(const ListParams &)>;
+    using Fetch = std::function<Reply *(const Params &)>;
     using PageHandler = std::function<void(const Page &)>;
 
-    explicit PageWalker(Fetch fetch, const ListParams &params = {}, QObject *parent = nullptr)
+    explicit PageWalker(Fetch fetch, const Params &params = {}, QObject *parent = nullptr)
         : PageWalkerBase(parent)
         , m_fetch(std::move(fetch))
-    {
-        setParams(params);
-    }
+        , m_params(params)
+    { }
+
+    // The query the walk started from. Its cursor field is overwritten per page;
+    // every other filter is carried through unchanged, which is what keeps a
+    // walk restricted to what the caller asked for.
+    Params params() const { return m_params; }
+    void setParams(const Params &params) { m_params = params; }
 
     // Called once per page, in order, before the next request goes out.
     void setPageHandler(PageHandler handler) { m_pageHandler = std::move(handler); }
 
 protected:
-    void requestPage() override
+    void requestPage(const QString &cursor) override
     {
-        Reply *reply = m_fetch(params());
+        if (!cursor.isEmpty())
+            applyPageCursor(m_params, cursor); // ADL; see the class note
+        Reply *reply = m_fetch(m_params);
         connect(reply, &Reply::finished, this, [this](const Page &page) {
             if (!isWalking())
                 return;
@@ -129,7 +152,7 @@ protected:
             // stop() may have been called from the handler.
             if (!isWalking())
                 return;
-            pageHandled(page.hasMore ? page.lastId : QString());
+            pageHandled(nextPageCursor(page)); // ADL; see the class note
         });
         connect(reply, &Reply::failed, this, [this](const ClientError &error) {
             if (!isWalking())
@@ -141,6 +164,7 @@ protected:
 private:
     Fetch m_fetch;
     PageHandler m_pageHandler;
+    Params m_params;
 };
 
 } // namespace Client

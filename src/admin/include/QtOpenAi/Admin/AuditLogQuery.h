@@ -72,5 +72,10 @@ struct QTOPENAI_ADMIN_EXPORT AuditLogQuery
     QUrlQuery toQuery() const;
 };
 
+// `after`, as Client::ListParams uses -- but this query is its own type, so it
+// needs its own overload for Client::PageWalker to reach it. See
+// Core::nextPageCursor().
+inline void applyPageCursor(AuditLogQuery &query, const QString &cursor) { query.after = cursor; }
+
 } // namespace Admin
 } // namespace QtOpenAi
