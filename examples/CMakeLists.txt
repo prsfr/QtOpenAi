@@ -29,6 +29,8 @@ qtopenai_add_example(structured_output structured_output.cpp)
 qtopenai_add_example(typed_output typed_output.cpp)
 qtopenai_add_example(vision vision.cpp)
 qtopenai_add_example(embeddings embeddings.cpp)
+qtopenai_add_example(models models.cpp)
+qtopenai_add_example(stored_completions stored_completions.cpp)
 qtopenai_add_example(semantic_search semantic_search.cpp)
 qtopenai_add_example(moderations moderations.cpp)
 qtopenai_add_example(guardrails guardrails.cpp)
@@ -57,6 +59,9 @@ qtopenai_add_example(assistant assistant.cpp)
 # --- Realtime & newer surfaces (v0.9) ---
 qtopenai_add_example(skills skills.cpp)
 qtopenai_add_example(chatkit chatkit.cpp)
+# The SIP call-control endpoints are the REST half of Realtime, so this one
+# needs only QtOpenAi::Client -- unlike the WebSocket example below.
+qtopenai_add_example(realtime_calls realtime_calls.cpp)
 
 # --- Administration (v1.0) ---
 qtopenai_add_example(organization organization.cpp)

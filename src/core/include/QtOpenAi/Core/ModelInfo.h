@@ -13,10 +13,8 @@ namespace Core {
 
 class ModelInfoData;
 
-// What a model can do and what it costs -- knowledge held locally, as opposed
-// to Core::Model, which is the record the API returns for `GET /models`. The
-// API says a model exists; this says whether it is worth sending a 200k-token
-// prompt to, and what that would cost.
+// What a model can do, as a flag set: the questions a caller asks before
+// building a request rather than after it is rejected.
 namespace ModelCapability {
 enum Flag {
     None = 0x00,
@@ -31,6 +29,22 @@ Q_DECLARE_FLAGS(Flags, Flag)
 Q_DECLARE_OPERATORS_FOR_FLAGS(Flags)
 } // namespace ModelCapability
 
+// What a model can do and what it costs -- knowledge held locally, as opposed
+// to Core::Model, which is the record the API returns for `GET /models`. The
+// API says a model exists; this says whether it is worth sending a 200k-token
+// prompt to, and what that would cost.
+//
+// Being local is the trade: a ModelInfo is available before any request is made
+// and costs nothing to consult, and it is only as current as the build. A model
+// released after this build decodes from the API perfectly well and is unknown
+// here -- which is what isKnown() is for, and why Core::ModelCatalog hands back
+// a fallback rather than nothing. Treat a price as a planning figure, not as a
+// bill.
+//
+// Obtained from Core::ModelCatalog rather than constructed:
+//
+//     const ModelInfo info = ModelCatalog::shared().model("gpt-4o-mini");
+//     if (info.supports(ModelCapability::Vision)) { ... }
 class QTOPENAI_CORE_EXPORT ModelInfo
 {
 public:
