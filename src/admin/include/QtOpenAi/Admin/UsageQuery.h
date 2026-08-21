@@ -72,5 +72,10 @@ struct QTOPENAI_ADMIN_EXPORT UsageQuery
     QUrlQuery toQuery() const;
 };
 
+// **`page`, not `after`.** The usage and cost reports paginate by an opaque
+// page token rather than by item ids, so a walker that assumed `after` would
+// re-request the first page for ever. See Core::nextPageCursor().
+inline void applyPageCursor(UsageQuery &query, const QString &cursor) { query.page = cursor; }
+
 } // namespace Admin
 } // namespace QtOpenAi

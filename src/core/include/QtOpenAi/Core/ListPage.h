@@ -62,5 +62,19 @@ struct ListPage
     bool operator!=(const ListPage &other) const { return !(*this == other); }
 };
 
+// The cursor for the page after this one, or empty when the walk is over.
+//
+// Found by argument-dependent lookup from Client::PageWalker, which is how one
+// walker drives three page shapes that spell their cursor differently: this one
+// advances by the last item's id, CursorPage by an opaque `next`, BucketPage by
+// `next_page`. Folding `hasMore` in here means the walker never has to know
+// which of the two signals -- the flag or an empty cursor -- a given endpoint
+// actually uses.
+template <typename T>
+QString nextPageCursor(const ListPage<T> &page)
+{
+    return page.hasMore ? page.lastId : QString();
+}
+
 } // namespace Core
 } // namespace QtOpenAi

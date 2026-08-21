@@ -14,6 +14,11 @@
 //   organization.usage(Admin::Organization::UsageKind::Completions, query);
 //   organization.costs(query);
 //
+// **These reports paginate by an opaque `next_page` token**, not by the item ids
+// the rest of the library uses — so the cursor goes back as `UsageQuery::page`
+// rather than `after`. Client::PageWalker knows that; the usage half below walks
+// every page rather than showing only the first.
+//
 // This needs an **admin** API key, not a standard one.
 //
 // Usage:
@@ -22,6 +27,7 @@
 //   ./organization_usage --costs    # last 7 days of spend, by line item
 
 #include <QtOpenAi/Admin/Organization.h>
+#include <QtOpenAi/Client/PageWalker.h>
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDateTime>
@@ -90,10 +96,18 @@ int main(int argc, char **argv)
             app.quit();
         });
     } else {
-        Admin::UsageReply *reply
-                = organization.usage(Admin::Organization::UsageKind::Completions, query);
-        QObject::connect(reply, &Admin::UsageReply::failed, onError);
-        QObject::connect(reply, &Admin::UsageReply::finished, [&](const Core::UsagePage &usage) {
+        // Three template arguments rather than the usual two: the reports answer
+        // with a Core::BucketPage and take their own query type, whose cursor
+        // field is `page`. The walker reads and writes the right one for both.
+        auto *walker
+                = new Client::PageWalker<Admin::UsageReply, Core::UsagePage, Admin::UsageQuery>(
+                        [&organization](const Admin::UsageQuery &q) {
+                            return organization.usage(Admin::Organization::UsageKind::Completions,
+                                                      q);
+                        },
+                        query);
+
+        walker->setPageHandler([&out](const Core::UsagePage &usage) {
             for (const Core::UsageBucket &bucket : usage.data) {
                 out << day(bucket.startTime) << "\n";
                 // An empty bucket is a day with no traffic, and the server sends
@@ -106,11 +120,11 @@ int main(int argc, char **argv)
                         << row.numModelRequests() << " request(s)\n";
                 }
             }
-            // next_page is an opaque cursor; pass it back as UsageQuery::page.
-            if (usage.hasMore)
-                out << "(more: page=" << usage.nextPage << ")\n";
-            app.quit();
         });
+        QObject::connect(walker, &Client::PageWalkerBase::failed, onError);
+        QObject::connect(walker, &Client::PageWalkerBase::finished, [&app] { app.quit(); });
+        // Deletes itself when it stops, so there is nothing to clean up here.
+        walker->start();
     }
 
     return app.exec();
