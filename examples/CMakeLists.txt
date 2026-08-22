@@ -41,6 +41,7 @@ qtopenai_add_example(voice_cloning voice_cloning.cpp)
 qtopenai_add_example(transcribe transcription.cpp)
 qtopenai_add_example(image image_generation.cpp)
 qtopenai_add_example(video video_generation.cpp)
+qtopenai_add_example(video_derivatives video_derivatives.cpp)
 
 # --- Data & storage (v0.6) ---
 qtopenai_add_example(files files.cpp)

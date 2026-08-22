@@ -51,8 +51,20 @@ public:
     void setSize(const QString &size);
 
     // Clip duration in seconds as a string (e.g. "8"), matching the wire type.
+    // For a job created by extendVideo() this is the *stitched total*, not the
+    // length of the new segment.
     QString seconds() const;
     void setSeconds(const QString &seconds);
+
+    // The prompt the render was made from; empty when the API did not send one.
+    QString prompt() const;
+    void setPrompt(const QString &prompt);
+
+    // The job this one was derived from, for a remix, an edit or an extension;
+    // empty for an original generation. It is the only link back to the source,
+    // so a caller that loses it cannot reconstruct the chain.
+    QString remixedFromVideoId() const;
+    void setRemixedFromVideoId(const QString &videoId);
 
     // Unix creation timestamp (`created_at`); 0 when absent.
     qint64 createdAt() const;
@@ -61,6 +73,12 @@ public:
     // Unix completion timestamp (`completed_at`); 0 while still rendering.
     qint64 completedAt() const;
     void setCompletedAt(qint64 completedAt);
+
+    // When the rendered bytes stop being downloadable (`expires_at`); 0 when
+    // the API sent no expiry. A completed job is not a permanent one --
+    // downloadVideoContent() starts failing once this passes.
+    qint64 expiresAt() const;
+    void setExpiresAt(qint64 expiresAt);
 
     // The failure code/message from the `error` object (populated when the job
     // status is Failed); both empty otherwise.

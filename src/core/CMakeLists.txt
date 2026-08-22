@@ -42,6 +42,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/ImageVariationRequest.h
     include/QtOpenAi/Core/ImageResponse.h
     include/QtOpenAi/Core/SpeechRequest.h
+    include/QtOpenAi/Core/VideoCharacter.h
     include/QtOpenAi/Core/VideoJob.h
     include/QtOpenAi/Core/Upload.h
     include/QtOpenAi/Core/CreateUploadRequest.h
@@ -52,6 +53,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/Container.h
     include/QtOpenAi/Core/CreateContainerRequest.h
     include/QtOpenAi/Core/CreateVideoRequest.h
+    include/QtOpenAi/Core/VideoSourceRequest.h
     include/QtOpenAi/Core/Voice.h
     include/QtOpenAi/Core/CreateVoiceRequest.h
     include/QtOpenAi/Core/Batch.h
@@ -149,6 +151,7 @@ add_library(QtOpenAiCore
     src/ImageVariationRequest.cpp
     src/ImageResponse.cpp
     src/SpeechRequest.cpp
+    src/VideoCharacter.cpp
     src/VideoJob.cpp
     src/Upload.cpp
     src/CreateUploadRequest.cpp
@@ -159,6 +162,7 @@ add_library(QtOpenAiCore
     src/Container.cpp
     src/CreateContainerRequest.cpp
     src/CreateVideoRequest.cpp
+    src/VideoSourceRequest.cpp
     src/Voice.cpp
     src/CreateVoiceRequest.cpp
     src/Batch.cpp
