@@ -5,6 +5,8 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QSharedData>
 
+#include <algorithm>
+
 namespace QtOpenAi {
 namespace Chat {
 
@@ -88,11 +90,12 @@ QList<Transcript::NodeId> Transcript::addMessages(const QList<Core::Message> &me
 
 Transcript::NodeId Transcript::fork(NodeId node, const Core::Message &message)
 {
-    if (!d->nodes.contains(node))
+    const auto it = d->nodes.constFind(node);
+    if (it == d->nodes.constEnd())
         return InvalidNode;
     // A sibling, not a child: the new message takes the old one's place in the
     // conversation rather than following it.
-    return d->append(d->nodes.value(node).parent, message);
+    return d->append(it->parent, message);
 }
 
 Transcript::NodeId Transcript::activeLeaf() const { return d->activeLeaf; }
@@ -105,23 +108,39 @@ bool Transcript::setActiveLeaf(NodeId node)
     return true;
 }
 
-Transcript::NodeId Transcript::parent(NodeId node) const { return d->nodes.value(node).parent; }
+// A Node carries a Message and a child list, so QHash::value() -- which
+// returns by value -- builds and destroys one for every read of a single field.
+// constFind() gives a real reference; these keep value()'s answer for an id
+// with no node behind it, which is the default-constructed field.
+Transcript::NodeId Transcript::parent(NodeId node) const
+{
+    const auto it = d->nodes.constFind(node);
+    return it != d->nodes.constEnd() ? it->parent : InvalidNode;
+}
 
 QList<Transcript::NodeId> Transcript::children(NodeId node) const
 {
-    return node == InvalidNode ? d->roots : d->nodes.value(node).children;
+    if (node == InvalidNode)
+        return d->roots;
+    const auto it = d->nodes.constFind(node);
+    return it != d->nodes.constEnd() ? it->children : QList<NodeId>();
 }
 
 QList<Transcript::NodeId> Transcript::siblings(NodeId node) const
 {
-    if (!d->nodes.contains(node))
+    const auto it = d->nodes.constFind(node);
+    if (it == d->nodes.constEnd())
         return {};
-    return children(d->nodes.value(node).parent);
+    return children(it->parent);
 }
 
 QList<Transcript::NodeId> Transcript::roots() const { return d->roots; }
 
-Core::Message Transcript::message(NodeId node) const { return d->nodes.value(node).message; }
+Core::Message Transcript::message(NodeId node) const
+{
+    const auto it = d->nodes.constFind(node);
+    return it != d->nodes.constEnd() ? it->message : Core::Message();
+}
 
 bool Transcript::setMessage(NodeId node, const Core::Message &message)
 {
@@ -139,9 +158,18 @@ bool Transcript::isEmpty() const { return d->nodes.isEmpty(); }
 
 QList<Transcript::NodeId> Transcript::activePath() const
 {
+    // Collected leaf-first and turned around once. QList keeps capacity at the
+    // front, so prepending was not the quadratic walk it looks like -- this is
+    // the conventional spelling rather than a fix, and it measures the same.
+    // What this loop was actually paying for was reading the parent through
+    // QHash::value(); see the note above parent().
     QList<NodeId> path;
-    for (NodeId node = d->activeLeaf; node != InvalidNode; node = d->nodes.value(node).parent)
-        path.prepend(node);
+    for (NodeId node = d->activeLeaf; node != InvalidNode;) {
+        path.append(node);
+        const auto it = d->nodes.constFind(node);
+        node = it != d->nodes.constEnd() ? it->parent : InvalidNode;
+    }
+    std::reverse(path.begin(), path.end());
     return path;
 }
 
@@ -150,11 +178,23 @@ void Transcript::setTrimPolicy(const TrimPolicy &policy) { d->policy = policy; }
 
 QList<Core::Message> Transcript::messages() const
 {
+    // One walk up from the active leaf. Going through activePath() built a list
+    // of ids for this to look every one of them up again.
     QList<Core::Message> messages;
+    for (NodeId node = d->activeLeaf; node != InvalidNode;) {
+        const auto it = d->nodes.constFind(node);
+        // An id with no node behind it -- which fromJson() leaves as the parent
+        // of a node whose own parent was never written -- contributes an empty
+        // message and ends the walk. That is what reading it through value()
+        // did, and it is not this function's to change.
+        const bool found = it != d->nodes.constEnd();
+        messages.append(found ? it->message : Core::Message());
+        node = found ? it->parent : InvalidNode;
+    }
+    std::reverse(messages.begin(), messages.end());
+
     if (!d->systemPrompt.isEmpty())
-        messages.append(Core::Message::system(d->systemPrompt));
-    for (const NodeId node : activePath())
-        messages.append(d->nodes.value(node).message);
+        messages.prepend(Core::Message::system(d->systemPrompt));
     return d->policy.apply(messages);
 }
 
@@ -233,7 +273,7 @@ bool Transcript::operator==(const Transcript &other) const
         return false;
     }
     for (auto it = d->nodes.constBegin(); it != d->nodes.constEnd(); ++it) {
-        auto mine = it.value();
+        const auto &mine = it.value();
         auto theirs = other.d->nodes.constFind(it.key());
         if (theirs == other.d->nodes.constEnd() || theirs->parent != mine.parent
             || theirs->children != mine.children || !(theirs->message == mine.message)) {
