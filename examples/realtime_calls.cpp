@@ -1,32 +1,41 @@
 // SPDX-License-Identifier: MIT
 //
-// Control a SIP call bridged into a Realtime session (the /realtime/calls
-// endpoints):
+// Open and control a Realtime call -- a session with a phone or a browser on
+// the other end (the /realtime/calls endpoints):
 //
+//   client.createRealtimeCall(sdpOffer, config); // open one over WebRTC
 //   client.acceptRealtimeCall(callId, config);   // answer it, with a session
 //   client.rejectRealtimeCall(callId, 486);      // decline; 0 -> the API's 603
 //   client.referRealtimeCall(callId, target);    // transfer it elsewhere
 //   client.hangupRealtimeCall(callId);           // end it
 //
-// **The call id does not come from this library.** It arrives in a
-// `realtime.call.incoming` webhook, which OpenAI POSTs to an HTTPS endpoint the
-// application publishes -- a web server, not an API client. So there is no call
-// to make here that produces one, and this example takes it on the command line
-// as a webhook handler would have taken it out of the payload. The create half,
-// `POST /realtime/calls`, is not implemented: it takes a WebRTC SDP offer
-// produced by a peer-connection stack, which Qt does not ship.
+// **A call id comes from one of two places, neither of them this library.** An
+// inbound SIP call announces itself in a `realtime.call.incoming` webhook, which
+// OpenAI POSTs to an HTTPS endpoint the application publishes -- a web server,
+// not an API client. The other way is to open a call yourself with `create`
+// below, which answers with the id.
+//
+// **`create` is the signalling half of a WebRTC handshake and nothing more.**
+// The SDP offer has to come from a peer-connection stack and the answer has to
+// go back into it; Qt ships neither, so the media path belongs in the
+// application. This example posts a canned offer to show the exchange -- it
+// will be refused by a real server, which is the honest demonstration: what the
+// library does here is HTTP, and the part that makes audio flow is yours.
 //
 // **Answering is a decision with a deadline.** The caller is listening to a
 // ringing phone while this runs, so a handler that waits on a slow lookup
 // before deciding is one the caller hangs up on. Accept first with a safe
 // configuration and adjust the session afterwards over the channel.
 //
-// **These four are the only endpoints in the library with nothing to decode.**
-// The API acknowledges and returns no object, so `RealtimeCallReply::finished()`
-// carries no payload -- success *is* the result.
+// **The four control verbs are the only endpoints in the library with nothing
+// to decode.** The API acknowledges and returns no object, so
+// `RealtimeCallReply::finished()` carries no payload -- success *is* the result.
+// `create` is the opposite extreme: its result is split between an
+// application/sdp body and the `Location` header, and both halves are needed.
 //
 // Usage:
 //   export OPENAI_API_KEY=sk-...
+//   ./realtime_calls create offer.sdp       # open a call, print the answer
 //   ./realtime_calls accept rtc_abc123      # answer, with a concierge session
 //   ./realtime_calls reject rtc_abc123      # decline (SIP 486 Busy Here)
 //   ./realtime_calls refer  rtc_abc123 tel:+14155550123
@@ -35,6 +44,7 @@
 #include <QtOpenAi/Client/Client.h>
 
 #include <QtCore/QCoreApplication>
+#include <QtCore/QFile>
 #include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
@@ -51,13 +61,14 @@ constexpr int kBusyHere = 486;
 void usage(QTextStream &out, const QString &program)
 {
     out << "Usage:\n"
+        << "  " << program << " create <offer.sdp-file>\n"
         << "  " << program << " accept <call-id>\n"
         << "  " << program << " reject <call-id>\n"
         << "  " << program << " refer  <call-id> <target-uri>\n"
         << "  " << program << " hangup <call-id>\n"
         << "\n"
-        << "The call id comes from a realtime.call.incoming webhook -- see the\n"
-        << "comment at the top of this file.\n";
+        << "A call id comes from a realtime.call.incoming webhook, or from\n"
+        << "`create` -- see the comment at the top of this file.\n";
 }
 
 } // namespace
@@ -75,6 +86,8 @@ int main(int argc, char **argv)
 
     const QStringList args = app.arguments();
     const QString action = args.value(1);
+    // For `create` the second argument is a file holding the SDP offer; for
+    // everything else it is the id of an existing call.
     const QString callId = args.value(2);
     if (action.isEmpty() || callId.isEmpty()) {
         usage(out, args.value(0));
@@ -87,20 +100,62 @@ int main(int argc, char **argv)
 
     auto *client = new Client::Client(QUrl(baseUrl), apiKey, &app);
 
-    Client::RealtimeCallReply *reply = nullptr;
-
-    if (action == QLatin1String("accept")) {
-        // The session the caller is bridged into, configured before they hear
-        // anything. Audio in both directions is the point of a phone call, so
-        // this is one of the few places {"audio"} is not a choice.
+    // The concierge the caller is bridged into, configured before they hear
+    // anything. Audio in both directions is the point of a phone call, so this
+    // is one of the few places {"audio"} is not a choice.
+    const auto conciergeSession = [&model] {
         Core::RealtimeSessionConfig session;
         session.setModel(model);
         session.setInstructions(
                 QStringLiteral("You are Alex, a friendly concierge for Example Corp. "
                                "Keep answers to one or two sentences."));
         session.setOutputModalities({QStringLiteral("audio")});
+        return session;
+    };
 
-        reply = client->acceptRealtimeCall(callId, session);
+    // `create` answers with an SDP body and a call id rather than an
+    // acknowledgement, so it has its own reply type and its own branch.
+    if (action == QLatin1String("create")) {
+        QFile offerFile(callId);
+        if (!offerFile.open(QIODevice::ReadOnly)) {
+            out << "Cannot read " << offerFile.fileName() << "\n"
+                << "Pass a file holding an SDP offer from your peer-connection stack.\n";
+            return 1;
+        }
+        const QByteArray sdpOffer = offerFile.readAll();
+
+        // Passing a session means the credential is an API key. With an
+        // ephemeral client secret you would call createRealtimeCall(sdpOffer)
+        // with no session -- the token carries one, and a bare application/sdp
+        // body is the only form the endpoint accepts from it.
+        Client::RealtimeCallCreateReply *call
+                = client->createRealtimeCall(sdpOffer, conciergeSession());
+        QObject::connect(call, &Client::RealtimeCallCreateReply::failed,
+                         [&](const Client::ClientError &error) {
+                             out << "Error: " << error.message() << "\n";
+                             out << "A canned or stale offer is refused here; the offer has to\n"
+                                 << "come from a live peer connection.\n";
+                             app.exit(1);
+                         });
+        QObject::connect(call, &Client::RealtimeCallCreateReply::finished,
+                         [&](const QString &newCallId, const QByteArray &sdpAnswer) {
+                             // Both halves matter: the answer completes the peer
+                             // connection, the id is how the call is controlled.
+                             out << "Call " << newCallId << " created.\n";
+                             out << "SDP answer (" << sdpAnswer.size()
+                                 << " bytes) -- hand this to\n"
+                                 << "the peer connection as its remote description.\n";
+                             out << "End it with:\n"
+                                 << "  " << args.value(0) << " hangup " << newCallId << "\n";
+                             app.quit();
+                         });
+        return app.exec();
+    }
+
+    Client::RealtimeCallReply *reply = nullptr;
+
+    if (action == QLatin1String("accept")) {
+        reply = client->acceptRealtimeCall(callId, conciergeSession());
 
     } else if (action == QLatin1String("reject")) {
         reply = client->rejectRealtimeCall(callId, kBusyHere);

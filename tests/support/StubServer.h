@@ -31,6 +31,10 @@ public:
         QByteArray body;
         int status = 200;
         QByteArray contentType = "application/json";
+        // Extra response headers, for the endpoints that put part of the answer
+        // outside the body -- POST /realtime/calls returns the call id in
+        // `Location`. Each pair is emitted verbatim as "Name: value".
+        QList<QPair<QByteArray, QByteArray>> headers;
     };
 
     // Serve a queue of responses (FIFO; the last is repeated once exhausted).
@@ -95,10 +99,13 @@ private:
 
             const Response response = nextResponse();
             const QByteArray reason = response.status < 400 ? "OK" : "Error";
+            QByteArray extra;
+            for (const auto &header : response.headers)
+                extra += "\r\n" + header.first + ": " + header.second;
             const QByteArray raw
                     = "HTTP/1.1 " + QByteArray::number(response.status) + " " + reason
                       + "\r\nContent-Type: " + response.contentType
-                      + "\r\nContent-Length: " + QByteArray::number(response.body.size())
+                      + "\r\nContent-Length: " + QByteArray::number(response.body.size()) + extra
                       + "\r\nConnection: close\r\n\r\n" + response.body;
             socket->write(raw);
             socket->flush();

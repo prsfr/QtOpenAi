@@ -10,9 +10,9 @@ using namespace QtOpenAi::Client;
 #include "support/StubServer.h"
 
 // Offline stub-server coverage for the Realtime REST endpoints (#25): the three
-// ways to mint an ephemeral credential, and the SIP call control that answers a
-// `realtime.call.incoming` webhook. The WebSocket channel itself is covered by
-// tst_realtime_connection in the Realtime module.
+// ways to mint an ephemeral credential, opening a call over WebRTC, and the
+// four control verbs that also serve a call arriving by SIP. The WebSocket
+// channel itself is covered by tst_realtime_connection in the Realtime module.
 class TestRealtimeClient : public QObject
 {
     Q_OBJECT
@@ -22,6 +22,9 @@ private slots:
     void createSessionPostsConfigDirectly();
     void createTranscriptionSessionUsesItsOwnPath();
     void createTranslationClientSecretUsesItsOwnPath();
+    void createCallPostsOfferAndSessionAsTypedParts();
+    void createCallPostsBareSdpWhenTheSessionComesFromTheToken();
+    void createCallSurvivesAMissingLocation();
     void acceptCallPostsSessionConfig();
     void rejectCallSendsStatusCode();
     void rejectCallOmitsUnsetStatusCode();
@@ -124,6 +127,85 @@ void TestRealtimeClient::createTranslationClientSecretUsesItsOwnPath()
     QVERIFY(reply->isSuccess());
     QVERIFY(server.requestLine().startsWith("POST /v1/realtime/translations/client_secrets "));
     QVERIFY(server.requestBody().contains(R"("session":{)"));
+}
+
+namespace {
+
+// The answer the API sends back, trimmed to the shape that matters here.
+constexpr auto kSdpAnswer = "v=0\r\no=- 4227147428 1719357865 IN IP4 127.0.0.1\r\ns=-\r\n";
+
+StubServer::Response createdCall(const QByteArray &location)
+{
+    StubServer::Response response {kSdpAnswer, 201, "application/sdp", {}};
+    if (!location.isEmpty())
+        response.headers.append({"Location", location});
+    return response;
+}
+
+} // namespace
+
+void TestRealtimeClient::createCallPostsOfferAndSessionAsTypedParts()
+{
+    StubServer server(QList<StubServer::Response> {createdCall("/v1/realtime/calls/rtc_abc123")});
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    const auto reply
+            = awaited(client.createRealtimeCall(QByteArray("v=0\r\no=offer\r\n"), sampleSession()));
+    QVERIFY(reply);
+
+    QVERIFY(reply->isSuccess());
+    QVERIFY(server.requestLine().startsWith("POST /v1/realtime/calls "));
+    QVERIFY(server.requestHeaders().toLower().contains("content-type: multipart/form-data;"));
+
+    // Two parts, each with its own content type and *neither* a file: the
+    // endpoint dispatches on those types, and a plain form field cannot carry
+    // one. A filename here would be wrong rather than merely redundant.
+    const QByteArray body = server.requestBody();
+    QVERIFY2(body.contains("name=\"sdp\"\r\n"), body.constData());
+    QVERIFY2(body.contains("name=\"session\"\r\n"), body.constData());
+    QVERIFY(!body.contains("filename="));
+    QVERIFY(body.toLower().contains("content-type: application/sdp"));
+    QVERIFY(body.toLower().contains("content-type: application/json"));
+    QVERIFY(body.contains(R"("model":"gpt-realtime")"));
+    QVERIFY(body.contains("o=offer"));
+
+    // 201 is a success, and the result is in two places at once.
+    QCOMPARE(reply->sdpAnswer(), QByteArray(kSdpAnswer));
+    QCOMPARE(reply->callId(), QStringLiteral("rtc_abc123"));
+}
+
+void TestRealtimeClient::createCallPostsBareSdpWhenTheSessionComesFromTheToken()
+{
+    StubServer server(QList<StubServer::Response> {createdCall("/v1/realtime/calls/rtc_xyz")});
+    Client client(server.baseUrl(), QStringLiteral("ek_ephemeral"));
+
+    // No session: the credential is a client secret, which already carries one.
+    // This is the only variant that endpoint accepts from a client secret, and
+    // it is not multipart at all.
+    const auto reply = awaited(client.createRealtimeCall(QByteArray("v=0\r\no=offer\r\n")));
+    QVERIFY(reply);
+
+    QVERIFY(reply->isSuccess());
+    QVERIFY2(server.requestHeaders().toLower().contains("content-type: application/sdp"),
+             server.requestHeaders().constData());
+    QCOMPARE(server.requestBody(), QByteArray("v=0\r\no=offer\r\n"));
+    QCOMPARE(reply->callId(), QStringLiteral("rtc_xyz"));
+}
+
+void TestRealtimeClient::createCallSurvivesAMissingLocation()
+{
+    // No Location header. The media path still works, so this is not a failure
+    // -- the caller simply has a call it cannot address, and finding that out
+    // through an empty callId() beats finding it out through a decode error.
+    StubServer server(QList<StubServer::Response> {createdCall({})});
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    const auto reply = awaited(client.createRealtimeCall(QByteArray("v=0\r\n"), sampleSession()));
+    QVERIFY(reply);
+
+    QVERIFY(reply->isSuccess());
+    QVERIFY(reply->callId().isEmpty());
+    QCOMPARE(reply->sdpAnswer(), QByteArray(kSdpAnswer));
 }
 
 void TestRealtimeClient::acceptCallPostsSessionConfig()

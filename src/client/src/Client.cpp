@@ -68,7 +68,11 @@ public:
     template <typename Reply>
     Reply *get(const QString &path, const QUrlQuery &query = {}, const char *beta = nullptr) const;
     template <typename Reply>
-    Reply *post(const QString &path, const QByteArray &body = {}, const char *beta = nullptr) const;
+    // `contentType` overrides the application/json default -- for the one
+    // endpoint whose request body is not JSON (POST /realtime/calls, which
+    // takes a bare SDP offer when authenticated with a client secret).
+    Reply *post(const QString &path, const QByteArray &body = {}, const char *beta = nullptr,
+                const QByteArray &contentType = {}) const;
     template <typename Reply>
     Reply *postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
                          QList<detail::FormFilePart> files, const char *beta = nullptr) const;
@@ -446,6 +450,9 @@ constexpr QLatin1String kChatCompletions("/chat/completions");
 constexpr QLatin1String kResponses("/responses");
 constexpr QLatin1String kConversations("/conversations");
 constexpr QLatin1String kVideos("/videos");
+constexpr QLatin1String kVideoEdits("/videos/edits");
+constexpr QLatin1String kVideoExtensions("/videos/extensions");
+constexpr QLatin1String kVideoCharacters("/videos/characters");
 constexpr QLatin1String kFiles("/files");
 constexpr QLatin1String kUploads("/uploads");
 constexpr QLatin1String kVectorStores("/vector_stores");
@@ -798,10 +805,14 @@ Reply *ClientPrivate::get(const QString &path, const QUrlQuery &query, const cha
 }
 
 template <typename Reply>
-Reply *ClientPrivate::post(const QString &path, const QByteArray &body, const char *beta) const
+Reply *ClientPrivate::post(const QString &path, const QByteArray &body, const char *beta,
+                           const QByteArray &contentType) const
 {
     QNetworkAccessManager *manager = q->networkAccessManager();
-    return issue<Reply>("POST", apiRequest(this, path, beta), body,
+    QNetworkRequest request = apiRequest(this, path, beta);
+    if (!contentType.isEmpty())
+        request.setHeader(QNetworkRequest::ContentTypeHeader, contentType);
+    return issue<Reply>("POST", std::move(request), body,
                         [this, manager, body](QNetworkRequest sent) {
                             return postFactory(this, manager, std::move(sent), body);
                         });
@@ -1180,6 +1191,54 @@ VideoReply *Client::remixVideo(const QString &videoId, const QString &prompt)
     bodyObject.insert(QStringLiteral("prompt"), prompt);
     return d->post<VideoReply>(resourcePath(kVideos, videoId, QStringLiteral("/remix")),
                                compactJson(bodyObject));
+}
+
+// Edit and extend take the same body and differ only in the path and in
+// whether `seconds` is part of it, so one helper issues both rather than two
+// near-identical copies drifting apart.
+namespace {
+
+VideoReply *postVideoSource(ClientPrivate *d, const QString &path,
+                            const Core::VideoSourceRequest &request, bool withSeconds)
+{
+    if (request.hasSourceUpload()) {
+        detail::FormFilePart video {"video", request.sourceVideoFileName(),
+                                    request.sourceVideoData(), "video/mp4"};
+        return d->postMultipart<VideoReply>(path, request.formFields(withSeconds),
+                                            {std::move(video)});
+    }
+    return d->post<VideoReply>(path, compactJson(request.toJson(withSeconds)));
+}
+
+} // namespace
+
+VideoReply *Client::editVideo(const Core::VideoSourceRequest &request)
+{
+    Q_D(Client);
+    return postVideoSource(d, kVideoEdits, request, /*withSeconds=*/false);
+}
+
+VideoReply *Client::extendVideo(const Core::VideoSourceRequest &request)
+{
+    Q_D(Client);
+    return postVideoSource(d, kVideoExtensions, request, /*withSeconds=*/true);
+}
+
+VideoCharacterReply *Client::createVideoCharacter(const QString &name, const QString &fileName,
+                                                  const QByteArray &videoData)
+{
+    Q_D(Client);
+    // Always multipart: this endpoint has no JSON variant, because the whole
+    // point of it is the footage.
+    detail::FormFilePart video {"video", fileName, videoData, "video/mp4"};
+    return d->postMultipart<VideoCharacterReply>(kVideoCharacters, {{QStringLiteral("name"), name}},
+                                                 {std::move(video)});
+}
+
+VideoCharacterReply *Client::getVideoCharacter(const QString &characterId)
+{
+    Q_D(Client);
+    return d->get<VideoCharacterReply>(resourcePath(kVideoCharacters, characterId));
 }
 
 VideoContentReply *Client::downloadVideoContent(const QString &videoId)
@@ -1956,6 +2015,31 @@ Client::createRealtimeTranscriptionSession(const Core::RealtimeSessionConfig &se
     return d->post<RealtimeClientSecretReply>(QString(kRealtime)
                                                       + QStringLiteral("/transcription_sessions"),
                                               compactJson(session.toJson()));
+}
+
+RealtimeCallCreateReply *Client::createRealtimeCall(const QByteArray &sdpOffer,
+                                                    const Core::RealtimeSessionConfig &session)
+{
+    Q_D(Client);
+
+    // Two request shapes, and which one applies is decided by the credential
+    // rather than by taste. A client secret already carries the session, and
+    // the endpoint accepts only a bare SDP body from one; an API key carries
+    // nothing, so the configuration has to travel with the offer. A default
+    // session is the caller saying "it is in the token".
+    if (session == Core::RealtimeSessionConfig()) {
+        return d->post<RealtimeCallCreateReply>(kRealtimeCalls, sdpOffer, nullptr,
+                                                "application/sdp");
+    }
+
+    // Both parts carry a content type and neither is a file, which is what an
+    // empty fileName means to buildMultipart(). Sending them as plain form
+    // fields instead would lose the types the endpoint dispatches on.
+    detail::FormFilePart offerPart {"sdp", QString(), sdpOffer, "application/sdp"};
+    detail::FormFilePart sessionPart {"session", QString(), compactJson(session.toJson()),
+                                      "application/json"};
+    return d->postMultipart<RealtimeCallCreateReply>(
+            kRealtimeCalls, {}, {std::move(offerPart), std::move(sessionPart)});
 }
 
 RealtimeCallReply *Client::acceptRealtimeCall(const QString &callId,

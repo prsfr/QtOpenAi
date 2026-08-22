@@ -49,6 +49,7 @@
 #include <QtOpenAi/Client/ModelListReply.h>
 #include <QtOpenAi/Client/ModelReply.h>
 #include <QtOpenAi/Client/ModerationReply.h>
+#include <QtOpenAi/Client/RealtimeCallCreateReply.h>
 #include <QtOpenAi/Client/RealtimeCallReply.h>
 #include <QtOpenAi/Client/RealtimeClientSecretReply.h>
 #include <QtOpenAi/Client/RealtimeSessionReply.h>
@@ -79,6 +80,7 @@
 #include <QtOpenAi/Client/VectorStoreListReply.h>
 #include <QtOpenAi/Client/VectorStoreReply.h>
 #include <QtOpenAi/Client/VectorStoreSearchReply.h>
+#include <QtOpenAi/Client/VideoCharacterReply.h>
 #include <QtOpenAi/Client/VideoContentReply.h>
 #include <QtOpenAi/Client/VideoListReply.h>
 #include <QtOpenAi/Client/VideoPoller.h>
@@ -114,6 +116,7 @@
 #include <QtOpenAi/Core/TranscriptionRequest.h>
 #include <QtOpenAi/Core/TranslationRequest.h>
 #include <QtOpenAi/Core/VectorStoreSearch.h>
+#include <QtOpenAi/Core/VideoSourceRequest.h>
 
 #include <QtCore/QByteArray>
 #include <QtCore/QHash>
@@ -468,6 +471,36 @@ public:
     // Create a new job that remixes an existing completed video with a new
     // prompt (POST /videos/{id}/remix).
     VideoReply *remixVideo(const QString &videoId, const QString &prompt);
+
+    // Edit a source video into a new one (POST /videos/edits), and lengthen a
+    // completed one (POST /videos/extensions).
+    //
+    // All three of remix, edit and extend answer with a fresh VideoJob rather
+    // than changing the source, so each has to be polled and downloaded like an
+    // original generation, and the source is left untouched. What separates
+    // them: a remix re-renders the whole clip from a new prompt, an edit
+    // changes a source that may be footage the API has never seen, and an
+    // extension appends a new segment -- so the resulting job's seconds() is
+    // the stitched total, not the length of what was added.
+    //
+    // The request carries its source either as the id of a completed video or
+    // as bytes to upload, and that choice picks the encoding: JSON for an id,
+    // multipart/form-data for an upload. See Core::VideoSourceRequest.
+    VideoReply *editVideo(const Core::VideoSourceRequest &request);
+
+    // `seconds` on the request is required here and is the length of the *new
+    // segment*.
+    VideoReply *extendVideo(const Core::VideoSourceRequest &request);
+
+    // Register a reusable cameo from an uploaded video
+    // (POST /videos/characters), so the same likeness can be referred to by id
+    // in later prompts without re-uploading the footage.
+    VideoCharacterReply *createVideoCharacter(const QString &name, const QString &fileName,
+                                              const QByteArray &videoData);
+
+    // Retrieve one character (GET /videos/characters/{id}). There is no list
+    // endpoint and no delete endpoint: hold on to the ids you create.
+    VideoCharacterReply *getVideoCharacter(const QString &characterId);
 
     // Download the rendered video bytes of a completed job
     // (GET /videos/{id}/content). The reply exposes the raw bytes and the
@@ -872,7 +905,26 @@ public:
     RealtimeClientSecretReply *
     createRealtimeTranscriptionSession(const Core::RealtimeSessionConfig &session);
 
-    // --- Realtime SIP calls (/realtime/calls) ------------------------------
+    // --- Realtime calls (/realtime/calls) ----------------------------------
+    // Open a call over WebRTC: post an SDP offer, get the SDP answer back
+    // (POST /realtime/calls).
+    //
+    // **This is the signalling half only.** The offer must be produced by a
+    // peer-connection stack and the answer handed back to it; Qt ships no such
+    // stack, so the media path belongs in the application. What this does is
+    // the part that is ordinary HTTP -- and it is the only way other than an
+    // inbound SIP call to obtain a call id, which is what the four control
+    // endpoints below need.
+    //
+    // With an API key, pass `session` to configure the call; the request goes
+    // out as multipart/form-data with the offer and the configuration as
+    // separately typed parts. With an ephemeral client secret as the
+    // credential, leave `session` default-constructed: the session parameters
+    // come from the token and the offer is posted as a bare application/sdp
+    // body, which is the only form that endpoint accepts from a client secret.
+    RealtimeCallCreateReply *createRealtimeCall(const QByteArray &sdpOffer,
+                                                const Core::RealtimeSessionConfig &session = {});
+
     // Answer a `realtime.call.incoming` webhook: accept the call and configure
     // the session that will handle it.
     RealtimeCallReply *acceptRealtimeCall(const QString &callId,

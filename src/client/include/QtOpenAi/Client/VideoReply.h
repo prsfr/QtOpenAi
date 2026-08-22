@@ -8,9 +8,11 @@ namespace QtOpenAi {
 namespace Client {
 
 // An asynchronous handle for a single-video request (POST /videos, GET
-// /videos/{id}, POST /videos/{id}/remix, DELETE /videos/{id}). All return a
-// VideoJob shape, so this reply serves them all. See RestReplyBase for the
-// shared lifecycle (finished/failed/done, auto-delete).
+// /videos/{id}, POST /videos/{id}/remix, POST /videos/edits, POST
+// /videos/extensions, DELETE /videos/{id}). All return a VideoJob shape, so
+// this reply serves them all -- an edit or an extension is a new generation
+// job, not a modification of the old one. See RestReplyBase for the shared
+// lifecycle (finished/failed/done, auto-delete).
 class QTOPENAI_CLIENT_EXPORT VideoReply : public TypedReply<Core::VideoJob>
 {
     Q_OBJECT
