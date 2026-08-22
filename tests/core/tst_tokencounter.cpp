@@ -34,6 +34,35 @@ QByteArray testVocabulary()
     return data;
 }
 
+// A vocabulary whose merges have to be taken in rank order across the whole
+// piece rather than left to right, so that a piece needing many merges pins
+// down the order they happen in:
+//
+//   "a" 0   "b" 1   "c" 2   "bc" 3   "abc" 4   "abcabc" 5   " " 6
+//
+// Encoding "abcabcabc":
+//
+//   a b c a b c a b c  -> "bc"(3) is lowest, leftmost of the three
+//   a bc a b c a b c   -> "abc"(4) beats the remaining "bc"(3)? no: 3 < 4,
+//                         so the next "bc" merges, and the third after it
+//   a bc a bc a bc     -> "abc"(4), leftmost first, then the other two
+//   abc abc abc        -> "abcabc"(5), leftmost
+//   abcabc abc         -> nothing spans the rest
+//
+// leaving {5, 4}. Nine bytes and six merges is enough that a stale cached
+// score, or one recomputed for the wrong neighbour, changes the answer.
+QByteArray mergeOrderVocabulary()
+{
+    const QList<QPair<QByteArray, int>> tokens {
+            {"a", 0}, {"b", 1}, {"c", 2}, {"bc", 3}, {"abc", 4}, {"abcabc", 5}, {" ", 6},
+    };
+
+    QByteArray data;
+    for (const auto &token : tokens)
+        data += token.first.toBase64() + ' ' + QByteArray::number(token.second) + '\n';
+    return data;
+}
+
 // Splitting on runs of letters and runs of spaces, so the piece boundaries in
 // these tests are obvious by inspection.
 const QString kTestPattern = QStringLiteral("[a-z]+|\\s+");
@@ -53,6 +82,8 @@ private slots:
     void mergesTheLowestRankedPairFirst();
     void splitsWithTheEncodingsPattern();
     void countsBytesOutsideTheVocabulary();
+    void mergesInRankOrderAcrossALongPiece();
+    void countingAgreesWithEncoding();
     void countsMessageFraming();
     void becomesExactWhenItsVocabularyArrives();
     void rejectsDataItCannotRead();
@@ -111,6 +142,40 @@ void TestTokenCounter::countsBytesOutsideTheVocabulary()
     // never silently short.
     QCOMPARE(counter.count(QStringLiteral("zzz")), 3);
     QCOMPARE(counter.encode(QStringLiteral("zzz")), QList<int>({-1, -1, -1}));
+}
+
+void TestTokenCounter::mergesInRankOrderAcrossALongPiece()
+{
+    QVERIFY(TokenCounter::loadEncoding(QStringLiteral("merge_base"), mergeOrderVocabulary(),
+                                       kTestPattern));
+    const TokenCounter counter(QStringLiteral("merge_base"));
+
+    // Six merges deep; see the vocabulary comment for the order they take.
+    QCOMPARE(counter.encode(QStringLiteral("abcabcabc")), QList<int>({5, 4}));
+
+    // The same piece one byte longer, so the merge that wins last differs.
+    QCOMPARE(counter.encode(QStringLiteral("abcabc")), QList<int>({5}));
+    QCOMPARE(counter.encode(QStringLiteral("abcab")), QList<int>({4, 0, 1}));
+
+    // Merging still stops at a piece boundary however many merges precede it.
+    QCOMPARE(counter.encode(QStringLiteral("abcabc abc")), QList<int>({5, 6, 4}));
+}
+
+void TestTokenCounter::countingAgreesWithEncoding()
+{
+    // count() does not build the token list that encode() returns -- it has no
+    // use for the ranks -- so the two have to be held to the same answer.
+    const TokenCounter counter(QStringLiteral("test_base"));
+
+    const QStringList texts {QString(),
+                             QStringLiteral("a"),
+                             QStringLiteral("ab"),
+                             QStringLiteral("ababa"),
+                             QStringLiteral("zzz"),
+                             QStringLiteral("ab ab aba abab"),
+                             QStringLiteral("abababababababababababababab")};
+    for (const QString &text : texts)
+        QCOMPARE(counter.count(text), int(counter.encode(text).size()));
 }
 
 void TestTokenCounter::countsMessageFraming()
