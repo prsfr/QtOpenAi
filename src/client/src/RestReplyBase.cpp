@@ -130,5 +130,11 @@ QByteArray RestReplyBase::responseContentType() const
     return d->engine->contentType();
 }
 
+QByteArray RestReplyBase::responseHeader(const QByteArray &name) const
+{
+    Q_D(const RestReplyBase);
+    return d->engine->responseHeader(name);
+}
+
 } // namespace Client
 } // namespace QtOpenAi

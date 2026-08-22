@@ -20,7 +20,15 @@ namespace QtOpenAi {
 namespace Client {
 namespace detail {
 
-// One binary file part (a named upload with a filename and content type).
+// One part carrying bytes and a content type.
+//
+// With a fileName it is an ordinary upload. **Leaving fileName empty makes it a
+// typed field instead**: the part keeps its Content-Type but loses the
+// `filename=` parameter, which is what distinguishes "here is a file" from
+// "here is a value that happens not to be text". POST /realtime/calls needs
+// both of those in one body -- an `sdp` part typed application/sdp and a
+// `session` part typed application/json, neither of them a file -- and the
+// scalar fields below cannot carry a content type at all.
 struct FormFilePart
 {
     QByteArray fieldName;
@@ -47,9 +55,13 @@ inline QHttpMultiPart *buildMultipart(const QList<QPair<QString, QString>> &fiel
 
     for (const FormFilePart &file : files) {
         QHttpPart part;
-        part.setHeader(QNetworkRequest::ContentDispositionHeader,
-                       QStringLiteral("form-data; name=\"%1\"; filename=\"%2\"")
-                               .arg(QString::fromUtf8(file.fieldName), file.fileName));
+        const QString disposition
+                = file.fileName.isEmpty()
+                          ? QStringLiteral("form-data; name=\"%1\"")
+                                    .arg(QString::fromUtf8(file.fieldName))
+                          : QStringLiteral("form-data; name=\"%1\"; filename=\"%2\"")
+                                    .arg(QString::fromUtf8(file.fieldName), file.fileName);
+        part.setHeader(QNetworkRequest::ContentDispositionHeader, disposition);
         part.setHeader(QNetworkRequest::ContentTypeHeader, file.contentType);
         part.setBody(file.data);
         multiPart->append(part);

@@ -45,6 +45,12 @@ public:
     // Content-Type of the last successful response (e.g. "audio/mpeg"); useful
     // for endpoints that return a binary blob rather than JSON.
     QByteArray contentType() const;
+    // One raw response header of the last successful response, matched
+    // case-insensitively as HTTP requires. Empty when the header was absent.
+    // Kept alongside the body because some endpoints put part of the result
+    // there -- POST /realtime/calls returns the call id in `Location` and
+    // nowhere else.
+    QByteArray responseHeader(const QByteArray &name) const;
     void abort();
 
     // Must be installed before the event loop turns, i.e. in the same turn the
@@ -72,6 +78,7 @@ private:
     QNetworkReply *m_networkReply = nullptr;
     RateLimit m_rateLimit;
     QByteArray m_contentType;
+    QList<QPair<QByteArray, QByteArray>> m_responseHeaders;
     Gate m_gate;
     int m_retryCount = 0;
 };

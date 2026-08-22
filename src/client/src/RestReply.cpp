@@ -42,6 +42,15 @@ RateLimit RestReply::rateLimit() const { return m_rateLimit; }
 int RestReply::retryCount() const { return m_retryCount; }
 QByteArray RestReply::contentType() const { return m_contentType; }
 
+QByteArray RestReply::responseHeader(const QByteArray &name) const
+{
+    for (const auto &header : m_responseHeaders) {
+        if (header.first.compare(name, Qt::CaseInsensitive) == 0)
+            return header.second;
+    }
+    return {};
+}
+
 void RestReply::setGate(Gate gate) { m_gate = std::move(gate); }
 
 void RestReply::abort()
@@ -106,6 +115,7 @@ void RestReply::start()
         }
 
         m_contentType = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
+        m_responseHeaders = reply->rawHeaderPairs();
         Q_EMIT settled(body, status);
         Q_EMIT succeeded(body, status);
     });

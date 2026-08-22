@@ -1015,8 +1015,76 @@ connect(poller, &Client::VideoPoller::completed, this,
 poller->start();
 ```
 
-`listVideos`, `remixVideo`, and `deleteVideo` round out the surface. Characters,
-edits, and extensions are not yet implemented (limited availability).
+`listVideos` and `deleteVideo` round out the basic surface.
+
+### Deriving one video from another
+
+Three endpoints make a new video from an existing one, and **all three answer
+with a fresh job rather than changing the source** — so each is polled and
+downloaded like an original generation, and the original is left alone:
+
+| call | what it does |
+|---|---|
+| `remixVideo(id, prompt)` | re-render the whole clip from a new prompt |
+| `editVideo(request)` | change a source, which may be footage the API has never seen |
+| `extendVideo(request)` | append a new segment to a completed video |
+
+The resulting job's `remixedFromVideoId()` points back at where it came from —
+the only link there is, so a caller that discards it cannot reconstruct the
+chain.
+
+`editVideo` and `extendVideo` share one request type, because the API sends them
+one shape. **The source is either named or uploaded, and that choice picks the
+encoding:**
+
+```cpp
+// Named: a video the API already holds. Goes out as JSON.
+Core::VideoSourceRequest edit("video_abc123", "make it night");
+client.editVideo(edit);
+
+// Uploaded: bytes it has never seen. Goes out as multipart/form-data.
+Core::VideoSourceRequest fromFile;
+fromFile.setPrompt("make it night");
+fromFile.setSourceVideo("clip.mp4", mp4Bytes);
+client.editVideo(fromFile);
+
+// Extending needs `seconds` -- the length of the *new segment*.
+Core::VideoSourceRequest extend("video_abc123", "keep going, the wave breaks");
+extend.setSeconds("8");
+client.extendVideo(extend);   // resulting job's seconds() is the stitched total
+```
+
+The two sources are mutually exclusive: setting one clears the other, because a
+body carrying both is not something the endpoint accepts and quietly sending the
+wrong half would render a plausible video of the wrong source. `seconds` is sent
+by `extendVideo` and dropped by `editVideo`, which has no such parameter — one
+request type, and the caller does not have to remember which fields apply where.
+
+> On `seconds`: the published schema enumerates `"4"`, `"8"` and `"12"` while the
+> prose beside it says 4, 8, 12, 16 and 20. They cannot both be right, so the
+> value is passed through as the string the API models rather than validated
+> here — guessing either way would reject a request the API accepts, or send one
+> it does not.
+
+### Characters (`/videos/characters`)
+
+A character is a reusable cameo built from an uploaded video: register a
+likeness once, then refer to it by id in later prompts instead of re-uploading
+the footage.
+
+```cpp
+auto *created = client.createVideoCharacter("Ada", "ada.mp4", mp4Bytes);
+connect(created, &Client::VideoCharacterReply::finished, this,
+        [](const Core::VideoCharacter &character) {
+            qInfo() << character.id();     // "char_123" -- keep it
+        });
+```
+
+Unlike everything else in this section a character is **not a job**: it is
+created synchronously and has no status to poll. There is also **no list
+endpoint and no delete endpoint** — `getVideoCharacter(id)` is the only way back
+to one, so an id that is lost is lost. And the likeness in the uploaded video
+belongs to somebody: that is a consent question, not a technical one.
 
 ## Files (`/files`)
 
@@ -1527,8 +1595,14 @@ reconfigured mid-call. Its `audio` tree, `tools`, `tool_choice`, `tracing` and
 `prompt` are carried verbatim, and `max_output_tokens` is a `QJsonValue` because
 the API answers with the string `"inf"` as readily as with a number.
 
-SIP calls bridged into a session are controlled over REST, answering a
-`realtime.call.incoming` webhook:
+### Calls (`/realtime/calls`)
+
+A call is a Realtime session with a phone or a browser on the other end. It
+starts in one of two ways, and the four control verbs are the same afterwards.
+
+**Inbound, over SIP.** The call id arrives in a `realtime.call.incoming` webhook
+— which needs a web server, not an API client, so it comes from outside this
+library:
 
 ```cpp
 client.acceptRealtimeCall(callId, config);          // ... or
@@ -1537,12 +1611,36 @@ client.referRealtimeCall(callId, "tel:+14155550123");
 client.hangupRealtimeCall(callId);
 ```
 
-These are the one family with nothing to decode — the API acknowledges and
+These four are the one family with nothing to decode — the API acknowledges and
 returns no object — so `RealtimeCallReply::finished()` carries no payload.
 
-> **Not covered:** `POST /realtime/calls`, the WebRTC SDP handshake. It takes an
-> SDP offer produced by a peer-connection stack, which Qt does not ship; the SIP
-> control endpoints above cover the calls the library can actually complete.
+**Outbound, over WebRTC.** `createRealtimeCall()` is the signalling half of the
+handshake: post an SDP offer, get the SDP answer back.
+
+```cpp
+auto *call = client.createRealtimeCall(sdpOffer, config);
+connect(call, &Client::RealtimeCallCreateReply::finished, this,
+        [](const QString &callId, const QByteArray &sdpAnswer) {
+            peerConnection.setRemoteDescription(sdpAnswer);   // media path
+            // callId addresses hangupRealtimeCall() and a monitoring socket
+        });
+```
+
+**The media half is the application's.** The offer has to be produced by a
+peer-connection stack and the answer handed back to it; Qt ships no such stack,
+so what belongs here is the part that is ordinary HTTP. This is also the only
+way other than an inbound SIP call to obtain a call id.
+
+Two details this endpoint does not share with any other:
+
+- **The result is in two places.** The SDP answer is the response body
+  (`application/sdp`, not JSON) and the new call's id is in the `Location`
+  header and nowhere else. `RealtimeCallCreateReply` carries both; a caller that
+  had only the body would have a working call it could not control.
+- **The credential picks the request shape.** With an API key, pass a `config` —
+  the offer and the session travel as separately typed multipart parts. With an
+  ephemeral client secret, omit it: the session comes from the token, and a bare
+  `application/sdp` body is the only form the endpoint accepts from one.
 
 ## ChatKit (`/chatkit`) — beta
 
@@ -2925,6 +3023,7 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `transcribe`        | Speech-to-text (`/audio/transcriptions`)             |
 | `image`             | Image generation (`/images/generations`)             |
 | `video`             | Video / Sora: create → poll → download (`/videos`)   |
+| `video_derivatives` | Edit, extend and register a cameo (`/videos/*`)      |
 | `files`             | Files: upload → list → download → delete (`/files`)  |
 | `chunked_upload`    | Large-file multipart upload (`/uploads`)             |
 | `vector_search`     | Index a document and search it (`/vector_stores`)    |

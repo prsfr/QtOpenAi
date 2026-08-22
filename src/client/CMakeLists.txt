@@ -49,6 +49,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/VoiceConsentListReply.h
     include/QtOpenAi/Client/VideoReply.h
     include/QtOpenAi/Client/VideoListReply.h
+    include/QtOpenAi/Client/VideoCharacterReply.h
     include/QtOpenAi/Client/VideoContentReply.h
     include/QtOpenAi/Client/JobPoller.h
     include/QtOpenAi/Client/VideoPoller.h
@@ -96,6 +97,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/RunPoller.h
     include/QtOpenAi/Client/RealtimeClientSecretReply.h
     include/QtOpenAi/Client/RealtimeSessionReply.h
+    include/QtOpenAi/Client/RealtimeCallCreateReply.h
     include/QtOpenAi/Client/RealtimeCallReply.h
     include/QtOpenAi/Client/ChatKitSessionReply.h
     include/QtOpenAi/Client/ChatKitThreadReply.h

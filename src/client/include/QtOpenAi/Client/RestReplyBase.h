@@ -83,6 +83,11 @@ protected:
     bool parseJsonObject(const QByteArray &body, int httpStatus, QJsonObject &out);
     // Content-Type of the successful response (for binary replies).
     QByteArray responseContentType() const;
+    // One raw header of the successful response, matched case-insensitively;
+    // empty when it was absent. For the few endpoints that put part of the
+    // answer in a header rather than in the body -- POST /realtime/calls
+    // returns the new call's id in `Location` and nowhere else.
+    QByteArray responseHeader(const QByteArray &name) const;
 
     QScopedPointer<RestReplyBasePrivate> d_ptr;
 
