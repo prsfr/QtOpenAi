@@ -5,6 +5,8 @@
 #include <QtNetwork/QTcpSocket>
 #include <QtTest/QtTest>
 
+#include <functional>
+
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Client;
 
@@ -71,6 +73,8 @@ private slots:
     void legacyCompletionStream();
     void responseStreamEmitsDeltasAndFinal();
     void responseStreamFailedEvent();
+    void everyStreamReportsAnErrorBodyTheSameWay();
+    void aStreamThatStopsShortIsNotAnAnswer();
 };
 
 void TestStreamingExtra::legacyCompletionStream()
@@ -156,6 +160,140 @@ void TestStreamingExtra::responseStreamFailedEvent()
     QCOMPARE(failedSpy.count(), 1);
     QCOMPARE(reply->error().message(), QStringLiteral("boom"));
     delete reply;
+}
+
+// Ask a stream for its outcome once it has settled, whichever kind it is.
+template <typename Reply, typename Start>
+static void settled(Start start, const std::function<void(Reply *)> &check)
+{
+    Reply *reply = start();
+    reply->setAutoDelete(false);
+    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    check(reply);
+    delete reply;
+}
+
+void TestStreamingExtra::everyStreamReportsAnErrorBodyTheSameWay()
+{
+    // All four streams parse the error body through one helper now. What that
+    // has to be worth is that they agree: the same 500 gets the same message,
+    // type, code and status out of every one of them, where before each had its
+    // own copy of the parsing to drift.
+    const QByteArray body = R"({"error":{"message":"boom","type":"server_error","code":"x"}})";
+
+    const auto expect = [](const ClientError &error) {
+        QCOMPARE(error.kind(), ClientError::Kind::Http);
+        QCOMPARE(error.httpStatus(), 500);
+        QCOMPARE(error.message(), QStringLiteral("boom"));
+        QCOMPARE(error.type(), QStringLiteral("server_error"));
+        QCOMPARE(error.code(), QStringLiteral("x"));
+    };
+
+    {
+        SseStubServer server(500, body);
+        Client client(server.baseUrl(), QStringLiteral("k"));
+        settled<ChatCompletionStreamReply>(
+                [&] {
+                    return client.createChatCompletionStream(ChatCompletionRequest(
+                            QStringLiteral("gpt-4o"), {Message::user(QStringLiteral("hi"))}));
+                },
+                [&](ChatCompletionStreamReply *reply) {
+                    QVERIFY(!reply->isSuccess());
+                    expect(reply->error());
+                });
+    }
+    {
+        SseStubServer server(500, body);
+        Client client(server.baseUrl(), QStringLiteral("k"));
+        settled<CompletionStreamReply>(
+                [&] {
+                    return client.createCompletionStream(CompletionRequest(
+                            QStringLiteral("gpt-3.5-turbo-instruct"), QStringLiteral("hi")));
+                },
+                [&](CompletionStreamReply *reply) {
+                    QVERIFY(!reply->isSuccess());
+                    expect(reply->error());
+                });
+    }
+    {
+        SseStubServer server(500, body);
+        Client client(server.baseUrl(), QStringLiteral("k"));
+        settled<ResponseStreamReply>(
+                [&] {
+                    return client.createResponseStream(
+                            ResponseRequest(QStringLiteral("gpt-4o"), QStringLiteral("hi")));
+                },
+                [&](ResponseStreamReply *reply) {
+                    QVERIFY(!reply->isSuccess());
+                    expect(reply->error());
+                });
+    }
+    {
+        SseStubServer server(500, body);
+        Client client(server.baseUrl(), QStringLiteral("k"));
+        settled<RunStreamReply>(
+                [&] {
+                    CreateRunRequest request;
+                    request.setAssistantId(QStringLiteral("asst_1"));
+                    return client.createRunStream(QStringLiteral("thread_1"), request);
+                },
+                [&](RunStreamReply *reply) {
+                    QVERIFY(!reply->isSuccess());
+                    expect(reply->error());
+                });
+    }
+}
+
+void TestStreamingExtra::aStreamThatStopsShortIsNotAnAnswer()
+{
+    // The other half of what the streams disagree on: a chat or text completion
+    // is finished when the transport is, while a response or a run has to have
+    // seen the event that says so. A clean 200 carrying deltas and nothing else
+    // separates the two.
+    {
+        SseStubServer server(200, sse(R"({"id":"cmpl_1","choices":[{"text":"hi"}]})")
+                                          + "data: [DONE]\n\n");
+        Client client(server.baseUrl(), QStringLiteral("k"));
+        settled<CompletionStreamReply>(
+                [&] {
+                    return client.createCompletionStream(CompletionRequest(
+                            QStringLiteral("gpt-3.5-turbo-instruct"), QStringLiteral("hi")));
+                },
+                [](CompletionStreamReply *reply) {
+                    QVERIFY(reply->isSuccess());
+                    QCOMPARE(reply->response().choices().first().text(), QStringLiteral("hi"));
+                });
+    }
+    {
+        // Deltas but no response.completed: not a response.
+        SseStubServer server(200, sse(R"({"type":"response.output_text.delta","delta":"hi"})"));
+        Client client(server.baseUrl(), QStringLiteral("k"));
+        settled<ResponseStreamReply>(
+                [&] {
+                    return client.createResponseStream(
+                            ResponseRequest(QStringLiteral("gpt-4o"), QStringLiteral("hi")));
+                },
+                [](ResponseStreamReply *reply) {
+                    QVERIFY(!reply->isSuccess());
+                    QCOMPARE(reply->error().kind(), ClientError::Kind::Parse);
+                });
+    }
+    {
+        // A run that never settled: likewise.
+        SseStubServer server(200, sse(R"({"object":"thread.message.delta",)"
+                                      R"("delta":{"content":[]}})"));
+        Client client(server.baseUrl(), QStringLiteral("k"));
+        settled<RunStreamReply>(
+                [&] {
+                    CreateRunRequest request;
+                    request.setAssistantId(QStringLiteral("asst_1"));
+                    return client.createRunStream(QStringLiteral("thread_1"), request);
+                },
+                [](RunStreamReply *reply) {
+                    QVERIFY(!reply->isSuccess());
+                    QCOMPARE(reply->error().kind(), ClientError::Kind::Parse);
+                });
+    }
 }
 
 QTEST_MAIN(TestStreamingExtra)
