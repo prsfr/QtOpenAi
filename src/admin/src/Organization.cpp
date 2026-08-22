@@ -3,6 +3,8 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "RestPath_p.h"
+
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
@@ -55,18 +57,11 @@ constexpr QLatin1String kDeactivate("/deactivate");
 constexpr QLatin1String kOrganizationRoot("/organization");
 constexpr QLatin1String kProjectsRoot("/projects");
 
-// Compose a resource path: a collection, optionally one member of it, optionally
-// a sub-resource below that -- e.g. ("/organization/projects", "proj_1",
-// "/api_keys"). The same helper Client.cpp composes its nested paths with, so
-// the endpoint methods stay free of string arithmetic and every path is built
-// from the constants above rather than retyped.
-QString resourcePath(const QString &collection, const QString &id, const QString &suffix = {})
-{
-    QString path(collection);
-    if (!id.isEmpty())
-        path += QLatin1Char('/') + id;
-    return path + suffix;
-}
+// The same helper Client.cpp composes its nested paths with -- literally the
+// same one now; see RestPath_p.h. The endpoint methods below stay free of
+// string arithmetic, and every path is built from the constants above rather
+// than retyped.
+using Rest::resourcePath;
 
 // A member of a project's sub-collection, which is two levels of the above:
 // ("proj_1", "/api_keys", "key_1") -> "/organization/projects/proj_1/api_keys/key_1".

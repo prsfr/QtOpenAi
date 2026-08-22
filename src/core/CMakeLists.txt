@@ -113,7 +113,7 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
 
 add_library(QtOpenAiCore
     ${QTOPENAI_CORE_PUBLIC_HEADERS}
-    src/JsonHelpers_p.h
+    ${QTOPENAI_PRIVATE_HEADERS}
     src/Enums.cpp
     src/FunctionCall.cpp
     src/ToolCall.cpp
@@ -227,6 +227,7 @@ target_include_directories(QtOpenAiCore
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
 )
 
 target_compile_definitions(QtOpenAiCore PRIVATE QTOPENAI_CORE_LIBRARY)

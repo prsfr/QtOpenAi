@@ -33,6 +33,7 @@ target_include_directories(QtOpenAiRealtime
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
 )
 
 target_compile_definitions(QtOpenAiRealtime PRIVATE QTOPENAI_REALTIME_LIBRARY)
