@@ -42,6 +42,7 @@ private slots:
     void neverLetsAToolResultLead();
     void keepsTheNewestTurnEvenWhenItDoesNotFit();
     void countsAgainstATokenBudget();
+    void keepsTheLongestSuffixThatFits();
     void reservesRoomForTheReply();
     void handsTheDroppedMessagesToASummariser();
     void derivesABudgetFromTheModel();
@@ -125,6 +126,48 @@ void TestTrimPolicy::countsAgainstATokenBudget()
     QVERIFY(policy.tokenCounter().count(kept) <= 40);
     // What survived is the tail, not an arbitrary subset.
     QCOMPARE(kept.last().content(), messages.last().content());
+}
+
+void TestTrimPolicy::keepsTheLongestSuffixThatFits()
+{
+    // The property the budget search has to satisfy, stated without reference
+    // to how it searches: what comes back is the *longest* tail of the
+    // conversation that still fits, so nothing that would have fit was dropped
+    // and nothing that pushes it over was kept.
+    //
+    // apply() no longer counts each candidate window -- it counts each message
+    // once and adds them up -- so this is what holds the cheap arithmetic to
+    // the answer the expensive one gave.
+    QList<Message> messages {Message::system(QStringLiteral("be brief"))};
+    for (int i = 1; i <= 30; ++i)
+        messages.append(Message::user(QStringLiteral("q%1").arg(i).repeated(i)));
+
+    for (int budget = 10; budget <= 400; budget += 7) {
+        TrimPolicy policy;
+        policy.setMaxTokens(budget);
+        const QList<Message> kept = policy.apply(messages);
+        const TokenCounter counter = policy.tokenCounter();
+
+        // The system prompt is pinned, so it is there whatever the budget.
+        QVERIFY(!kept.isEmpty());
+        QCOMPARE(kept.first().content(), messages.first().content());
+        // What follows it is a tail of the original, in order.
+        QCOMPARE(kept.mid(1), messages.mid(messages.size() - (kept.size() - 1)));
+
+        // Either everything fits, or the newest turn alone already does not --
+        // the one case where apply() sends something too long on purpose.
+        const int keptTurns = kept.size() - 1;
+        if (counter.count(kept) > budget) {
+            QCOMPARE(keptTurns, 1);
+            continue;
+        }
+        // ... and if there was room for one more, it should have been taken.
+        if (keptTurns < messages.size() - 1) {
+            const QList<Message> oneMore = QList<Message> {messages.first()}
+                                           + messages.mid(messages.size() - (keptTurns + 1));
+            QVERIFY(counter.count(oneMore) > budget);
+        }
+    }
 }
 
 void TestTrimPolicy::reservesRoomForTheReply()
