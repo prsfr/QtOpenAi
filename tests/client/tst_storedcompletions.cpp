@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include <QtOpenAi/Client/Client.h>
 
+#include <QtCore/QJsonDocument>
 #include <QtNetwork/QTcpServer>
 #include <QtNetwork/QTcpSocket>
 #include <QtTest/QtTest>
@@ -26,6 +27,8 @@ private:
 private slots:
     void getUsesGetAndParses();
     void listUsesGetWithPagination();
+    void updateSendsMetadataAndReadsItBack();
+    void untaggedCompletionDecodesToEmptyMetadata();
     void deleteUsesDelete();
     void listMessagesUsesGet();
 };
@@ -63,6 +66,56 @@ void TestStoredCompletions::listUsesGetWithPagination()
     QVERIFY(server.requestLine().contains("after=cmpl_0"));
     QCOMPARE(reply->list().size(), 1);
     QVERIFY(reply->list().hasMore);
+}
+
+void TestStoredCompletions::updateSendsMetadataAndReadsItBack()
+{
+    StubServer server(R"({"id":"cmpl_1","object":"chat.completion","created":1,"model":"gpt-4o",
+        "choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2},
+        "metadata":{"topic":"billing","ticket":"4711"}})");
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    QJsonObject metadata;
+    metadata.insert(QStringLiteral("topic"), QStringLiteral("billing"));
+    metadata.insert(QStringLiteral("ticket"), QStringLiteral("4711"));
+
+    const auto reply = awaited(client.updateChatCompletion(QStringLiteral("cmpl_1"), metadata));
+    QVERIFY(reply);
+
+    QVERIFY(reply->isSuccess());
+    QVERIFY(server.requestLine().startsWith("POST /v1/chat/completions/cmpl_1 "));
+    // The body wraps the tags: {"metadata": {...}}, not the tags at the top level.
+    const QJsonObject sent = QJsonDocument::fromJson(server.requestBody()).object();
+    QCOMPARE(sent.value(QStringLiteral("metadata")).toObject(), metadata);
+
+    // Reading it back is the half that used to be missing: the tags could be
+    // written and never retrieved through the typed value.
+    QCOMPARE(reply->response().metadata(), metadata);
+}
+
+void TestStoredCompletions::untaggedCompletionDecodesToEmptyMetadata()
+{
+    // The API sends `"metadata": null` for a stored completion nobody tagged,
+    // and omits the field entirely on the reply to createChatCompletion().
+    // Both have to arrive as an empty object rather than as a decode failure.
+    StubServer server(QList<StubServer::Response> {
+            {R"({"id":"cmpl_1","object":"chat.completion","created":1,"model":"gpt-4o",
+                 "choices":[],"usage":{},"metadata":null})"},
+            {completionBody()},
+    });
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    const auto nulled = awaited(client.getChatCompletion(QStringLiteral("cmpl_1")));
+    QVERIFY(nulled);
+    QVERIFY(nulled->isSuccess());
+    QVERIFY(nulled->response().metadata().isEmpty());
+
+    const auto absent = awaited(client.getChatCompletion(QStringLiteral("cmpl_1")));
+    QVERIFY(absent);
+    QVERIFY(absent->isSuccess());
+    QVERIFY(absent->response().metadata().isEmpty());
+    // ...and an empty one does not come back out on the way to JSON.
+    QVERIFY(!absent->response().toJson().contains(QStringLiteral("metadata")));
 }
 
 void TestStoredCompletions::deleteUsesDelete()

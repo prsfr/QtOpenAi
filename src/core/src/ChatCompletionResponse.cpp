@@ -19,6 +19,7 @@ public:
     QString systemFingerprint;
     QList<Choice> choices;
     Usage usage;
+    QJsonObject metadata;
 };
 
 ChatCompletionResponse::ChatCompletionResponse()
@@ -57,6 +58,9 @@ void ChatCompletionResponse::setChoices(const QList<Choice> &choices) { d->choic
 Usage ChatCompletionResponse::usage() const { return d->usage; }
 void ChatCompletionResponse::setUsage(const Usage &usage) { d->usage = usage; }
 
+QJsonObject ChatCompletionResponse::metadata() const { return d->metadata; }
+void ChatCompletionResponse::setMetadata(const QJsonObject &metadata) { d->metadata = metadata; }
+
 Message ChatCompletionResponse::firstMessage() const
 {
     return d->choices.isEmpty() ? Message() : d->choices.first().message();
@@ -82,6 +86,10 @@ QJsonObject ChatCompletionResponse::toJson() const
     json.insert(QStringLiteral("choices"), choices);
 
     json.insert(QStringLiteral("usage"), d->usage.toJson());
+    // Only when there is one: an unstored completion should not round-trip
+    // through a stray "metadata": {}.
+    if (!d->metadata.isEmpty())
+        json.insert(QStringLiteral("metadata"), d->metadata);
     return json;
 }
 
@@ -102,6 +110,10 @@ ChatCompletionResponse ChatCompletionResponse::fromJson(const QJsonObject &json)
     if (json.contains(QStringLiteral("usage")))
         response.d->usage = Usage::fromJson(json.value(QStringLiteral("usage")).toObject());
 
+    // The API sends `"metadata": null` for a stored completion that has never
+    // been tagged, so toObject() rather than contains() decides this.
+    response.d->metadata = json.value(QStringLiteral("metadata")).toObject();
+
     return response;
 }
 
@@ -109,7 +121,8 @@ bool ChatCompletionResponse::operator==(const ChatCompletionResponse &other) con
 {
     return d->id == other.d->id && d->object == other.d->object && d->created == other.d->created
            && d->model == other.d->model && d->systemFingerprint == other.d->systemFingerprint
-           && d->choices == other.d->choices && d->usage == other.d->usage;
+           && d->choices == other.d->choices && d->usage == other.d->usage
+           && d->metadata == other.d->metadata;
 }
 
 } // namespace Core

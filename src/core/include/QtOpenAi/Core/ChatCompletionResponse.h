@@ -49,6 +49,19 @@ public:
     Usage usage() const;
     void setUsage(const Usage &usage);
 
+    // The tags a stored completion carries -- what updateChatCompletion() writes
+    // and what a caller filters their own history by. Empty for a completion
+    // that was not stored, and empty on the reply to createChatCompletion()
+    // even when the request set metadata: the API echoes it back only from the
+    // /chat/completions management endpoints.
+    //
+    // The schema does not declare this field on the completion object; the
+    // API's own example payload for GET /chat/completions carries it. Decoding
+    // it costs nothing when it is absent, and not decoding it would mean a
+    // caller can set a tag and never read it back.
+    QJsonObject metadata() const;
+    void setMetadata(const QJsonObject &metadata);
+
     // Convenience: the first choice's message, or a default-constructed Message.
     Message firstMessage() const;
     // Convenience: tool calls of the first choice, or an empty list.

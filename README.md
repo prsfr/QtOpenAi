@@ -643,6 +643,46 @@ connect(list, &Client::ChatCompletionListReply::finished, this,
 `Core::ListPage<T>` (aliased as `ChatCompletionList` / `ChatCompletionMessageList`),
 the shared page type reused by every list endpoint.
 
+**Metadata is the only mutable part of a stored completion**, and the write
+*replaces* rather than merges — sending one key drops the rest:
+
+```cpp
+QJsonObject tags{{"tenant", "acme"}, {"ticket", "4711"}};
+auto *tagged = client.updateChatCompletion(id, tags);
+connect(tagged, &Client::ChatCompletionReply::finished, this,
+        [](const Core::ChatCompletionResponse &completion) {
+            qInfo() << completion.metadata();     // read back what stuck
+        });
+```
+
+`metadata()` is empty on the reply to `createChatCompletion()` even when the
+request set it — the API echoes tags back only from the management endpoints
+above. See [`examples/stored_completions.cpp`](examples/stored_completions.cpp).
+
+## Legacy text completions (`/completions`)
+
+The pre-chat endpoint: one prompt string in, one continuation out, no roles and
+no messages. **New code wants Chat Completions or the Responses API instead** —
+this is here for OpenAI-compatible servers that expose only the deprecated
+endpoint, and for prompts that were written against it.
+
+```cpp
+Core::CompletionRequest request("gpt-3.5-turbo-instruct", "Once upon a time");
+request.setMaxTokens(64);
+auto *reply = client.createCompletion(request);
+connect(reply, &Client::CompletionReply::finished, this,
+        [](const Core::CompletionResponse &response) {
+            qInfo() << response.firstText();
+        });
+```
+
+`setPrompt()` takes a `QJsonValue` as well as a string, because the endpoint
+accepts an *array* of prompts (or of token arrays); the reply then carries a
+`Core::CompletionChoice` for each of them, and `n` more for each on top. So
+`firstText()` is a convenience for the one-prompt-one-answer case — anything
+else reads `choices()` and matches on `index()`. `createCompletionStream()` is
+the SSE variant and behaves like every other stream here.
+
 ## Embeddings & models
 
 Turn text into vectors and enumerate the available models:
@@ -1352,8 +1392,37 @@ stream, so a streamed tool loop never has to fall back to polling.
 `listThreadMessages()` returns the transcript (most-recent-first). The Assistants
 content parts nest their text differently from the chat ones, so
 `ThreadMessage::text()` pulls the readable part out of whatever the message
-carries. `listRunSteps()` and `getRunStep()` are the audit trail: which message
-the assistant wrote, which tools it called.
+carries.
+
+### Run steps: what the run actually did
+
+A `Core::Run` says how it ended. `listRunSteps()` and `getRunStep()` say how it
+got there — one `Core::RunStep` per thing the assistant did, in order:
+
+```cpp
+auto *steps = client.listRunSteps(threadId, runId);
+connect(steps, &Client::RunStepListReply::finished, this,
+        [](const Core::RunStepList &page) {
+            for (const Core::RunStep &step : page.data) {
+                qInfo() << step.type()          // "message_creation" or "tool_calls"
+                        << Core::runStepStatusToString(step.status());
+                if (!step.errorCode().isEmpty())
+                    qWarning() << step.errorCode() << step.errorMessage();
+            }
+        });
+```
+
+**`stepDetails()` is deliberately a `QJsonObject`.** Its shape depends on
+`type()` and, for tool calls, on which tool ran — code interpreter steps carry
+their input and their outputs, file search steps carry the chunks they matched,
+and the API adds tool types faster than a typed union could follow. Naming the
+envelope and keeping the payload verbatim means a step from a tool this build
+has never heard of still reaches the caller intact.
+
+This is the surface to reach for when a run failed and the status alone does not
+say why: the run's `errorCode()`/`errorMessage()` report the failure that ended
+it, while the steps show what had already succeeded before it.
+`RunStep::isTerminal()` follows the same rule as `Run::isTerminal()`.
 
 ## Realtime (`/realtime`)
 
@@ -1388,6 +1457,30 @@ An API key and an ephemeral secret are presented identically, so moving a
 program from server-side to browser-side changes only that one string. Events
 sent before the handshake completes are queued and flushed on connect, so
 `sendText()` on the line after `open()` is not a race.
+
+`Core::RealtimeClientSecret` is what the mint returns, and it carries more than
+the token:
+
+```cpp
+connect(minted, &Client::RealtimeClientSecretReply::finished, this,
+        [](const Core::RealtimeClientSecret &secret) {
+            secret.value();       // "ek_..." — the only part the browser needs
+            secret.expiresAt();   // Unix seconds; 600 by default, 10–7200
+            secret.session();     // the config a session opened with it starts from
+        });
+```
+
+**`expiresAt()` is a deadline for *opening* a session, not for holding one.** A
+call already running outlives its secret, so a long conversation does not need
+the credential refreshed — but a browser that sits on one for an hour before
+dialling gets a refusal. Mint it when the client is about to connect.
+
+The three minting calls differ only in what they are for:
+`createRealtimeClientSecret()` is the one new code wants (pass a transcription
+session for transcription); `createRealtimeTranslationClientSecret()` is the
+translation variant; and `createRealtimeTranscriptionSession()` is the pre-GA
+endpoint, which answers with the key nested under `client_secret` instead of at
+the top level. The value type accepts both spellings rather than existing twice.
 
 Output arrives as signals, with audio already base64-decoded so a player can be
 fed straight from it:
@@ -2394,13 +2487,22 @@ not fail, it comes back as a perfectly valid report of the wrong thing — which
 why the tests assert the query string that goes on the wire rather than the
 reply.
 
-A report is a page of time buckets, and a bucket is a time range plus rows:
+A report is a page of time buckets, and a bucket is a time range plus rows. That
+is `Core::BucketPage<T>`, the third of the library's three page shapes and the
+one used only here — its `data` holds `Core::Bucket<T>`, and the rows are a level
+further in, under the bucket's `results`:
 
 ```cpp
 for (const Core::UsageBucket &bucket : usage.data)        // one per day here
     for (const Core::UsageResult &row : bucket.results)   // one per model
         chart.add(bucket.startTime, row.model(), row.totalTokens());
 ```
+
+That extra level is the thing to get right: `page.data` is *not* the rows, and a
+loop that treats it as such compiles for a `ListPage` and not for this. A
+`BucketPage` also paginates differently — `nextPage`, sent back as `page` rather
+than `after` — which is handled for you by `PageWalker`; see
+[Iterating a paginated endpoint](#iterating-a-paginated-endpoint).
 
 An **empty bucket is a bucket**. The server sends the quiet days too, and keeping
 them is what lets a caller plot the series without inventing the gaps.
@@ -2813,6 +2915,8 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `typed_output`      | Structured Outputs bound to a Q_GADGET, both ways    |
 | `vision`            | Multimodal input (text + image content parts)        |
 | `embeddings`        | Embeddings (`/embeddings`)                            |
+| `models`            | `/models` against the local catalog's prices         |
+| `stored_completions`| Browse, tag and delete stored completions            |
 | `semantic_search`   | Index a corpus locally and answer from what it finds |
 | `moderations`       | Moderation (`/moderations`)                           |
 | `guardrails`        | Screen input and output against a per-category policy |
@@ -2832,14 +2936,27 @@ export OPENAI_MODEL=llama3.1        # overrides each example's default model
 | `skills`            | Skill: publish → version → promote → zip (`/skills`) |
 | `chatkit`           | ChatKit session secret + thread transcript (`/chatkit`)|
 | `realtime`          | Live Realtime session over a WebSocket (`/realtime`)  |
+| `realtime_calls`    | Accept, refer and hang up a SIP call (`/realtime/calls`) |
 | `persistence`       | Conversation, cache and metrics kept across runs     |
 | `organization`      | List the organization's projects (`/organization`)   |
+| `organization_projects` | A project and what lives inside it               |
+| `organization_members`  | Members, and who has been invited                |
+| `organization_roles`    | Roles, groups, and what a group may do           |
+| `organization_permissions` | Which models and hosted tools a project may run |
+| `organization_certificates` | Client certificates and where they are active |
+| `organization_admin_keys`  | The keys that reach the administration surface |
+| `organization_audit_logs`  | What happened, who did it, and to what        |
+| `organization_spend_alerts` | Spend alerts, hard limits and data retention |
+| `organization_usage`    | What last week cost, and what spent it           |
 
 `realtime` is the one example that needs the optional `QtOpenAi::Realtime`
-module, so it is built only when `Qt6::WebSockets` is available. `persistence`
-uses the optional `QtOpenAi::Sql` module when it is there and falls back to the
-JSON-files store when it is not. The rest need nothing beyond
-`QtOpenAi::Client`.
+module, so it is built only when `Qt6::WebSockets` is available —
+`realtime_calls` does not, because SIP call control is REST. `persistence` uses
+the optional `QtOpenAi::Sql` module when it is there and falls back to the
+JSON-files store when it is not. The ten `organization_*` programs link
+`QtOpenAi::Admin` and read `OPENAI_ADMIN_KEY` rather than `OPENAI_API_KEY` — an
+admin key, which a standard one cannot substitute for. The rest need nothing
+beyond `QtOpenAi::Client`.
 
 ## Building
 

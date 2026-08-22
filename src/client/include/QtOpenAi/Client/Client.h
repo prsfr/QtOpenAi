@@ -150,6 +150,38 @@ class RateLimiter;
 // A provider that implements a subset works just as well: nothing here assumes
 // more of the server than the endpoint being called (OpenAI, Azure OpenAI,
 // Ollama, vLLM, LM Studio, ...).
+//
+// --- On the size of this class (decided for 1.0, see issue #123) ------------
+//
+// This is deliberately one flat object with an endpoint method per API call --
+// around 156 of them across two dozen families -- rather than a facade handing
+// out per-family sub-objects (client.files().list(), client.vectorStores()...).
+// It was measured and argued before 1.0 froze the surface, and the reasons are
+// recorded here so it does not have to be re-litigated:
+//
+//   * Compile time is not the argument anyone assumes it is. Preprocessed,
+//     this header costs about 11% more than a single reply header, because Qt
+//     dominates both (QString alone is 82k lines, one reply header 113k, this
+//     header 126k). Splitting it would save nothing worth having.
+//
+//   * A facade that kept the flat methods as forwarders -- the only variant
+//     that is not source-breaking -- would freeze *two* spellings of every
+//     call into 1.0 instead of one. That is a worse commitment than the size
+//     it was meant to fix, and it is permanent in a way the size is not.
+//
+//   * QtOpenAi::Admin::Organization looks like a precedent for splitting and
+//     argues the other way. It is separate because it takes a *different
+//     credential*: an admin key, which a standard key cannot substitute for.
+//     Holding those methods on their own object means a user key cannot reach
+//     them by accident. Every family here shares one credential, so a split
+//     would enforce nothing -- it would only be tidier.
+//
+//   * The families have no coupling to each other. The section comments below
+//     carry the structure, and each method is one line over the same private
+//     request path, so there is no duplication a split would remove.
+//
+// If this is ever revisited, the thing that would change the answer is a family
+// needing its own credential, base URL or lifetime -- not the method count.
 class QTOPENAI_CLIENT_EXPORT Client : public QObject
 {
     Q_OBJECT
