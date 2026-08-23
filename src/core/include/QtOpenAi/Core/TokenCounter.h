@@ -89,6 +89,20 @@ public:
     // an image's cost depends on tiling rules that live server-side.
     int count(const QList<Message> &messages) const;
 
+    // What each message costs on its own, in order: element i is what
+    // messages.at(i) contributes to count(messages). Their sum plus
+    // requestOverhead() is count(messages) exactly.
+    //
+    // For weighing a conversation against a budget message by message. Asking
+    // count() about one window after another re-counts every message the
+    // windows have in common, which is every message but one -- see
+    // Chat::TrimPolicy, which does exactly this walk.
+    QList<int> countEach(const QList<Message> &messages) const;
+
+    // What a request costs beyond its messages: the tokens that prime the
+    // reply, charged once to a conversation that has any messages at all.
+    static int requestOverhead();
+
 private:
     QSharedDataPointer<TokenCounterData> d;
 };

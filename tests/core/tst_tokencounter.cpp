@@ -85,6 +85,7 @@ private slots:
     void mergesInRankOrderAcrossALongPiece();
     void countingAgreesWithEncoding();
     void countsMessageFraming();
+    void countEachSumsToCount();
     void becomesExactWhenItsVocabularyArrives();
     void rejectsDataItCannotRead();
     void takesTheEncodingFromTheCatalog();
@@ -194,6 +195,40 @@ void TestTokenCounter::countsMessageFraming()
     Message named(Role::User, QStringLiteral("ab"));
     named.setName(QStringLiteral("ab"));
     QCOMPARE(counter.count({named}), 11 + 1 + 1);
+}
+
+void TestTokenCounter::countEachSumsToCount()
+{
+    // The identity TrimPolicy relies on to weigh a conversation without
+    // counting the same message once per candidate window: the per-message
+    // costs plus the one-off request overhead are count(), exactly.
+    for (const TokenCounter &counter :
+         {TokenCounter(), TokenCounter(QStringLiteral("test_base"))}) {
+        QCOMPARE(counter.countEach(QList<Message>()), QList<int>());
+
+        Message named(Role::User, QStringLiteral("ab aba"));
+        named.setName(QStringLiteral("ab"));
+        Message refused(Role::Assistant, QString());
+        refused.setRefusal(QStringLiteral("ababa"));
+
+        const QList<Message> messages {Message::system(QStringLiteral("ab")), named,
+                                       Message(Role::Assistant, QStringLiteral("ababab")), refused};
+
+        const QList<int> costs = counter.countEach(messages);
+        QCOMPARE(costs.size(), messages.size());
+
+        int total = TokenCounter::requestOverhead();
+        for (const int cost : costs)
+            total += cost;
+        QCOMPARE(total, counter.count(messages));
+
+        // And each element really is that message on its own, so a caller can
+        // add and drop them one at a time.
+        for (int i = 0; i < messages.size(); ++i) {
+            QCOMPARE(costs.at(i) + TokenCounter::requestOverhead(),
+                     counter.count({messages.at(i)}));
+        }
+    }
 }
 
 void TestTokenCounter::becomesExactWhenItsVocabularyArrives()

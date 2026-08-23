@@ -212,6 +212,26 @@ int countWith(const Encoding *encoding, const QString &text)
     return encoding ? encodeWith(*encoding, text, nullptr) : heuristicCount(text);
 }
 
+// What one message contributes to a request, framing included but the
+// once-per-request reply priming excluded -- that belongs to the conversation,
+// not to any message in it.
+int countMessageWith(const Encoding *encoding, const Message &message)
+{
+    int total = kTokensPerMessage;
+    total += countWith(encoding, roleToString(message.role()));
+    total += countWith(encoding, message.content());
+    if (!message.name().isEmpty())
+        total += kTokensPerName + countWith(encoding, message.name());
+    if (!message.refusal().isEmpty())
+        total += countWith(encoding, message.refusal());
+    // A tool call is billed for the JSON that carries it.
+    for (const ToolCall &call : message.toolCalls()) {
+        total += countWith(encoding, call.function().name());
+        total += countWith(encoding, call.function().arguments());
+    }
+    return total;
+}
+
 } // namespace
 
 class TokenCounterData : public QSharedData
@@ -335,25 +355,25 @@ int TokenCounter::count(const QList<Message> &messages) const
     // every message made counting a long transcript take that mutex a thousand
     // times to learn the same answer.
     const EncodingPtr vocabulary = d->vocabulary();
-    const Encoding *encoding = vocabulary.get();
 
     int total = 0;
-    for (const Message &message : messages) {
-        total += kTokensPerMessage;
-        total += countWith(encoding, roleToString(message.role()));
-        total += countWith(encoding, message.content());
-        if (!message.name().isEmpty())
-            total += kTokensPerName + countWith(encoding, message.name());
-        if (!message.refusal().isEmpty())
-            total += countWith(encoding, message.refusal());
-        // A tool call is billed for the JSON that carries it.
-        for (const ToolCall &call : message.toolCalls()) {
-            total += countWith(encoding, call.function().name());
-            total += countWith(encoding, call.function().arguments());
-        }
-    }
+    for (const Message &message : messages)
+        total += countMessageWith(vocabulary.get(), message);
     return total + kTokensForReplyPriming;
 }
+
+QList<int> TokenCounter::countEach(const QList<Message> &messages) const
+{
+    const EncodingPtr vocabulary = d->vocabulary();
+
+    QList<int> costs;
+    costs.reserve(messages.size());
+    for (const Message &message : messages)
+        costs.append(countMessageWith(vocabulary.get(), message));
+    return costs;
+}
+
+int TokenCounter::requestOverhead() { return kTokensForReplyPriming; }
 
 } // namespace Core
 } // namespace QtOpenAi
