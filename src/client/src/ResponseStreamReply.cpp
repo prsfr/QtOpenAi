@@ -1,172 +1,83 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/ResponseStreamReply.h"
 
-#include "HttpSupport_p.h"
-#include "SseParser_p.h"
+#include "StreamReplyBase_p.h"
 
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
-#include <QtNetwork/QNetworkReply>
 
 namespace QtOpenAi {
 namespace Client {
 
-class ResponseStreamReplyPrivate
+class ResponseStreamReplyPrivate : public StreamReplyBasePrivate
 {
 public:
-    QNetworkReply *networkReply = nullptr;
-    detail::SseParser parser;
     Core::Response response;
-    ClientError error;
-    RateLimit rateLimit;
     bool sawCompleted = false;
-    bool finished = false;
-    bool success = false;
-    bool autoDelete = true;
 };
 
 ResponseStreamReply::ResponseStreamReply(QNetworkReply *reply, QObject *parent)
-    : QObject(parent)
-    , d_ptr(new ResponseStreamReplyPrivate)
+    : StreamReplyBase(*new ResponseStreamReplyPrivate, reply, parent)
+{ }
+
+void ResponseStreamReply::handleEvent(const QByteArray &name, const QByteArray &data)
 {
     Q_D(ResponseStreamReply);
-    d->networkReply = reply;
-    reply->setParent(this);
+    // These streams name their event type inside the payload, so the SSE
+    // `event:` field is of no interest here.
+    Q_UNUSED(name);
 
-    connect(reply, &QNetworkReply::readyRead, this, [this]() {
-        Q_D(ResponseStreamReply);
-        // These streams name their event type inside the payload, so only the
-        // framed data is of interest here.
-        const QList<detail::SseEvent> events = d->parser.feed(d->networkReply->readAll());
-        for (const detail::SseEvent &sse : events) {
-            const QByteArray &data = sse.data;
-            if (data == "[DONE]")
-                continue;
-            const QJsonDocument doc = QJsonDocument::fromJson(data);
-            if (!doc.isObject())
-                continue;
-            const QJsonObject object = doc.object();
-            const QString type = object.value(QStringLiteral("type")).toString();
+    const QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isObject())
+        return;
+    const QJsonObject object = doc.object();
+    const QString type = object.value(QStringLiteral("type")).toString();
 
-            Q_EMIT event(type, object);
+    Q_EMIT event(type, object);
 
-            if (type == QLatin1String("response.output_text.delta")) {
-                Q_EMIT outputTextDelta(object.value(QStringLiteral("delta")).toString());
-            } else if (type == QLatin1String("response.function_call_arguments.delta")) {
-                Q_EMIT functionCallArgumentsDelta(object.value(QStringLiteral("delta")).toString());
-            } else if (type == QLatin1String("response.completed")) {
-                d->response = Core::Response::fromJson(
-                        object.value(QStringLiteral("response")).toObject());
-                d->sawCompleted = true;
-            } else if (type == QLatin1String("response.failed") || type == QLatin1String("error")) {
-                // The error may sit at the event root or inside a response object.
-                QJsonObject errorObject = object.value(QStringLiteral("error")).toObject();
-                if (errorObject.isEmpty()) {
-                    const QJsonObject response
-                            = object.value(QStringLiteral("response")).toObject();
-                    errorObject = response.value(QStringLiteral("error")).toObject();
-                }
-                const QString message = errorObject.value(QStringLiteral("message")).toString(type);
-                d->error = ClientError(ClientError::Kind::Http, message);
-                d->error.setType(errorObject.value(QStringLiteral("type")).toString());
-                d->error.setCode(errorObject.value(QStringLiteral("code")).toString());
-            }
+    if (type == QLatin1String("response.output_text.delta")) {
+        Q_EMIT outputTextDelta(object.value(QStringLiteral("delta")).toString());
+    } else if (type == QLatin1String("response.function_call_arguments.delta")) {
+        Q_EMIT functionCallArgumentsDelta(object.value(QStringLiteral("delta")).toString());
+    } else if (type == QLatin1String("response.completed")) {
+        d->response = Core::Response::fromJson(object.value(QStringLiteral("response")).toObject());
+        d->sawCompleted = true;
+    } else if (type == QLatin1String("response.failed") || type == QLatin1String("error")) {
+        // The error may sit at the event root or inside a response object.
+        QJsonObject errorObject = object.value(QStringLiteral("error")).toObject();
+        if (errorObject.isEmpty()) {
+            const QJsonObject response = object.value(QStringLiteral("response")).toObject();
+            errorObject = response.value(QStringLiteral("error")).toObject();
         }
-    });
-
-    connect(reply, &QNetworkReply::finished, this, [this]() {
-        Q_D(ResponseStreamReply);
-        d->finished = true;
-        QNetworkReply *reply = d->networkReply;
-        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        d->rateLimit = detail::parseRateLimit(reply);
-
-        if (reply->error() != QNetworkReply::NoError || status >= 400) {
-            QString message = reply->errorString();
-            ClientError err(status >= 400 ? ClientError::Kind::Http : ClientError::Kind::Network,
-                            message, status);
-            const QByteArray body = d->parser.buffered() + reply->readAll();
-            const QJsonDocument doc = QJsonDocument::fromJson(body);
-            if (doc.isObject()) {
-                const QJsonObject errorObject
-                        = doc.object().value(QStringLiteral("error")).toObject();
-                if (!errorObject.isEmpty()) {
-                    message = errorObject.value(QStringLiteral("message")).toString(message);
-                    err = ClientError(ClientError::Kind::Http, message, status);
-                    err.setType(errorObject.value(QStringLiteral("type")).toString());
-                    err.setCode(errorObject.value(QStringLiteral("code")).toString());
-                }
-            }
-            d->success = false;
-            d->error = err;
-            Q_EMIT failed(d->error);
-        } else if (d->sawCompleted) {
-            d->success = true;
-            Q_EMIT finished(d->response);
-        } else {
-            d->success = false;
-            if (!d->error.isError())
-                d->error = ClientError(ClientError::Kind::Parse,
-                                       QStringLiteral("stream ended before response.completed"),
-                                       status);
-            Q_EMIT failed(d->error);
-        }
-
-        Q_EMIT done();
-        if (d->autoDelete)
-            deleteLater();
-    });
+        const QString message = errorObject.value(QStringLiteral("message")).toString(type);
+        ClientError error(ClientError::Kind::Http, message);
+        error.setType(errorObject.value(QStringLiteral("type")).toString());
+        error.setCode(errorObject.value(QStringLiteral("code")).toString());
+        setError(error);
+    }
 }
 
-ResponseStreamReply::~ResponseStreamReply() = default;
-
-bool ResponseStreamReply::isFinished() const
+bool ResponseStreamReply::dispatchFinished(int httpStatus)
 {
-    Q_D(const ResponseStreamReply);
-    return d->finished;
-}
-
-bool ResponseStreamReply::isSuccess() const
-{
-    Q_D(const ResponseStreamReply);
-    return d->success;
+    Q_D(ResponseStreamReply);
+    if (d->sawCompleted) {
+        Q_EMIT finished(d->response);
+        return true;
+    }
+    // A stream that stopped short is not a response, however clean the
+    // transport was. An error the stream reported in-band says more about why
+    // than anything that can be said here, so it stands.
+    if (!d->error.isError()) {
+        setError(ClientError(ClientError::Kind::Parse,
+                             QStringLiteral("stream ended before response.completed"), httpStatus));
+    }
+    return false;
 }
 
 Core::Response ResponseStreamReply::response() const
 {
     Q_D(const ResponseStreamReply);
     return d->response;
-}
-
-ClientError ResponseStreamReply::error() const
-{
-    Q_D(const ResponseStreamReply);
-    return d->error;
-}
-
-RateLimit ResponseStreamReply::rateLimit() const
-{
-    Q_D(const ResponseStreamReply);
-    return d->rateLimit;
-}
-
-void ResponseStreamReply::setAutoDelete(bool enabled)
-{
-    Q_D(ResponseStreamReply);
-    d->autoDelete = enabled;
-}
-
-bool ResponseStreamReply::autoDelete() const
-{
-    Q_D(const ResponseStreamReply);
-    return d->autoDelete;
-}
-
-void ResponseStreamReply::abort()
-{
-    Q_D(ResponseStreamReply);
-    if (d->networkReply && d->networkReply->isRunning())
-        d->networkReply->abort();
 }
 
 } // namespace Client

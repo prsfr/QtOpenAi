@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-// Internal (private) HTTP helpers shared by the reply implementations:
-// parsing of rate-limit and Retry-After headers. Not installed.
+// Internal (private) HTTP helpers shared by the reply implementations: parsing
+// of rate-limit and Retry-After headers, and of an error response body. Not
+// installed.
 
+#include "QtOpenAi/Client/ClientError.h"
 #include "QtOpenAi/Client/RetryPolicy.h"
 
 #include <QtCore/QByteArray>
 #include <QtCore/QDateTime>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
 #include <QtCore/QRandomGenerator>
+#include <QtCore/QString>
 #include <QtNetwork/QNetworkReply>
 
 namespace QtOpenAi {
@@ -106,6 +111,41 @@ inline RateLimit parseRateLimit(QNetworkReply *reply)
     if (reply->hasRawHeader("Retry-After"))
         info.retryAfterMs = retryAfterToMs(reply->rawHeader("Retry-After"));
     return info;
+}
+
+// The error a failed exchange reports.
+//
+// OpenAI answers a failure with a JSON body carrying an `error` object, and
+// when there is one its message, type and code are what a caller wants. When
+// there is not -- a proxy's HTML, a truncated body, a transport failure that
+// never reached the API at all -- the network layer's own description is all
+// there is to go on, so it stands.
+//
+// `transportMessage` is QNetworkReply::errorString(); `status` the HTTP status,
+// 0 when no response arrived. A status below 400 with an error here means the
+// transport failed rather than the API, which is the Network/Http distinction.
+inline ClientError errorFromBody(const QByteArray &body, const QString &transportMessage,
+                                 int status)
+{
+    ClientError error(status >= 400 ? ClientError::Kind::Http : ClientError::Kind::Network,
+                      transportMessage, status);
+
+    const QJsonDocument document = QJsonDocument::fromJson(body);
+    if (!document.isObject())
+        return error;
+    const QJsonObject errorObject = document.object().value(QStringLiteral("error")).toObject();
+    if (errorObject.isEmpty())
+        return error;
+
+    // An `error` object is the API speaking for itself, so it replaces the
+    // transport's account of what went wrong rather than adding to it -- and it
+    // makes this an HTTP error whatever the status looked like.
+    error = ClientError(ClientError::Kind::Http,
+                        errorObject.value(QStringLiteral("message")).toString(transportMessage),
+                        status);
+    error.setType(errorObject.value(QStringLiteral("type")).toString());
+    error.setCode(errorObject.value(QStringLiteral("code")).toString());
+    return error;
 }
 
 // Compute the delay before the next retry, honouring Retry-After and jitter.

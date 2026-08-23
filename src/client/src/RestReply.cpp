@@ -96,21 +96,8 @@ void RestReply::start()
             return;
         }
         if (httpError) {
-            const QJsonDocument doc = QJsonDocument::fromJson(body);
-            QString message = reply->errorString();
-            ClientError err(ClientError::Kind::Http, message, status);
-            if (doc.isObject()) {
-                const QJsonObject errorObject
-                        = doc.object().value(QStringLiteral("error")).toObject();
-                if (!errorObject.isEmpty()) {
-                    message = errorObject.value(QStringLiteral("message")).toString(message);
-                    err = ClientError(ClientError::Kind::Http, message, status);
-                    err.setType(errorObject.value(QStringLiteral("type")).toString());
-                    err.setCode(errorObject.value(QStringLiteral("code")).toString());
-                }
-            }
             Q_EMIT settled(body, status);
-            Q_EMIT failed(err);
+            Q_EMIT failed(detail::errorFromBody(body, reply->errorString(), status));
             return;
         }
 

@@ -19,6 +19,7 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/ToolRegistry.h
     include/QtOpenAi/Client/RetryPolicy.h
     include/QtOpenAi/Client/RestReplyBase.h
+    include/QtOpenAi/Client/StreamReplyBase.h
     include/QtOpenAi/Client/TypedReply.h
     include/QtOpenAi/Client/BinaryReply.h
     include/QtOpenAi/Client/ChatCompletionReply.h
@@ -135,6 +136,8 @@ add_library(QtOpenAiClient
     src/RetryPolicy.cpp
     src/RestReply.cpp
     src/RestReplyBase.cpp
+    src/StreamReplyBase.cpp
+    src/StreamReplyBase_p.h
     src/PageWalker.cpp
     src/BinaryReply.cpp
     src/ChatCompletionAccumulator.cpp

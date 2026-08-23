@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/ClientError.h>
 #include <QtOpenAi/Client/GlobalClient.h>
-#include <QtOpenAi/Client/RetryPolicy.h>
+#include <QtOpenAi/Client/StreamReplyBase.h>
 #include <QtOpenAi/Core/Run.h>
 #include <QtOpenAi/Core/ThreadMessage.h>
 
 #include <QtCore/QJsonObject>
-#include <QtCore/QObject>
 
 class QNetworkReply;
 
@@ -33,25 +31,12 @@ class RunStreamReplyPrivate;
 // one). An HTTP error, or a stream that stops before any terminal state, emits
 // failed(). Both precede done(), after which the object deletes itself unless
 // disabled.
-class QTOPENAI_CLIENT_EXPORT RunStreamReply : public QObject
+class QTOPENAI_CLIENT_EXPORT RunStreamReply : public StreamReplyBase
 {
     Q_OBJECT
 public:
-    ~RunStreamReply() override;
-
-    bool isFinished() const;
-    bool isSuccess() const;
-
     // The last run state seen (default-constructed until the first event).
     Core::Run run() const;
-    ClientError error() const;
-
-    RateLimit rateLimit() const;
-
-    void setAutoDelete(bool enabled);
-    bool autoDelete() const;
-
-    void abort();
 
 Q_SIGNALS:
     // Every streamed event, keyed by the payload's `object` (e.g. "thread.run",
@@ -66,15 +51,16 @@ Q_SIGNALS:
     // The run is waiting for the outputs of its requiredToolCalls().
     void requiresAction(const QtOpenAi::Core::Run &run);
     void finished(const QtOpenAi::Core::Run &run);
-    void failed(const QtOpenAi::Client::ClientError &error);
-    void done();
 
 private:
     friend class Client;
     explicit RunStreamReply(QNetworkReply *reply, QObject *parent = nullptr);
 
+    // See StreamReplyBase for what these are called with and when.
+    void handleEvent(const QByteArray &name, const QByteArray &data) override;
+    bool dispatchFinished(int httpStatus) override;
+
     Q_DECLARE_PRIVATE(RunStreamReply)
-    QScopedPointer<RunStreamReplyPrivate> d_ptr;
 };
 
 } // namespace Client

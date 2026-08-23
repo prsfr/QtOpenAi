@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <QtOpenAi/Client/ClientError.h>
 #include <QtOpenAi/Client/GlobalClient.h>
-#include <QtOpenAi/Client/RetryPolicy.h>
+#include <QtOpenAi/Client/StreamReplyBase.h>
 #include <QtOpenAi/Core/Response.h>
 
 #include <QtCore/QJsonObject>
-#include <QtCore/QObject>
 
 class QNetworkReply;
 
@@ -25,26 +23,13 @@ class ResponseStreamReplyPrivate;
 // event arrives it emits finished() with the full Response; a `response.failed` /
 // error event or an HTTP error emits failed(). Both precede done(). The object
 // deletes itself after done() unless disabled.
-class QTOPENAI_CLIENT_EXPORT ResponseStreamReply : public QObject
+class QTOPENAI_CLIENT_EXPORT ResponseStreamReply : public StreamReplyBase
 {
     Q_OBJECT
 public:
-    ~ResponseStreamReply() override;
-
-    bool isFinished() const;
-    bool isSuccess() const;
-
     // The final Response from the `response.completed` event (default-constructed
     // until then).
     Core::Response response() const;
-    ClientError error() const;
-
-    RateLimit rateLimit() const;
-
-    void setAutoDelete(bool enabled);
-    bool autoDelete() const;
-
-    void abort();
 
 Q_SIGNALS:
     // Every streamed event, with its `type` and raw JSON payload.
@@ -54,15 +39,16 @@ Q_SIGNALS:
     // Incremental function-call arguments (`response.function_call_arguments.delta`).
     void functionCallArgumentsDelta(const QString &delta);
     void finished(const QtOpenAi::Core::Response &response);
-    void failed(const QtOpenAi::Client::ClientError &error);
-    void done();
 
 private:
     friend class Client;
     explicit ResponseStreamReply(QNetworkReply *reply, QObject *parent = nullptr);
 
+    // See StreamReplyBase for what these are called with and when.
+    void handleEvent(const QByteArray &name, const QByteArray &data) override;
+    bool dispatchFinished(int httpStatus) override;
+
     Q_DECLARE_PRIVATE(ResponseStreamReply)
-    QScopedPointer<ResponseStreamReplyPrivate> d_ptr;
 };
 
 } // namespace Client
