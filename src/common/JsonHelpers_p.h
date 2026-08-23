@@ -130,7 +130,8 @@ inline QByteArray compactJson(const QJsonArray &json)
 
 // The same payload as text, for the places that hand JSON to something that
 // wants a string rather than bytes: a tool result the model reads, a database
-// column, a WebSocket text frame. Five more modules spelled this exact
+// column, a WebSocket text frame. Six modules -- Chat, Client, Core, Realtime,
+// Sql and Tools -- spelled this exact
 // QString::fromUtf8(QJsonDocument(...).toJson(Compact)) out for themselves.
 inline QString compactJsonText(const QJsonObject &json)
 {
