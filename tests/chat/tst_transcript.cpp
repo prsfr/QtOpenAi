@@ -30,6 +30,7 @@ private slots:
     void switchingTheActiveLeafChangesTheContext();
     void reportsTheTreeAroundANode();
     void rejectsOperationsOnNodesItDoesNotHave();
+    void aDanglingParentEndsTheWalkWhereItAlwaysDid();
     void roundTripsThroughJson();
     void buildsARequestFromTheActivePath();
 };
@@ -132,6 +133,38 @@ void TestTranscript::rejectsOperationsOnNodesItDoesNotHave()
     QVERIFY(transcript.siblings(ghost).isEmpty());
     // The failed calls left the transcript as it was.
     QCOMPARE(transcript.count(), 1);
+}
+
+void TestTranscript::aDanglingParentEndsTheWalkWhereItAlwaysDid()
+{
+    // fromJson() keeps a node's parent id even when no such node was written,
+    // treating it as a root. The active path then runs off the end of the tree,
+    // and messages() has always answered with an empty message where the
+    // missing node would have been. activePath() and messages() are now one
+    // walk rather than two, so this pins that they still agree, and still
+    // agree with what reading a missing node used to give.
+    const QJsonObject json {
+            {QStringLiteral("nodes"),
+             QJsonArray {QJsonObject {{QStringLiteral("id"), 1},
+                                      {QStringLiteral("parent"), 99}, // never written
+                                      {QStringLiteral("message"),
+                                       Message::user(QStringLiteral("orphan")).toJson()}}}},
+            {QStringLiteral("active_leaf"), 1}};
+
+    const Transcript transcript = Transcript::fromJson(json);
+    QCOMPARE(transcript.activeLeaf(), 1);
+    QVERIFY(!transcript.contains(99));
+
+    // Root-first, the missing id included -- the path is what it was.
+    QCOMPARE(transcript.activePath(), QList<Transcript::NodeId>({99, 1}));
+    QCOMPARE(transcript.parent(1), 99);
+    QCOMPARE(transcript.parent(99), Transcript::InvalidNode);
+
+    // One message per id on the path, in the same order, the missing one empty.
+    const QList<Message> messages = transcript.messages();
+    QCOMPARE(messages.size(), transcript.activePath().size());
+    QVERIFY(messages.first().content().isEmpty());
+    QCOMPARE(messages.last().content(), QStringLiteral("orphan"));
 }
 
 void TestTranscript::roundTripsThroughJson()
