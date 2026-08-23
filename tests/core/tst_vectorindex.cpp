@@ -14,6 +14,8 @@ private slots:
     void mismatchedLengthsAreNotComparable();
     void rankingIsCorrectForKnownVectors();
     void topKAndTheScoreFloor();
+    void equalScoresKeepInsertionOrder();
+    void aReplacedVectorIsRankedByItsNewLength();
     void everyMetricRanksBestFirst();
     void entriesCanBeReplacedAndRemoved();
     void aMixedDimensionIsRefused();
@@ -114,6 +116,52 @@ void TestVectorIndex::topKAndTheScoreFloor()
     // undefined.
     QVERIFY(VectorIndex().search({1.0, 0.0}, 5).isEmpty());
     QVERIFY(index.search({}, 5).isEmpty());
+}
+
+void TestVectorIndex::equalScoresKeepInsertionOrder()
+{
+    // A ranking that reshuffles equal scores between runs is a ranking nobody
+    // can test. Only the k best are put in order now, so the tie-break has to
+    // be part of the comparison rather than a property of sorting everything.
+    VectorIndex index;
+    for (int i = 0; i < 12; ++i) {
+        // Same direction, different lengths: cosine scores every one of them
+        // exactly 1, so nothing but insertion order can separate them.
+        index.add(QStringLiteral("tie%1").arg(i), {double(i + 1), 0.0});
+    }
+    index.add(QStringLiteral("other"), {0.0, 1.0});
+
+    for (const int k : {1, 3, 12, 13, 99}) {
+        const QList<VectorMatch> hits = index.search({1.0, 0.0}, k);
+        const int tied = qMin(k, 12);
+        QCOMPARE(hits.size(), qMin(k, 13));
+        for (int i = 0; i < tied; ++i) {
+            QCOMPARE(hits.at(i).id, QStringLiteral("tie%1").arg(i));
+            QCOMPARE(hits.at(i).score, 1.0);
+        }
+    }
+}
+
+void TestVectorIndex::aReplacedVectorIsRankedByItsNewLength()
+{
+    // Each entry's length is measured when it goes in rather than on every
+    // query, so replacing an entry has to measure it again -- a stale length
+    // would score the new vector as if it were still the old one.
+    VectorIndex index;
+    index.add(QStringLiteral("a"), {3.0, 4.0}); // length 5, points up-right
+    index.add(QStringLiteral("b"), {0.0, 1.0});
+
+    QVERIFY(index.add(QStringLiteral("a"), {100.0, 0.0})); // length 100, points right
+    const QList<VectorMatch> hits = index.search({1.0, 0.0}, 2);
+    QCOMPARE(hits.at(0).id, QStringLiteral("a"));
+    // Cosine ignores magnitude, so a vector straight along the query is 1 --
+    // which it is only if the length used is the new one.
+    QCOMPARE(hits.at(0).score, 1.0);
+
+    // The same holds for an index rebuilt from JSON, which goes in through the
+    // same door.
+    const VectorIndex reloaded = VectorIndex::fromJson(index.toJson());
+    QCOMPARE(reloaded.search({1.0, 0.0}, 1).at(0).score, 1.0);
 }
 
 void TestVectorIndex::everyMetricRanksBestFirst()

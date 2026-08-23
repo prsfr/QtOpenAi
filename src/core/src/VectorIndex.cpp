@@ -65,6 +65,9 @@ struct Entry
     QList<double> vector;
     QString text;
     QJsonObject payload;
+    // Cached at insertion. A cosine search needs it for every entry on every
+    // query, and it cannot change without the vector changing.
+    double norm = 0.0;
 };
 
 } // namespace
@@ -103,7 +106,7 @@ bool VectorIndex::add(const QString &id, const QList<double> &vector, const QStr
 
     if (!d->entries.contains(id))
         d->order.append(id);
-    d->entries.insert(id, Entry {vector, text, payload});
+    d->entries.insert(id, Entry {vector, text, payload, Vector::norm(vector)});
     d->dimension = int(vector.size());
     return true;
 }
@@ -146,15 +149,45 @@ QList<VectorMatch> VectorIndex::search(const QList<double> &query, int k, double
     if (query.isEmpty() || k <= 0 || d->entries.isEmpty())
         return matches;
 
-    matches.reserve(d->order.size());
-    for (const QString &id : d->order) {
-        const Entry &entry = d->entries.value(id);
+    // The query's own length is the same for every entry it is compared with,
+    // so it is measured once here rather than inside cosineSimilarity() once
+    // per entry. With the entries' lengths cached at insertion, a cosine search
+    // is left with the one dot product it genuinely has to compute per entry,
+    // where it was doing three.
+    const double queryNorm = d->metric == Metric::Cosine ? Vector::norm(query) : 0.0;
+
+    // Scored candidates as a score and a position, so that ranking sorts two
+    // numbers instead of shuffling ids, texts and payloads along with them --
+    // and so that ties can be broken by position, which is what keeps entries
+    // that score equally in insertion order.
+    struct Candidate
+    {
+        double score;
+        qsizetype position;
+    };
+    QList<Candidate> candidates;
+    candidates.reserve(d->order.size());
+
+    for (qsizetype position = 0; position < d->order.size(); ++position) {
+        // constFind rather than value(): the latter returns by value, so
+        // binding it to a reference still built and destroyed a whole Entry --
+        // three implicit-sharing round-trips -- for every entry of every query.
+        const auto it = d->entries.constFind(d->order.at(position));
+        if (it == d->entries.constEnd())
+            continue;
+        const Entry &entry = it.value();
 
         double score = 0.0;
         switch (d->metric) {
-        case Metric::Cosine:
-            score = Vector::cosineSimilarity(query, entry.vector);
+        case Metric::Cosine: {
+            // The same expression cosineSimilarity() evaluates, with both
+            // lengths already known. A zero vector has no direction, so it is
+            // not similar to anything -- an honest 0 rather than a division by
+            // zero.
+            const double denominator = queryNorm * entry.norm;
+            score = denominator > 0.0 ? Vector::dot(query, entry.vector) / denominator : 0.0;
             break;
+        }
         case Metric::DotProduct:
             score = Vector::dot(query, entry.vector);
             break;
@@ -167,15 +200,25 @@ QList<VectorMatch> VectorIndex::search(const QList<double> &query, int k, double
 
         if (score < minScore)
             continue;
-        matches.append(VectorMatch {id, score, entry.text, entry.payload});
+        candidates.append(Candidate {score, position});
     }
 
-    // Stable, so entries that score equally come back in insertion order rather
-    // than in whatever order the sort happened to leave them.
-    std::stable_sort(matches.begin(), matches.end(),
-                     [](const VectorMatch &a, const VectorMatch &b) { return a.score > b.score; });
-    if (matches.size() > k)
-        matches.resize(k);
+    // Only the k best have to be in order, and k is a handful where the corpus
+    // is not.
+    const qsizetype wanted = qMin(qsizetype(k), candidates.size());
+    std::partial_sort(candidates.begin(), candidates.begin() + wanted, candidates.end(),
+                      [](const Candidate &a, const Candidate &b) {
+                          if (a.score != b.score)
+                              return a.score > b.score;
+                          return a.position < b.position;
+                      });
+
+    matches.reserve(wanted);
+    for (qsizetype i = 0; i < wanted; ++i) {
+        const QString &id = d->order.at(candidates.at(i).position);
+        const Entry &entry = d->entries.constFind(id).value();
+        matches.append(VectorMatch {id, candidates.at(i).score, entry.text, entry.payload});
+    }
     return matches;
 }
 
@@ -183,7 +226,7 @@ QJsonObject VectorIndex::toJson() const
 {
     QJsonArray entries;
     for (const QString &id : d->order) {
-        const Entry &entry = d->entries.value(id);
+        const Entry &entry = d->entries.constFind(id).value();
         QJsonArray vector;
         for (double value : entry.vector)
             vector.append(value);
@@ -236,10 +279,12 @@ bool VectorIndex::operator==(const VectorIndex &other) const
     if (d->metric != other.d->metric || d->order != other.d->order)
         return false;
     for (const QString &id : d->order) {
-        const Entry &mine = d->entries.value(id);
-        const Entry &theirs = other.d->entries.value(id);
-        if (mine.vector != theirs.vector || mine.text != theirs.text
-            || mine.payload != theirs.payload)
+        const auto theirs = other.d->entries.constFind(id);
+        if (theirs == other.d->entries.constEnd())
+            return false;
+        const Entry &mine = d->entries.constFind(id).value();
+        if (mine.vector != theirs->vector || mine.text != theirs->text
+            || mine.payload != theirs->payload)
             return false;
     }
     return true;
