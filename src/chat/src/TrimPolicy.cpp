@@ -85,16 +85,39 @@ QList<Core::Message> TrimPolicy::apply(const QList<Core::Message> &messages) con
 
     const int tokenBudget = d->maxTokens > 0 ? d->maxTokens - d->reservedForReply : 0;
 
+    // Every message is weighed once, here, and only when a token budget is what
+    // is being weighed against. The search below then adds turns to a running
+    // total. Asking the counter for the whole candidate window on each step
+    // instead -- which is what this did -- re-tokenised every message the
+    // windows have in common, so a window of k turns cost O(k^2) tokenisations
+    // of a transcript that Agent runs this over on every single turn.
+    //
+    // The decomposition is exact: count(list) is the sum of countEach(list)
+    // plus requestOverhead() for any list with something in it, and every
+    // window here has the newest turn in it at least.
+    QList<int> turnCosts;
+    int fixedCost = 0;
+    if (tokenBudget > 0) {
+        turnCosts = d->counter.countEach(turns);
+        // The pinned messages are in every window, so they are counted once and
+        // never revisited.
+        for (const int cost : d->counter.countEach(pinned))
+            fixedCost += cost;
+        fixedCost += Core::TokenCounter::requestOverhead();
+    }
+
     // How many of the newest turns fit. Counting from the newest backwards
     // answers that directly, where counting forwards would only say when the
     // budget ran out.
     int keptFrom = turns.size();
+    int turnCost = 0; // the turns from `i` onwards, in tokens
     for (int i = turns.size() - 1; i >= 0; --i) {
         const int count = turns.size() - i;
         if (d->maxMessages > 0 && count + pinned.size() > d->maxMessages)
             break;
+        turnCost += turnCosts.value(i); // 0 when there is no token budget
         if (tokenBudget > 0
-            && d->counter.count(pinned + turns.mid(i)) > tokenBudget
+            && fixedCost + turnCost > tokenBudget
             // The newest turn goes in whether it fits or not: being told it is
             // too long is more useful than sending nothing.
             && i != turns.size() - 1)

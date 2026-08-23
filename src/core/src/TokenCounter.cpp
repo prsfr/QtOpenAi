@@ -111,10 +111,14 @@ EncodingPtr lookup(const QString &name)
 // Merge the bytes of one piece into tokens, always taking the lowest-ranked
 // adjacent pair first -- the order that reproduces the vocabulary's own
 // construction, and so the server's count.
-void bytePairEncode(const QByteArray &piece, const Encoding &encoding, QList<int> *tokens)
+//
+// Returns how many tokens the piece cost. `tokens` collects their ranks when a
+// caller wants them and may be null: counting is by far the commoner request,
+// and it has no use for the ranks themselves.
+int bytePairEncode(const QByteArray &piece, const Encoding &encoding, QList<int> *tokens)
 {
     if (piece.isEmpty())
-        return;
+        return 0;
 
     const auto rankOf = [&](int start, int end) {
         return encoding.ranks.value(QByteArray::fromRawData(piece.constData() + start, end - start),
@@ -124,8 +128,9 @@ void bytePairEncode(const QByteArray &piece, const Encoding &encoding, QList<int
     // A piece that is a token already needs no merging at all, which is the
     // common case for ordinary words.
     if (const int whole = rankOf(0, piece.size()); whole >= 0) {
-        tokens->append(whole);
-        return;
+        if (tokens)
+            tokens->append(whole);
+        return 1;
     }
 
     // Boundaries between the tokens found so far; every byte starts as its own.
@@ -134,11 +139,23 @@ void bytePairEncode(const QByteArray &piece, const Encoding &encoding, QList<int
     for (int i = 0; i <= piece.size(); ++i)
         boundaries.append(i);
 
+    // The rank of merging the token at boundaries[i] with the one after it,
+    // kept alongside the boundaries themselves. A merge changes the score of at
+    // most two pairs, so scoring every pair again on every pass -- which is
+    // what this list replaces -- was asking the vocabulary O(n^2) questions to
+    // learn something that changes O(1) times per merge.
+    const auto pairRankAt = [&](int i) {
+        return i + 2 < boundaries.size() ? rankOf(boundaries.at(i), boundaries.at(i + 2)) : -1;
+    };
+    QList<int> pairRank(boundaries.size(), -1);
+    for (int i = 0; i + 2 < boundaries.size(); ++i)
+        pairRank[i] = pairRankAt(i);
+
     while (boundaries.size() > 2) {
         int bestIndex = -1;
         int bestRank = -1;
         for (int i = 0; i + 2 < boundaries.size(); ++i) {
-            const int rank = rankOf(boundaries.at(i), boundaries.at(i + 2));
+            const int rank = pairRank.at(i);
             if (rank >= 0 && (bestRank < 0 || rank < bestRank)) {
                 bestRank = rank;
                 bestIndex = i;
@@ -146,14 +163,26 @@ void bytePairEncode(const QByteArray &piece, const Encoding &encoding, QList<int
         }
         if (bestIndex < 0)
             break;
+
         boundaries.removeAt(bestIndex + 1);
+        pairRank.removeAt(bestIndex + 1);
+
+        // The merged token has a new right-hand neighbour, and it is itself the
+        // new right-hand side of the pair before it. Every other pair spans the
+        // same bytes it did and scores the same.
+        pairRank[bestIndex] = pairRankAt(bestIndex);
+        if (bestIndex > 0)
+            pairRank[bestIndex - 1] = pairRankAt(bestIndex - 1);
     }
 
-    for (int i = 0; i + 1 < boundaries.size(); ++i) {
-        // A byte outside the vocabulary still costs a token; -1 marks it as one
-        // this vocabulary cannot name.
-        tokens->append(rankOf(boundaries.at(i), boundaries.at(i + 1)));
+    if (tokens) {
+        for (int i = 0; i + 1 < boundaries.size(); ++i) {
+            // A byte outside the vocabulary still costs a token; -1 marks it as
+            // one this vocabulary cannot name.
+            tokens->append(rankOf(boundaries.at(i), boundaries.at(i + 1)));
+        }
     }
+    return int(boundaries.size()) - 1;
 }
 
 int heuristicCount(const QString &text)
@@ -161,6 +190,46 @@ int heuristicCount(const QString &text)
     if (text.isEmpty())
         return 0;
     return qMax(1, (int(text.size()) + kCharactersPerToken - 1) / kCharactersPerToken);
+}
+
+// Split `text` with the encoding's pre-tokenizer and merge each piece. Returns
+// the token count; `tokens` collects the ranks when a caller wants them.
+int encodeWith(const Encoding &encoding, const QString &text, QList<int> *tokens)
+{
+    int total = 0;
+    QRegularExpressionMatchIterator pieces = encoding.pattern.globalMatch(text);
+    while (pieces.hasNext())
+        total += bytePairEncode(pieces.next().captured().toUtf8(), encoding, tokens);
+    return total;
+}
+
+// What one string costs against a vocabulary already resolved -- exactly when
+// there is one, and by the four-characters-to-the-token estimate when there is
+// not. Taking the vocabulary as an argument is what lets a caller counting many
+// strings look it up once; see TokenCounter::count(const QList<Message> &).
+int countWith(const Encoding *encoding, const QString &text)
+{
+    return encoding ? encodeWith(*encoding, text, nullptr) : heuristicCount(text);
+}
+
+// What one message contributes to a request, framing included but the
+// once-per-request reply priming excluded -- that belongs to the conversation,
+// not to any message in it.
+int countMessageWith(const Encoding *encoding, const Message &message)
+{
+    int total = kTokensPerMessage;
+    total += countWith(encoding, roleToString(message.role()));
+    total += countWith(encoding, message.content());
+    if (!message.name().isEmpty())
+        total += kTokensPerName + countWith(encoding, message.name());
+    if (!message.refusal().isEmpty())
+        total += countWith(encoding, message.refusal());
+    // A tool call is billed for the JSON that carries it.
+    for (const ToolCall &call : message.toolCalls()) {
+        total += countWith(encoding, call.function().name());
+        total += countWith(encoding, call.function().arguments());
+    }
+    return total;
 }
 
 } // namespace
@@ -264,38 +333,47 @@ QList<int> TokenCounter::encode(const QString &text) const
         return {};
 
     QList<int> tokens;
-    QRegularExpressionMatchIterator pieces = encoding->pattern.globalMatch(text);
-    while (pieces.hasNext())
-        bytePairEncode(pieces.next().captured().toUtf8(), *encoding, &tokens);
+    encodeWith(*encoding, text, &tokens);
     return tokens;
 }
 
 int TokenCounter::count(const QString &text) const
 {
-    if (!isExact())
-        return heuristicCount(text);
-    return int(encode(text).size());
+    // One resolution, not two: going through isExact() and then encode() took
+    // the registry's mutex twice to answer one question.
+    const EncodingPtr encoding = d->vocabulary();
+    return countWith(encoding.get(), text);
 }
 
 int TokenCounter::count(const QList<Message> &messages) const
 {
+    if (messages.isEmpty())
+        return 0;
+
+    // Resolved once for the whole conversation. The registry is shared between
+    // threads and so guarded by a mutex; asking it again for every field of
+    // every message made counting a long transcript take that mutex a thousand
+    // times to learn the same answer.
+    const EncodingPtr vocabulary = d->vocabulary();
+
     int total = 0;
-    for (const Message &message : messages) {
-        total += kTokensPerMessage;
-        total += count(roleToString(message.role()));
-        total += count(message.content());
-        if (!message.name().isEmpty())
-            total += kTokensPerName + count(message.name());
-        if (!message.refusal().isEmpty())
-            total += count(message.refusal());
-        // A tool call is billed for the JSON that carries it.
-        for (const ToolCall &call : message.toolCalls()) {
-            total += count(call.function().name());
-            total += count(call.function().arguments());
-        }
-    }
-    return messages.isEmpty() ? 0 : total + kTokensForReplyPriming;
+    for (const Message &message : messages)
+        total += countMessageWith(vocabulary.get(), message);
+    return total + kTokensForReplyPriming;
 }
+
+QList<int> TokenCounter::countEach(const QList<Message> &messages) const
+{
+    const EncodingPtr vocabulary = d->vocabulary();
+
+    QList<int> costs;
+    costs.reserve(messages.size());
+    for (const Message &message : messages)
+        costs.append(countMessageWith(vocabulary.get(), message));
+    return costs;
+}
+
+int TokenCounter::requestOverhead() { return kTokensForReplyPriming; }
 
 } // namespace Core
 } // namespace QtOpenAi
