@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/VideoSourceRequest.h"
 
+#include "FormFields_p.h"
 #include "JsonHelpers_p.h"
 
 #include <QtCore/QSharedData>
@@ -70,11 +71,10 @@ void VideoSourceRequest::setExtraBody(const QJsonObject &extra) { d->extraBody =
 
 QList<VideoSourceRequest::FormField> VideoSourceRequest::formFields(bool withSeconds) const
 {
-    QList<FormField> fields;
-    if (!d->prompt.isEmpty())
-        fields.append({QStringLiteral("prompt"), d->prompt});
-    if (withSeconds && !d->seconds.isEmpty())
-        fields.append({QStringLiteral("seconds"), d->seconds});
+    detail::FormFields fields;
+    detail::appendIfNotEmpty(fields, QStringLiteral("prompt"), d->prompt);
+    if (withSeconds)
+        detail::appendIfNotEmpty(fields, QStringLiteral("seconds"), d->seconds);
     // The video itself is the file part and is added by the Client; a source
     // named by id has no place in a multipart body, since naming one is
     // precisely the case that does not need an upload.

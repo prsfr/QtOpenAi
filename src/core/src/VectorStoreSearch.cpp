@@ -118,15 +118,12 @@ void VectorStoreSearchRequest::setRankingOptions(const QJsonObject &rankingOptio
 QJsonObject VectorStoreSearchRequest::toJson() const
 {
     QJsonObject json;
-    // A single query goes out as a plain string, several as an array.
-    if (d->query.size() == 1) {
+    // A single query goes out as a plain string, several as an array -- and
+    // none as no field at all, which is what insertIfNotEmpty() leaves out.
+    if (d->query.size() == 1)
         json.insert(QStringLiteral("query"), d->query.first());
-    } else if (!d->query.isEmpty()) {
-        QJsonArray query;
-        for (const QString &term : d->query)
-            query.append(term);
-        json.insert(QStringLiteral("query"), query);
-    }
+    else
+        detail::insertIfNotEmpty(json, QStringLiteral("query"), d->query);
     if (d->maxNumResults)
         json.insert(QStringLiteral("max_num_results"), *d->maxNumResults);
     if (d->rewriteQuery)
@@ -230,10 +227,7 @@ QJsonObject VectorStoreSearchPage::toJson() const
 {
     QJsonObject json;
     json.insert(QStringLiteral("object"), QStringLiteral("vector_store.search_results.page"));
-    QJsonArray query;
-    for (const QString &term : searchQuery)
-        query.append(term);
-    json.insert(QStringLiteral("search_query"), query);
+    json.insert(QStringLiteral("search_query"), QJsonArray::fromStringList(searchQuery));
     QJsonArray results;
     for (const VectorStoreSearchResult &result : data)
         results.append(result.toJson());

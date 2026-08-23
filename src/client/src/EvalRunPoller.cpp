@@ -39,17 +39,9 @@ Core::EvalRun EvalRunPoller::run() const
 void EvalRunPoller::requestPoll()
 {
     Q_D(EvalRunPoller);
-    trackPoll<EvalRunReply, Core::EvalRun>(client()->getEvalRun(d->evalId, jobId()),
-                                           [this](const Core::EvalRun &run) {
-                                               Q_D(EvalRunPoller);
-                                               d->run = run;
-                                               Q_EMIT progressed(run);
-                                               if (!run.isTerminal())
-                                                   return false;
-                                               finish();
-                                               Q_EMIT completed(run);
-                                               return true;
-                                           });
+    trackTerminalPoll<EvalRunReply, Core::EvalRun>(
+            client()->getEvalRun(d->evalId, jobId()), d, &EvalRunPollerPrivate::run,
+            &EvalRunPoller::progressed, &EvalRunPoller::completed);
 }
 
 } // namespace Client

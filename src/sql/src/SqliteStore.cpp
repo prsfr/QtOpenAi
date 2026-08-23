@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Sql/SqliteStore.h"
 
+#include "JsonHelpers_p.h"
+
 #include <QtCore/QAtomicInteger>
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
@@ -16,6 +18,10 @@ namespace Sql {
 
 using Storage::CachedResponse;
 using Storage::ConversationRecord;
+
+// The serialiser every module that stores or sends JSON as text shares; see
+// JsonHelpers_p.h. Pulled in by name so the call sites below read as they did.
+using Core::detail::compactJsonText;
 
 namespace {
 
@@ -39,12 +45,28 @@ QDateTime fromStamp(qint64 stamp)
     return stamp > 0 ? QDateTime::fromMSecsSinceEpoch(stamp).toUTC() : QDateTime();
 }
 
-QString compact(const QJsonObject &json)
+QJsonObject parse(const QString &text) { return QJsonDocument::fromJson(text.toUtf8()).object(); }
+
+// What both conversation readers select, so that they select the same five
+// columns in the same order: that is what lets them share the row decoding
+// below rather than each spell it out, and what keeps a column added here from
+// being missed by one of them.
+QString conversationSelect()
 {
-    return QString::fromUtf8(QJsonDocument(json).toJson(QJsonDocument::Compact));
+    return QStringLiteral("SELECT id, title, created_at, updated_at, message_count "
+                          "FROM conversations");
 }
 
-QJsonObject parse(const QString &text) { return QJsonDocument::fromJson(text.toUtf8()).object(); }
+ConversationRecord recordFromRow(const QSqlQuery &query)
+{
+    ConversationRecord record;
+    record.id = query.value(0).toString();
+    record.title = query.value(1).toString();
+    record.createdAt = fromStamp(query.value(2).toLongLong());
+    record.updatedAt = fromStamp(query.value(3).toLongLong());
+    record.messageCount = query.value(4).toInt();
+    return record;
+}
 
 } // namespace
 
@@ -272,7 +294,7 @@ bool SqliteStore::saveConversation(const QString &id, const Chat::Transcript &tr
                                 "(id, title, created_at, updated_at, message_count, transcript) "
                                 "VALUES (?, ?, ?, ?, ?, ?)"),
                  {id, storedTitle, createdAt, now, transcript.count(),
-                  compact(transcript.toJson())})) {
+                  compactJsonText(transcript.toJson())})) {
         return fail(QStringLiteral("SqliteStore: cannot save conversation %1: %2")
                             .arg(id, query.lastError().text()));
     }
@@ -302,21 +324,11 @@ std::optional<ConversationRecord> SqliteStore::conversation(const QString &id)
         return std::nullopt;
     }
     QSqlQuery query = d->query();
-    if (!d->exec(query,
-                 QStringLiteral("SELECT id, title, created_at, updated_at, message_count "
-                                "FROM conversations WHERE id = ?"),
-                 {id})
+    if (!d->exec(query, conversationSelect() + QStringLiteral(" WHERE id = ?"), {id})
         || !query.next()) {
         return std::nullopt;
     }
-
-    ConversationRecord record;
-    record.id = query.value(0).toString();
-    record.title = query.value(1).toString();
-    record.createdAt = fromStamp(query.value(2).toLongLong());
-    record.updatedAt = fromStamp(query.value(3).toLongLong());
-    record.messageCount = query.value(4).toInt();
-    return record;
+    return recordFromRow(query);
 }
 
 QList<ConversationRecord> SqliteStore::conversations()
@@ -328,23 +340,16 @@ QList<ConversationRecord> SqliteStore::conversations()
     }
     QSqlQuery query = d->query();
     // Ties broken by id so the order is stable rather than the storage order.
-    if (!d->exec(query, QStringLiteral("SELECT id, title, created_at, updated_at, message_count "
-                                       "FROM conversations ORDER BY updated_at DESC, id ASC"))) {
+    if (!d->exec(query,
+                 conversationSelect() + QStringLiteral(" ORDER BY updated_at DESC, id ASC"))) {
         fail(QStringLiteral("SqliteStore: cannot list conversations: %1")
                      .arg(query.lastError().text()));
         return {};
     }
 
     QList<ConversationRecord> records;
-    while (query.next()) {
-        ConversationRecord record;
-        record.id = query.value(0).toString();
-        record.title = query.value(1).toString();
-        record.createdAt = fromStamp(query.value(2).toLongLong());
-        record.updatedAt = fromStamp(query.value(3).toLongLong());
-        record.messageCount = query.value(4).toInt();
-        records.append(record);
-    }
+    while (query.next())
+        records.append(recordFromRow(query));
     return records;
 }
 
@@ -479,7 +484,7 @@ bool SqliteStore::saveMetrics(const QString &id, const Client::MetricsSnapshot &
     QSqlQuery query = d->query();
     if (!d->exec(query,
                  QStringLiteral("INSERT OR REPLACE INTO metrics (id, snapshot) VALUES (?, ?)"),
-                 {id, compact(snapshot.toJson())})) {
+                 {id, compactJsonText(snapshot.toJson())})) {
         return fail(QStringLiteral("SqliteStore: cannot save metrics %1: %2")
                             .arg(id, query.lastError().text()));
     }

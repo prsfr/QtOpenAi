@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/SchemaValidator.h"
 
+#include "JsonHelpers_p.h"
+
 #include <QtCore/QJsonArray>
-#include <QtCore/QJsonDocument>
 #include <QtCore/QRegularExpression>
 
 #include <cmath>
@@ -60,8 +61,7 @@ bool matchesType(const QJsonValue &value, const QString &type)
 // message quotes strings and leaves numbers bare.
 QString display(const QJsonValue &value)
 {
-    const QJsonArray wrapper {value};
-    const QString text = QString::fromUtf8(QJsonDocument(wrapper).toJson(QJsonDocument::Compact));
+    const QString text = detail::compactJsonText(QJsonArray {value});
     return text.mid(1, text.size() - 2);
 }
 

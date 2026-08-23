@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/TranscriptionRequest.h"
 
+#include "FormFields_p.h"
+
 #include <QtCore/QSharedData>
 
 namespace QtOpenAi {
@@ -78,24 +80,16 @@ void TranscriptionRequest::setStream(bool stream) { d->stream = stream; }
 
 QList<TranscriptionRequest::FormField> TranscriptionRequest::formFields() const
 {
-    QList<FormField> fields;
+    detail::FormFields fields;
     fields.append({QStringLiteral("model"), d->model});
-    if (!d->language.isEmpty())
-        fields.append({QStringLiteral("language"), d->language});
-    if (!d->prompt.isEmpty())
-        fields.append({QStringLiteral("prompt"), d->prompt});
-    if (!d->responseFormat.isEmpty())
-        fields.append({QStringLiteral("response_format"), d->responseFormat});
-    if (d->temperature)
-        fields.append({QStringLiteral("temperature"), QString::number(*d->temperature)});
-    // Array fields are repeated with the `name[]` convention.
-    for (const QString &granularity : d->timestampGranularities)
-        fields.append({QStringLiteral("timestamp_granularities[]"), granularity});
-    for (const QString &item : d->include)
-        fields.append({QStringLiteral("include[]"), item});
-    if (d->stream)
-        fields.append({QStringLiteral("stream"),
-                       *d->stream ? QStringLiteral("true") : QStringLiteral("false")});
+    detail::appendIfNotEmpty(fields, QStringLiteral("language"), d->language);
+    detail::appendIfNotEmpty(fields, QStringLiteral("prompt"), d->prompt);
+    detail::appendIfNotEmpty(fields, QStringLiteral("response_format"), d->responseFormat);
+    detail::appendIfSet(fields, QStringLiteral("temperature"), d->temperature);
+    detail::appendEach(fields, QStringLiteral("timestamp_granularities[]"),
+                       d->timestampGranularities);
+    detail::appendEach(fields, QStringLiteral("include[]"), d->include);
+    detail::appendIfSet(fields, QStringLiteral("stream"), d->stream);
     return fields;
 }
 

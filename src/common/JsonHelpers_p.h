@@ -12,7 +12,9 @@
 // naming them for where they came from is worth more than matching the
 // directory.
 
+#include <QtCore/QByteArray>
 #include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonValue>
 #include <QtCore/QString>
@@ -110,6 +112,34 @@ inline std::optional<bool> optionalBool(const QJsonObject &object, const QString
 {
     const QJsonValue value = object.value(key);
     return value.isBool() ? std::optional<bool>(value.toBool()) : std::nullopt;
+}
+
+// Serialise a request body into the payload that goes on the wire. Compact
+// rather than indented: nothing reads these but the server, and the whitespace
+// would be paid for on every request. Client and Admin each had their own copy
+// of this one-liner, the second with a comment saying it matched the first.
+inline QByteArray compactJson(const QJsonObject &json)
+{
+    return QJsonDocument(json).toJson(QJsonDocument::Compact);
+}
+
+inline QByteArray compactJson(const QJsonArray &json)
+{
+    return QJsonDocument(json).toJson(QJsonDocument::Compact);
+}
+
+// The same payload as text, for the places that hand JSON to something that
+// wants a string rather than bytes: a tool result the model reads, a database
+// column, a WebSocket text frame. Five more modules spelled this exact
+// QString::fromUtf8(QJsonDocument(...).toJson(Compact)) out for themselves.
+inline QString compactJsonText(const QJsonObject &json)
+{
+    return QString::fromUtf8(compactJson(json));
+}
+
+inline QString compactJsonText(const QJsonArray &json)
+{
+    return QString::fromUtf8(compactJson(json));
 }
 
 // Merge caller-supplied provider-specific fields into a request body, without

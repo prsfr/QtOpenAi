@@ -5,7 +5,8 @@
 #include "QtOpenAi/Tools/HttpTools.h"
 #include "QtOpenAi/Tools/UtilityTools.h"
 
-#include <QtCore/QJsonDocument>
+#include "JsonHelpers_p.h"
+
 #include <QtCore/QMetaObject>
 
 namespace QtOpenAi {
@@ -19,6 +20,16 @@ public:
     UtilityTools *utilities = nullptr;
     DefaultTools::ApprovalHandler approval;
     bool approveReads = false;
+
+    // Where an approved call is actually dispatched from. A gated tool is
+    // registered on the caller's registry with a handler that asks first, so
+    // the receiver and its argument mapping have to live somewhere else -- and
+    // that somewhere is built once, at install time, rather than rebuilt inside
+    // the handler on every approval. Rebuilding it there meant re-scanning the
+    // receiver's meta-object and re-deriving the method's JSON schema for each
+    // call the user said yes to, and re-issuing registerMethod()'s
+    // dangling-annotation warnings with it.
+    Client::ToolRegistry *dispatch = nullptr;
 };
 
 DefaultTools::DefaultTools(QObject *parent)
@@ -90,33 +101,44 @@ QStringList DefaultTools::install(Client::ToolRegistry *registry, const ToolPoli
 
         const bool gated = sideEffecting || d->approveReads;
         if (gated) {
-            const Core::FunctionDefinition definition = [registry, &name]() {
-                for (const Core::Tool &tool : registry->tools()) {
-                    if (tool.function().name() == name)
-                        return tool.function();
+            // The tool registerMethod() just derived from the method, so the
+            // gated version is described to the model exactly as the ungated
+            // one would have been.
+            const Core::Tool tool = [registry, &name]() {
+                for (const Core::Tool &candidate : registry->tools()) {
+                    if (candidate.function().name() == name)
+                        return candidate;
                 }
-                return Core::FunctionDefinition();
+                return Core::Tool();
             }();
+            const Core::FunctionDefinition definition = tool.function();
+
+            // The same method again on the dispatch registry, so an approved
+            // call goes through the argument mapping the ungated path would
+            // have used rather than a second implementation of it. Registered
+            // here and not in the handler: it is the same registration every
+            // time, and doing it per call charged every approval for a
+            // meta-object scan, a fresh schema derived from it, and another
+            // round of registerMethod()'s dangling-annotation warnings. It is
+            // also the overload taking the definition already in hand, so that
+            // derivation does not happen a second time even here.
+            if (!d->dispatch)
+                d->dispatch = new Client::ToolRegistry(this);
+            d->dispatch->registerMethod(tool, receiver, name);
 
             registry->registerFunction(
                     definition.name(), definition.description(), definition.parameters(),
-                    [this, d, receiver, name](const QJsonObject &arguments) -> QString {
+                    [this, d, name](const QJsonObject &arguments) -> QString {
                         if (d->approval && !d->approval(name, arguments)) {
                             Q_EMIT denied(name, arguments);
                             return QStringLiteral(
                                     "that was not approved; ask the user first, or do "
                                     "something else");
                         }
-                        // Approved: dispatch through a second registry that
-                        // knows only this method, so the argument mapping is
-                        // the same one the ungated path would have used rather
-                        // than a second implementation of it.
-                        Client::ToolRegistry inner;
-                        inner.registerMethod(receiver, name);
-                        const Core::FunctionCall function(
-                                name, QString::fromUtf8(QJsonDocument(arguments).toJson(
-                                              QJsonDocument::Compact)));
-                        return inner.invoke(Core::ToolCall(QStringLiteral("approved"), function))
+                        const Core::FunctionCall function(name,
+                                                          Core::detail::compactJsonText(arguments));
+                        return d->dispatch
+                                ->invoke(Core::ToolCall(QStringLiteral("approved"), function))
                                 .content();
                     });
         }

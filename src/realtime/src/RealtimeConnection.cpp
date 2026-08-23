@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Realtime/RealtimeConnection.h"
 
+#include "JsonHelpers_p.h"
+
 #include <QtCore/QHash>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QList>
@@ -110,8 +112,7 @@ void RealtimeConnectionPrivate::enqueue(const Core::RealtimeEvent &event)
         pending.append(event);
         return;
     }
-    socket.sendTextMessage(
-            QString::fromUtf8(QJsonDocument(event.toJson()).toJson(QJsonDocument::Compact)));
+    socket.sendTextMessage(Core::detail::compactJsonText(event.toJson()));
 }
 
 void RealtimeConnectionPrivate::flush()

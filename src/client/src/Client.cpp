@@ -16,7 +16,6 @@
 #include <QtCore/QBuffer>
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QJsonArray>
-#include <QtCore/QJsonDocument>
 #include <QtCore/QPointer>
 #include <QtCore/QUrlQuery>
 #include <QtCore/QUuid>
@@ -495,6 +494,12 @@ constexpr auto kChatKitBeta = "chatkit_beta=v1";
 // always have.
 using Rest::resourcePath;
 
+// Likewise the request-body serialiser Admin also builds its bodies with; see
+// JsonHelpers_p.h. Pulled in by name rather than called through Core::detail::
+// because this module has a `detail` of its own (the multipart helpers), and an
+// unqualified compactJson() is what the fifty call sites below already read.
+using Core::detail::compactJson;
+
 // Runs nest below an eval, so their paths compose two levels of resourcePath().
 QString evalRunPath(const QString &evalId, const QString &runId, const QString &suffix = {})
 {
@@ -561,12 +566,6 @@ private:
     QList<Core::ToolOutput> m_outputs;
     bool m_stream = false;
 };
-
-// Serialise a request body object into a compact JSON payload.
-QByteArray compactJson(const QJsonObject &json)
-{
-    return QJsonDocument(json).toJson(QJsonDocument::Compact);
-}
 
 // The body of the several "modify" endpoints whose only field is `metadata`.
 // They span four resource families that otherwise share nothing, so the shape
@@ -1299,10 +1298,7 @@ UploadReply *Client::completeUpload(const QString &uploadId, const QStringList &
 {
     Q_D(Client);
     QJsonObject bodyObject;
-    QJsonArray ids;
-    for (const QString &partId : partIds)
-        ids.append(partId);
-    bodyObject.insert(QStringLiteral("part_ids"), ids);
+    bodyObject.insert(QStringLiteral("part_ids"), QJsonArray::fromStringList(partIds));
     if (!md5.isEmpty())
         bodyObject.insert(QStringLiteral("md5"), md5);
     return d->post<UploadReply>(resourcePath(kUploads, uploadId, QStringLiteral("/complete")),

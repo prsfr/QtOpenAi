@@ -27,17 +27,10 @@ Core::VideoJob VideoPoller::job() const
 
 void VideoPoller::requestPoll()
 {
-    trackPoll<VideoReply, Core::VideoJob>(client()->getVideo(jobId()),
-                                          [this](const Core::VideoJob &job) {
-                                              Q_D(VideoPoller);
-                                              d->job = job;
-                                              Q_EMIT progressed(job);
-                                              if (!job.isTerminal())
-                                                  return false;
-                                              finish();
-                                              Q_EMIT completed(job);
-                                              return true;
-                                          });
+    Q_D(VideoPoller);
+    trackTerminalPoll<VideoReply, Core::VideoJob>(
+            client()->getVideo(jobId()), d, &VideoPollerPrivate::job, &VideoPoller::progressed,
+            &VideoPoller::completed);
 }
 
 } // namespace Client

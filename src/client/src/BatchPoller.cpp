@@ -27,17 +27,10 @@ Core::Batch BatchPoller::batch() const
 
 void BatchPoller::requestPoll()
 {
-    trackPoll<BatchReply, Core::Batch>(client()->getBatch(jobId()),
-                                       [this](const Core::Batch &batch) {
-                                           Q_D(BatchPoller);
-                                           d->batch = batch;
-                                           Q_EMIT progressed(batch);
-                                           if (!batch.isTerminal())
-                                               return false;
-                                           finish();
-                                           Q_EMIT completed(batch);
-                                           return true;
-                                       });
+    Q_D(BatchPoller);
+    trackTerminalPoll<BatchReply, Core::Batch>(client()->getBatch(jobId()), d,
+                                               &BatchPollerPrivate::batch, &BatchPoller::progressed,
+                                               &BatchPoller::completed);
 }
 
 } // namespace Client
