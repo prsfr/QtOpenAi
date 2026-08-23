@@ -5,8 +5,9 @@
 #include <QtOpenAi/Core/MetaSchema.h>
 #include <QtOpenAi/Core/SchemaValidator.h>
 
+#include "JsonHelpers_p.h"
+
 #include <QtCore/QJsonArray>
-#include <QtCore/QJsonDocument>
 #include <QtCore/QMetaMethod>
 #include <QtCore/QMetaObject>
 #include <QtCore/QPointer>
@@ -27,7 +28,7 @@ QString makeErrorPayload(const QString &message, const QStringList &details = QS
     error.insert(QStringLiteral("error"), message);
     if (!details.isEmpty())
         error.insert(QStringLiteral("details"), QJsonArray::fromStringList(details));
-    return QString::fromUtf8(QJsonDocument(error).toJson(QJsonDocument::Compact));
+    return Core::detail::compactJsonText(error);
 }
 
 // The invokable method of that name, or an invalid QMetaMethod.
@@ -59,16 +60,13 @@ QString stringify(const QVariant &value)
 {
     switch (value.metaType().id()) {
     case QMetaType::QJsonObject:
-        return QString::fromUtf8(
-                QJsonDocument(value.toJsonObject()).toJson(QJsonDocument::Compact));
+        return Core::detail::compactJsonText(value.toJsonObject());
     case QMetaType::QJsonArray:
-        return QString::fromUtf8(QJsonDocument(value.toJsonArray()).toJson(QJsonDocument::Compact));
+        return Core::detail::compactJsonText(value.toJsonArray());
     case QMetaType::QVariantMap:
-        return QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(value.toMap()))
-                                         .toJson(QJsonDocument::Compact));
+        return Core::detail::compactJsonText(QJsonObject::fromVariantMap(value.toMap()));
     case QMetaType::QVariantList:
-        return QString::fromUtf8(QJsonDocument(QJsonArray::fromVariantList(value.toList()))
-                                         .toJson(QJsonDocument::Compact));
+        return Core::detail::compactJsonText(QJsonArray::fromVariantList(value.toList()));
     default:
         break;
     }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/TranslationRequest.h"
 
+#include "FormFields_p.h"
+
 #include <QtCore/QSharedData>
 
 namespace QtOpenAi {
@@ -55,14 +57,11 @@ void TranslationRequest::setTemperature(double temperature) { d->temperature = t
 
 QList<TranslationRequest::FormField> TranslationRequest::formFields() const
 {
-    QList<FormField> fields;
+    detail::FormFields fields;
     fields.append({QStringLiteral("model"), d->model});
-    if (!d->prompt.isEmpty())
-        fields.append({QStringLiteral("prompt"), d->prompt});
-    if (!d->responseFormat.isEmpty())
-        fields.append({QStringLiteral("response_format"), d->responseFormat});
-    if (d->temperature)
-        fields.append({QStringLiteral("temperature"), QString::number(*d->temperature)});
+    detail::appendIfNotEmpty(fields, QStringLiteral("prompt"), d->prompt);
+    detail::appendIfNotEmpty(fields, QStringLiteral("response_format"), d->responseFormat);
+    detail::appendIfSet(fields, QStringLiteral("temperature"), d->temperature);
     return fields;
 }
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/CreateSkillRequest.h"
 
+#include "FormFields_p.h"
+
 #include <QtCore/QSharedData>
 
 #include <utility>
@@ -44,11 +46,8 @@ void CreateSkillRequest::setMakeDefault(bool makeDefault) { d->makeDefault = mak
 
 QList<CreateSkillRequest::FormField> CreateSkillRequest::formFields() const
 {
-    QList<FormField> fields;
-    if (d->makeDefault) {
-        fields.append({QStringLiteral("default"),
-                       *d->makeDefault ? QStringLiteral("true") : QStringLiteral("false")});
-    }
+    detail::FormFields fields;
+    detail::appendIfSet(fields, QStringLiteral("default"), d->makeDefault);
     return fields;
 }
 

@@ -3,10 +3,10 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "JsonHelpers_p.h"
 #include "RestPath_p.h"
 
 #include <QtCore/QJsonArray>
-#include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 
 namespace QtOpenAi {
@@ -63,6 +63,9 @@ constexpr QLatin1String kProjectsRoot("/projects");
 // than retyped.
 using Rest::resourcePath;
 
+// And the request-body serialiser Client uses; see JsonHelpers_p.h.
+using Core::detail::compactJson;
+
 // A member of a project's sub-collection, which is two levels of the above:
 // ("proj_1", "/api_keys", "key_1") -> "/organization/projects/proj_1/api_keys/key_1".
 QString projectPath(const QString &projectId, QLatin1String collection, const QString &id = {})
@@ -118,12 +121,6 @@ QJsonObject certificateIdsBody(const QStringList &certificateIds)
     QJsonObject body;
     body.insert(QStringLiteral("certificate_ids"), QJsonArray::fromStringList(certificateIds));
     return body;
-}
-
-// Serialise a request body object into a compact JSON payload, as Client does.
-QByteArray compactJson(const QJsonObject &json)
-{
-    return QJsonDocument(json).toJson(QJsonDocument::Compact);
 }
 
 // The last path segment of each usage report. A switch rather than a table

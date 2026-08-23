@@ -3,7 +3,6 @@
 
 #include "JsonHelpers_p.h"
 
-#include <QtCore/QJsonArray>
 #include <QtCore/QSharedData>
 
 namespace QtOpenAi {
@@ -69,12 +68,7 @@ QJsonObject CreateVectorStoreRequest::toJson() const
 {
     QJsonObject json;
     detail::insertIfNotEmpty(json, QStringLiteral("name"), d->name);
-    if (!d->fileIds.isEmpty()) {
-        QJsonArray fileIds;
-        for (const QString &fileId : d->fileIds)
-            fileIds.append(fileId);
-        json.insert(QStringLiteral("file_ids"), fileIds);
-    }
+    detail::insertIfNotEmpty(json, QStringLiteral("file_ids"), d->fileIds);
     if (d->expiresAfterDays > 0) {
         QJsonObject expiresAfter;
         detail::insertIfNotEmpty(expiresAfter, QStringLiteral("anchor"), d->expiresAfterAnchor);

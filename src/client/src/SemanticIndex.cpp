@@ -120,13 +120,9 @@ public:
 
         // One request for the whole batch: the endpoint takes an array, and a
         // hundred paragraphs is not a hundred requests.
-        QJsonArray input;
-        for (const QString &text : texts)
-            input.append(text);
-
         Core::EmbeddingRequest request;
         request.setModel(model);
-        request.setInput(input);
+        request.setInput(QJsonArray::fromStringList(texts));
 
         EmbeddingReply *embedding = client->createEmbeddings(request);
         QObject::connect(embedding, &EmbeddingReply::finished, reply,

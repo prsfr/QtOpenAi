@@ -28,17 +28,10 @@ Core::FineTuningJob FineTuningJobPoller::job() const
 
 void FineTuningJobPoller::requestPoll()
 {
-    trackPoll<FineTuningJobReply, Core::FineTuningJob>(client()->getFineTuningJob(jobId()),
-                                                       [this](const Core::FineTuningJob &job) {
-                                                           Q_D(FineTuningJobPoller);
-                                                           d->job = job;
-                                                           Q_EMIT progressed(job);
-                                                           if (!job.isTerminal())
-                                                               return false;
-                                                           finish();
-                                                           Q_EMIT completed(job);
-                                                           return true;
-                                                       });
+    Q_D(FineTuningJobPoller);
+    trackTerminalPoll<FineTuningJobReply, Core::FineTuningJob>(
+            client()->getFineTuningJob(jobId()), d, &FineTuningJobPollerPrivate::job,
+            &FineTuningJobPoller::progressed, &FineTuningJobPoller::completed);
 }
 
 } // namespace Client

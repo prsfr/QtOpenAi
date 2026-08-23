@@ -6,7 +6,8 @@
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/ToolRegistry.h>
 
-#include <QtCore/QJsonDocument>
+#include "JsonHelpers_p.h"
+
 #include <QtCore/QJsonObject>
 #include <QtCore/QPointer>
 #include <QtCore/QTimer>
@@ -25,7 +26,7 @@ QString refusalPayload(const QString &name)
     QJsonObject error;
     error.insert(QStringLiteral("error"),
                  QStringLiteral("the tool '%1' was not permitted to run").arg(name));
-    return QString::fromUtf8(QJsonDocument(error).toJson(QJsonDocument::Compact));
+    return Core::detail::compactJsonText(error);
 }
 
 } // namespace

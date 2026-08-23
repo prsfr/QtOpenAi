@@ -93,6 +93,34 @@ protected:
         });
     }
 
+    // The whole of requestPoll() for a poller that simply runs until its job
+    // goes terminal, which is all of them but RunPoller: store the observed job
+    // in `slot`, report it through `progressed`, and on the first terminal state
+    // stop and report it through `completed`.
+    //
+    // Four pollers spelled that same six-line lambda out, differing in nothing
+    // but the three names -- so the names are what they pass. `progressed` and
+    // `completed` are pointers to the subclass's own signals; calling one
+    // through a member pointer emits it exactly as Q_EMIT does, Q_EMIT being a
+    // no-op marker. `slot` is a member of the subclass's JobPollerPrivate,
+    // which this header cannot name but a template parameter can.
+    template <typename Reply, typename Job, typename Private, typename Poller>
+    void trackTerminalPoll(Reply *reply, Private *d, Job Private::*slot,
+                           void (Poller::*progressed)(const Job &),
+                           void (Poller::*completed)(const Job &))
+    {
+        trackPoll<Reply, Job>(reply, [this, d, slot, progressed, completed](const Job &job) {
+            d->*slot = job;
+            Poller *poller = static_cast<Poller *>(this);
+            (poller->*progressed)(job);
+            if (!job.isTerminal())
+                return false;
+            finish();
+            (poller->*completed)(job);
+            return true;
+        });
+    }
+
     // Mark polling as finished and honour the auto-delete policy. Subclasses
     // call this from `onState` before emitting their completed() signal.
     void finish();

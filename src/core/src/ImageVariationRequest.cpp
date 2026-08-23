@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/ImageVariationRequest.h"
 
+#include "FormFields_p.h"
+
 #include <QtCore/QSharedData>
 
 namespace QtOpenAi {
@@ -61,17 +63,12 @@ void ImageVariationRequest::setUser(const QString &user) { d->user = user; }
 
 QList<ImageVariationRequest::FormField> ImageVariationRequest::formFields() const
 {
-    QList<FormField> fields;
-    if (!d->model.isEmpty())
-        fields.append({QStringLiteral("model"), d->model});
-    if (d->n)
-        fields.append({QStringLiteral("n"), QString::number(*d->n)});
-    if (!d->size.isEmpty())
-        fields.append({QStringLiteral("size"), d->size});
-    if (!d->responseFormat.isEmpty())
-        fields.append({QStringLiteral("response_format"), d->responseFormat});
-    if (!d->user.isEmpty())
-        fields.append({QStringLiteral("user"), d->user});
+    detail::FormFields fields;
+    detail::appendIfNotEmpty(fields, QStringLiteral("model"), d->model);
+    detail::appendIfSet(fields, QStringLiteral("n"), d->n);
+    detail::appendIfNotEmpty(fields, QStringLiteral("size"), d->size);
+    detail::appendIfNotEmpty(fields, QStringLiteral("response_format"), d->responseFormat);
+    detail::appendIfNotEmpty(fields, QStringLiteral("user"), d->user);
     return fields;
 }
 
