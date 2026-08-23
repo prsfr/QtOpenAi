@@ -7,7 +7,9 @@
 #include "QtOpenAi/Core/TokenCounter.h"
 
 #include "CannedReply_p.h"
+#include "JsonHelpers_p.h"
 #include "Multipart_p.h"
+#include "RestPath_p.h"
 #include "RestReplyBase_p.h"
 #include "RestReply_p.h"
 
@@ -488,13 +490,10 @@ constexpr auto kAssistantsBeta = "assistants=v2";
 // ChatKit is a beta of its own, with its own header value.
 constexpr auto kChatKitBeta = "chatkit_beta=v1";
 
-QString resourcePath(QLatin1String collection, const QString &id, const QString &suffix = {})
-{
-    QString path(collection);
-    if (!id.isEmpty())
-        path += QLatin1Char('/') + id;
-    return path + suffix;
-}
+// The path composer both this module and Admin build their endpoints from; see
+// RestPath_p.h. Pulled in by name so the call sites below read the same as they
+// always have.
+using Rest::resourcePath;
 
 // Runs nest below an eval, so their paths compose two levels of resourcePath().
 QString evalRunPath(const QString &evalId, const QString &runId, const QString &suffix = {})
@@ -562,15 +561,6 @@ private:
     QList<Core::ToolOutput> m_outputs;
     bool m_stream = false;
 };
-
-// Serialise a list of ids to a JSON array.
-QJsonArray idsToArray(const QStringList &ids)
-{
-    QJsonArray array;
-    for (const QString &id : ids)
-        array.append(id);
-    return array;
-}
 
 // Serialise a request body object into a compact JSON payload.
 QByteArray compactJson(const QJsonObject &json)
@@ -967,10 +957,7 @@ ResponseReply *Client::compactResponse(const QString &responseId, const QJsonObj
     bodyObject.insert(QStringLiteral("response_id"), responseId);
     // Caller-supplied fields fill in what this library does not model, without
     // overriding what it does.
-    for (auto it = extra.constBegin(); it != extra.constEnd(); ++it) {
-        if (!bodyObject.contains(it.key()))
-            bodyObject.insert(it.key(), it.value());
-    }
+    Core::detail::mergeExtraBody(bodyObject, extra);
     return d->post<ResponseReply>(QStringLiteral("/responses/compact"), compactJson(bodyObject));
 }
 
@@ -1448,7 +1435,7 @@ VectorStoreFileBatchReply *Client::createVectorStoreFileBatch(const QString &vec
 {
     Q_D(Client);
     QJsonObject bodyObject;
-    bodyObject.insert(QStringLiteral("file_ids"), idsToArray(fileIds));
+    bodyObject.insert(QStringLiteral("file_ids"), QJsonArray::fromStringList(fileIds));
     if (!chunkingStrategy.isEmpty())
         bodyObject.insert(QStringLiteral("chunking_strategy"), chunkingStrategy);
     if (!attributes.isEmpty())
@@ -1676,7 +1663,7 @@ Client::createFineTuningCheckpointPermissions(const QString &checkpointId,
 {
     Q_D(Client);
     QJsonObject bodyObject;
-    bodyObject.insert(QStringLiteral("project_ids"), idsToArray(projectIds));
+    bodyObject.insert(QStringLiteral("project_ids"), QJsonArray::fromStringList(projectIds));
     return d->post<FineTuningPermissionListReply>(
             resourcePath(kFineTuningCheckpoints, checkpointId, QStringLiteral("/permissions")),
             compactJson(bodyObject));

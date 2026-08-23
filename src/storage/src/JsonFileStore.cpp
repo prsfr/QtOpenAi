@@ -36,6 +36,22 @@ QDateTime dateTimeFromIso(const QJsonValue &value)
     return QDateTime::fromString(value.toString(), Qt::ISODateWithMs).toUTC();
 }
 
+// One stored conversation, decoded. Reading one by id and listing them all need
+// exactly this, and a field added to only one of the two is a listing that
+// disagrees with the record it lists.
+ConversationRecord recordFromJson(const QJsonObject &json)
+{
+    ConversationRecord record;
+    // The id comes from inside the file, so a listing is right even for a file
+    // that was renamed or copied in by hand.
+    record.id = json.value(QLatin1String("id")).toString();
+    record.title = json.value(QLatin1String("title")).toString();
+    record.createdAt = dateTimeFromIso(json.value(QLatin1String("created_at")));
+    record.updatedAt = dateTimeFromIso(json.value(QLatin1String("updated_at")));
+    record.messageCount = json.value(QLatin1String("message_count")).toInt();
+    return record;
+}
+
 } // namespace
 
 class JsonFileStorePrivate
@@ -210,14 +226,7 @@ std::optional<ConversationRecord> JsonFileStore::conversation(const QString &id)
             = JsonFileStorePrivate::read(d->path(ConversationsDir, fileNameFor(id)));
     if (!json)
         return std::nullopt;
-
-    ConversationRecord record;
-    record.id = json->value(QLatin1String("id")).toString();
-    record.title = json->value(QLatin1String("title")).toString();
-    record.createdAt = dateTimeFromIso(json->value(QLatin1String("created_at")));
-    record.updatedAt = dateTimeFromIso(json->value(QLatin1String("updated_at")));
-    record.messageCount = json->value(QLatin1String("message_count")).toInt();
-    return record;
+    return recordFromJson(*json);
 }
 
 QList<ConversationRecord> JsonFileStore::conversations()
@@ -235,14 +244,7 @@ QList<ConversationRecord> JsonFileStore::conversations()
         const std::optional<QJsonObject> json = JsonFileStorePrivate::read(file.absoluteFilePath());
         if (!json)
             continue;
-        // The id comes from inside the file, so a listing is right even for a
-        // file that was renamed or copied in by hand.
-        ConversationRecord record;
-        record.id = json->value(QLatin1String("id")).toString();
-        record.title = json->value(QLatin1String("title")).toString();
-        record.createdAt = dateTimeFromIso(json->value(QLatin1String("created_at")));
-        record.updatedAt = dateTimeFromIso(json->value(QLatin1String("updated_at")));
-        record.messageCount = json->value(QLatin1String("message_count")).toInt();
+        const ConversationRecord record = recordFromJson(*json);
         if (record.isValid())
             records.append(record);
     }

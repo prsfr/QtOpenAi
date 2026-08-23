@@ -43,6 +43,7 @@ target_include_directories(QtOpenAiTools
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
 )
 
 target_compile_definitions(QtOpenAiTools PRIVATE QTOPENAI_TOOLS_LIBRARY)

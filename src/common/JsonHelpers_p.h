@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-// Internal (private) helpers shared across the Core module's serialisation
-// code. Not installed and not part of the public API.
+// Internal (private) helpers for the OpenAI JSON conventions -- which fields
+// are omitted rather than sent empty, and how an absent one decodes. Not
+// installed and not part of the public API.
+//
+// It lives in src/common/ rather than under one module because every module
+// that speaks to the API needs it, and the seven that could not reach it here
+// wrote the same one-liners out longhand instead. The namespace still says
+// Core: these are Core's serialisation conventions wherever the file sits, and
+// naming them for where they came from is worth more than matching the
+// directory.
 
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
