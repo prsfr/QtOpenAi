@@ -33,6 +33,12 @@ class JsonFileStorePrivate;
 // store that loses old data while failing to write new data would be worse
 // than one that never saved at all.
 //
+// **Batching is the inherited no-op.** Each write is its own QSaveFile and
+// each is atomic on its own; there is nowhere for atomicity *across* files to
+// come from, and a beginBatch() that reported grouping it cannot do would be a
+// promise this backend could not keep. Sql::SqliteStore is where a batch is a
+// transaction.
+//
 // **File names are the hex of the id's UTF-8**, not the id itself. An id is
 // the application's string and may contain a slash, a colon or a newline; two
 // ids differing only in case are two conversations on Linux and one on macOS.
@@ -59,6 +65,11 @@ public:
                           const QString &title = {}) override;
     std::optional<Chat::Transcript> loadConversation(const QString &id) override;
     std::optional<ConversationRecord> conversation(const QString &id) override;
+    // A directory of files has no order to page through without reading all
+    // of them, so the bounded listing stays the inherited one; the using
+    // declaration is what keeps it reachable through a JsonFileStore, which
+    // overriding the other overload would otherwise hide.
+    using Store::conversations;
     QList<ConversationRecord> conversations() override;
     bool removeConversation(const QString &id) override;
 

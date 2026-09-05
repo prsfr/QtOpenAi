@@ -63,8 +63,16 @@ void PersistentResponseCache::insert(const QByteArray &key, const QByteArray &bo
     entry.key = key;
     entry.body = body;
     entry.storedAt = QDateTime::currentDateTimeUtc();
-    if (d->store->saveCachedResponse(entry))
-        d->store->pruneCachedResponses(d->maxEntries, d->cutoff());
+
+    // The insert and the prune it triggers are one batch: every cached
+    // response pays for this pair, and on a backend with transactions the
+    // difference is one commit here rather than one per statement.
+    Store::Batch batch(d->store);
+    if (!d->store->saveCachedResponse(entry)) {
+        batch.abort();
+        return;
+    }
+    d->store->pruneCachedResponses(d->maxEntries, d->cutoff());
 }
 
 void PersistentResponseCache::remove(const QByteArray &key)

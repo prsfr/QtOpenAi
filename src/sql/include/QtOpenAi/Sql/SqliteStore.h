@@ -16,9 +16,10 @@ class SqliteStorePrivate;
 //         qWarning() << store.lastError();
 //
 // The backend for an application that accumulates: listing conversations is an
-// index scan rather than a read of every conversation, pruning the cache is one
-// statement rather than one per entry, and the whole history is one file to
-// back up. Storage::JsonFileStore is the one to prefer when the data should
+// index scan rather than a read of every conversation -- bounded to the page a
+// sidebar shows, when the caller asks for one -- pruning the cache is one
+// statement rather than one per entry, a batch of writes is one commit rather
+// than one per write, and the whole history is one file to back up. Storage::JsonFileStore is the one to prefer when the data should
 // stay legible on disk.
 //
 // **SQLite specifically, not "a database".** The schema uses `INSERT OR
@@ -54,11 +55,22 @@ public:
     bool isOpen() const override;
     int schemaVersion() const override;
 
+    // One transaction, so a run of saves is one commit rather than one per
+    // save -- which on SQLite is the difference between a journal write and
+    // fsync per conversation and a single pair for all of them. Counted, so
+    // this class's own batches (the two deletes of a prune) nest inside one an
+    // application opened.
+    bool beginBatch() override;
+    bool endBatch(bool commit = true) override;
+
     bool saveConversation(const QString &id, const Chat::Transcript &transcript,
                           const QString &title = {}) override;
     std::optional<Chat::Transcript> loadConversation(const QString &id) override;
     std::optional<Storage::ConversationRecord> conversation(const QString &id) override;
     QList<Storage::ConversationRecord> conversations() override;
+    // LIMIT and OFFSET over the conversations_updated_at index, which is the
+    // fifty rows a sidebar shows rather than every row it does not.
+    QList<Storage::ConversationRecord> conversations(int limit, int offset = 0) override;
     bool removeConversation(const QString &id) override;
 
     bool saveCachedResponse(const Storage::CachedResponse &response) override;

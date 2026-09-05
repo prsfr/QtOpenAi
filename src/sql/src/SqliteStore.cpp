@@ -78,6 +78,15 @@ public:
     bool open = false;
     int schemaVersion = 0;
 
+    // How many beginBatch() calls are outstanding, and whether any of them
+    // asked for the batch to be dropped. SQLite has one transaction per
+    // connection, so nesting is counted rather than nested: the outermost
+    // endBatch() is the one that commits, and an inner endBatch(false) means
+    // the whole thing rolls back -- an inner caller that could not finish must
+    // not have its half kept by an outer one that does not know.
+    int batchDepth = 0;
+    bool batchAborted = false;
+
     QSqlDatabase database() const { return QSqlDatabase::database(connectionName, false); }
 
     QSqlQuery query() const { return QSqlQuery(database()); }
@@ -248,6 +257,11 @@ void SqliteStore::close()
         return;
     d->open = false;
     d->schemaVersion = 0;
+    // Closing inside a batch drops it: SQLite rolls an open transaction back
+    // when the connection goes, and the counter must not survive into a
+    // reopened store as a batch nothing began.
+    d->batchDepth = 0;
+    d->batchAborted = false;
     {
         // The connection has to go out of scope before removeDatabase(), which
         // warns about connections still in use -- and then leaves the
@@ -262,6 +276,47 @@ void SqliteStore::close()
 bool SqliteStore::isOpen() const { return d->open; }
 
 int SqliteStore::schemaVersion() const { return d->schemaVersion; }
+
+bool SqliteStore::beginBatch()
+{
+    // lastError() is deliberately not cleared here or in endBatch(): a batch
+    // is ended on the way out of a failure, and clearing would erase the
+    // reason the caller is about to read.
+    if (!d->open)
+        return fail(QStringLiteral("SqliteStore: not open."));
+    if (d->batchDepth > 0) {
+        ++d->batchDepth;
+        return true;
+    }
+
+    QSqlDatabase database = d->database();
+    if (!database.transaction()) {
+        return fail(QStringLiteral("SqliteStore: cannot begin a batch: %1")
+                            .arg(database.lastError().text()));
+    }
+    d->batchDepth = 1;
+    d->batchAborted = false;
+    return true;
+}
+
+bool SqliteStore::endBatch(bool commit)
+{
+    if (d->batchDepth == 0)
+        return fail(QStringLiteral("SqliteStore: no batch to end."));
+    if (!commit)
+        d->batchAborted = true;
+    if (--d->batchDepth > 0)
+        return true;
+
+    QSqlDatabase database = d->database();
+    const bool dropping = d->batchAborted;
+    d->batchAborted = false;
+    if (dropping ? database.rollback() : database.commit())
+        return true;
+    return fail(QStringLiteral("SqliteStore: cannot %1 a batch: %2")
+                        .arg(dropping ? QStringLiteral("roll back") : QStringLiteral("commit"),
+                             database.lastError().text()));
+}
 
 bool SqliteStore::saveConversation(const QString &id, const Chat::Transcript &transcript,
                                    const QString &title)
@@ -331,17 +386,28 @@ std::optional<ConversationRecord> SqliteStore::conversation(const QString &id)
     return recordFromRow(query);
 }
 
-QList<ConversationRecord> SqliteStore::conversations()
+QList<ConversationRecord> SqliteStore::conversations() { return conversations(-1, 0); }
+
+QList<ConversationRecord> SqliteStore::conversations(int limit, int offset)
 {
     clearError();
     if (!d->open) {
         fail(QStringLiteral("SqliteStore: not open."));
         return {};
     }
+    if (limit == 0)
+        return {};
+
     QSqlQuery query = d->query();
     // Ties broken by id so the order is stable rather than the storage order.
+    // The bounds are in the statement rather than applied to the result: this
+    // way the fifty rows a sidebar shows are the fifty the index walks, and
+    // the other nine thousand nine hundred and fifty are never decoded. SQLite
+    // spells "no limit" as a negative one, and wants a LIMIT before an OFFSET.
     if (!d->exec(query,
-                 conversationSelect() + QStringLiteral(" ORDER BY updated_at DESC, id ASC"))) {
+                 conversationSelect()
+                         + QStringLiteral(" ORDER BY updated_at DESC, id ASC LIMIT ? OFFSET ?"),
+                 {limit < 0 ? -1 : limit, qMax(0, offset)})) {
         fail(QStringLiteral("SqliteStore: cannot list conversations: %1")
                      .arg(query.lastError().text()));
         return {};
@@ -452,10 +518,17 @@ bool SqliteStore::pruneCachedResponses(int maxEntries, const QDateTime &oldest)
     if (!d->open)
         return fail(QStringLiteral("SqliteStore: not open."));
 
+    // The two halves are one batch: two autocommits are two commits, and a
+    // prune that expired the old entries and then failed to apply the ceiling
+    // is a state no caller asked for. Nested inside the caller's batch when
+    // there is one -- PersistentResponseCache::insert() opens one around the
+    // save and this prune.
+    Batch batch(this);
     QSqlQuery query = d->query();
     if (oldest.isValid()
         && !d->exec(query, QStringLiteral("DELETE FROM cache WHERE stored_at < ?"),
                     {toStamp(oldest)})) {
+        batch.abort();
         return fail(QStringLiteral("SqliteStore: cannot expire cached responses: %1")
                             .arg(query.lastError().text()));
     }
@@ -467,10 +540,11 @@ bool SqliteStore::pruneCachedResponses(int maxEntries, const QDateTime &oldest)
                     QStringLiteral("DELETE FROM cache WHERE key NOT IN "
                                    "(SELECT key FROM cache ORDER BY stored_at DESC LIMIT ?)"),
                     {maxEntries})) {
+        batch.abort();
         return fail(QStringLiteral("SqliteStore: cannot prune cached responses: %1")
                             .arg(query.lastError().text()));
     }
-    return true;
+    return batch.commit();
 }
 
 bool SqliteStore::saveMetrics(const QString &id, const Client::MetricsSnapshot &snapshot)

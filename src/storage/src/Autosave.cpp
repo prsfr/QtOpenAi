@@ -150,6 +150,11 @@ bool Autosave::flush()
         return false;
     }
 
+    // The conversation and the metrics snapshot are one batch: they are the
+    // two writes of every interval, and a backend that can group them commits
+    // once rather than twice for each of them.
+    Store::Batch batch(d->store);
+
     bool ok = true;
     if (!d->conversationId.isEmpty() && d->conversationSource) {
         if (!d->store->saveConversation(d->conversationId, d->conversationSource())) {
@@ -167,8 +172,16 @@ bool Autosave::flush()
     if (!ok) {
         // Still dirty: what failed has not been written, and the next touch
         // should try again rather than assume it is safe on disk.
+        batch.abort();
         return false;
     }
+    // A store that would not start a batch has written the two above anyway,
+    // ungrouped; only one it did start can still fail to land.
+    if (batch.isActive() && !batch.commit()) {
+        Q_EMIT failed(d->store->lastError());
+        return false;
+    }
+
     d->dirty = false;
     Q_EMIT dirtyChanged();
     Q_EMIT saved();
