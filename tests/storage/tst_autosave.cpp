@@ -6,6 +6,8 @@
 #include <QtCore/QTemporaryDir>
 #include <QtTest/QtTest>
 
+#include "support/BatchCountingStore.h"
+
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Chat;
 using namespace QtOpenAi::Client;
@@ -20,6 +22,7 @@ private slots:
     void flushWritesTheCurrentConversation();
     void aCollectorMarksItselfDirty();
     void disablingSuspendsTheWriteButNotTheChange();
+    void oneFlushIsOneBatch();
     void aFailedSaveIsReportedAndStaysDirty();
 };
 
@@ -141,11 +144,43 @@ void TestAutosave::disablingSuspendsTheWriteButNotTheChange()
     QVERIFY(store.loadConversation(QStringLiteral("c")).has_value());
 }
 
+void TestAutosave::oneFlushIsOneBatch()
+{
+    // The conversation and the metrics snapshot are the two writes of every
+    // interval, and grouping them is what makes an interval one commit on a
+    // backend that has transactions rather than two.
+    QTemporaryDir root;
+    BatchCountingStore store(root.path());
+    QVERIFY2(store.open(), qPrintable(store.lastError()));
+
+    Transcript transcript;
+    transcript.addUserMessage(QStringLiteral("hello"));
+    MetricsCollector collector;
+
+    Autosave autosave(&store);
+    autosave.setIntervalMs(60000); // far away: only flush() can save here
+    autosave.setConversation(QStringLiteral("c"), [&transcript] { return transcript; });
+    autosave.setMetrics(QStringLiteral("all-time"), &collector);
+
+    autosave.touch();
+    QVERIFY(autosave.flush());
+    QCOMPARE(store.batchesBegun, 1);
+    QCOMPARE(store.batchesEnded, 1);
+    QCOMPARE(store.batchesDropped, 0);
+    // Both writes are inside that one batch.
+    QVERIFY(store.loadConversation(QStringLiteral("c")).has_value());
+    QVERIFY(store.loadMetrics(QStringLiteral("all-time")).has_value());
+
+    // A flush with nothing to write opens no batch either.
+    QVERIFY(autosave.flush());
+    QCOMPARE(store.batchesBegun, 1);
+}
+
 void TestAutosave::aFailedSaveIsReportedAndStaysDirty()
 {
     // A silent autosave failure is data loss nobody hears about.
     QTemporaryDir root;
-    JsonFileStore store(root.path()); // deliberately not opened
+    BatchCountingStore store(root.path()); // deliberately not opened
 
     Transcript transcript;
     transcript.addUserMessage(QStringLiteral("hello"));
@@ -162,6 +197,10 @@ void TestAutosave::aFailedSaveIsReportedAndStaysDirty()
     // Still dirty: what failed is not on disk, and the next attempt must try
     // again rather than assume it is safe.
     QVERIFY(autosave.isDirty());
+    // One failure, not two: the store never started a batch, so there is none
+    // to end and nothing to report a second time.
+    QCOMPARE(store.batchesBegun, 1);
+    QCOMPARE(store.batchesEnded, 0);
 }
 
 QTEST_MAIN(TestAutosave)

@@ -95,6 +95,53 @@ MetricsSnapshot recordedSnapshot()
     return snapshot;
 }
 
+// The ids of a listing, in the order it gave them: what the bounded-listing
+// assertions are about, without a record's other four fields in the way.
+QStringList idsOf(const QList<ConversationRecord> &records)
+{
+    QStringList ids;
+    ids.reserve(records.size());
+    for (const ConversationRecord &record : records)
+        ids.append(record.id);
+    return ids;
+}
+
+// `count` one-message conversations, saved a few milliseconds apart so that
+// the listing order is the store's rather than a tie broken by id. Returns
+// them newest first, which is the order a listing owes -- or an empty list
+// when a save failed, which the caller sees as a size mismatch.
+QStringList spacedConversations(Store *store, int count)
+{
+    Transcript transcript;
+    transcript.addUserMessage(QStringLiteral("hello"));
+
+    QStringList newestFirst;
+    for (int i = 0; i < count; ++i) {
+        if (i > 0)
+            QTest::qWait(5);
+        const QString id = QStringLiteral("c%1").arg(i);
+        if (!store->saveConversation(id, transcript, id))
+            return {};
+        newestFirst.prepend(id);
+    }
+    return newestFirst;
+}
+
+// Whether the backend can drop what a batch already wrote. SQLite has a
+// transaction to roll back; a directory of QSaveFiles has nothing to undo, and
+// the interface says as much -- a batch is a hint about grouping, never a
+// promise of atomicity. Asserting the same outcome for both would be asserting
+// something only one of them ever agreed to.
+bool dropsWhatABatchWrote(const QString &backend)
+{
+#ifdef QTOPENAI_TESTS_HAVE_SQL
+    return backend == QLatin1String("sqlite");
+#else
+    Q_UNUSED(backend);
+    return false;
+#endif
+}
+
 CachedResponse entry(const QByteArray &key, const QByteArray &body, const QDateTime &storedAt)
 {
     CachedResponse response;
@@ -155,6 +202,18 @@ private slots:
 
     void listsConversationsMostRecentlyUpdatedFirst();
     void listsConversationsMostRecentlyUpdatedFirst_data() { addBackends(); }
+
+    void listsABoundedPageOfConversations();
+    void listsABoundedPageOfConversations_data() { addBackends(); }
+
+    void writesInABatchLandTogether();
+    void writesInABatchLandTogether_data() { addBackends(); }
+
+    void nestedBatchesEndWithTheOutermost();
+    void nestedBatchesEndWithTheOutermost_data() { addBackends(); }
+
+    void anAbortedBatchIsDroppedWhereTheBackendCan();
+    void anAbortedBatchIsDroppedWhereTheBackendCan_data() { addBackends(); }
 
     void anEmptyTitleKeepsTheStoredOne();
     void anEmptyTitleKeepsTheStoredOne_data() { addBackends(); }
@@ -270,6 +329,148 @@ void TestStore::listsConversationsMostRecentlyUpdatedFirst()
     QCOMPARE(records.at(1).id, QStringLiteral("older"));
     QCOMPARE(records.at(0).title, QStringLiteral("Newer"));
     QCOMPARE(records.at(1).messageCount, 1);
+}
+
+void TestStore::listsABoundedPageOfConversations()
+{
+    // What a conversation sidebar actually asks for: the newest page, and the
+    // one after it. The unbounded listing is the same call without a bound,
+    // rather than a second thing the backends have to keep in step.
+    QFETCH(QString, backend);
+    QTemporaryDir root;
+    const auto store = makeStore(backend, root.path());
+    QVERIFY2(store->open(), qPrintable(store->lastError()));
+
+    const QStringList newestFirst = spacedConversations(store.get(), 5);
+    QCOMPARE(newestFirst.size(), 5);
+
+    QCOMPARE(idsOf(store->conversations(2)), newestFirst.mid(0, 2));
+    QCOMPARE(idsOf(store->conversations(2, 2)), newestFirst.mid(2, 2));
+    // A page that runs past the end is short rather than an error, and one
+    // that starts past it is empty.
+    QCOMPARE(idsOf(store->conversations(2, 4)), newestFirst.mid(4, 1));
+    QCOMPARE(store->conversations(2, 5).size(), 0);
+    // A negative limit is no limit, which is what conversations() is; zero is
+    // an empty listing; a negative offset is the first page.
+    QCOMPARE(idsOf(store->conversations(-1)), newestFirst);
+    QCOMPARE(idsOf(store->conversations()), newestFirst);
+    QCOMPARE(store->conversations(0).size(), 0);
+    QCOMPARE(idsOf(store->conversations(2, -3)), newestFirst.mid(0, 2));
+
+    // Whole records, not ids with the rest left out: a bounded listing is the
+    // listing, and an application draws its rows from exactly these fields.
+    const QList<ConversationRecord> page = store->conversations(1);
+    QCOMPARE(page.size(), 1);
+    QCOMPARE(page.at(0).title, newestFirst.at(0));
+    QCOMPARE(page.at(0).messageCount, 1);
+    QVERIFY(page.at(0).createdAt.isValid());
+    QVERIFY(page.at(0).updatedAt >= page.at(0).createdAt);
+    // A listing is not a failure, whichever bound it was given.
+    QVERIFY(store->lastError().isEmpty());
+
+    // Reachable through a concrete backend and not only through a Store *:
+    // a class that overrides one of the two overloads hides the other, which
+    // is what the using declaration in JsonFileStore is there to prevent. The
+    // assertion is the compiler's; the row it runs in does not matter.
+    JsonFileStore concrete(root.path() + QStringLiteral("/direct"));
+    QVERIFY2(concrete.open(), qPrintable(concrete.lastError()));
+    QVERIFY(concrete.conversations(50).isEmpty());
+}
+
+void TestStore::writesInABatchLandTogether()
+{
+    // Batching is a hint a backend may ignore, so what every backend owes is
+    // this: the writes inside one are in the store afterwards, and the pair of
+    // calls succeeds whether or not it grouped anything.
+    QFETCH(QString, backend);
+    QTemporaryDir root;
+    const auto store = makeStore(backend, root.path());
+    QVERIFY2(store->open(), qPrintable(store->lastError()));
+
+    Transcript transcript;
+    transcript.addUserMessage(QStringLiteral("hello"));
+
+    QVERIFY(store->beginBatch());
+    QVERIFY(store->saveConversation(QStringLiteral("a"), transcript, QStringLiteral("A")));
+    QVERIFY(store->saveMetrics(QStringLiteral("all-time"), recordedSnapshot()));
+    QVERIFY(store->saveCachedResponse(entry("k", "1", QDateTime::currentDateTimeUtc())));
+    QVERIFY(store->endBatch());
+
+    QCOMPARE(idsOf(store->conversations()), QStringList({QStringLiteral("a")}));
+    QVERIFY(store->loadMetrics(QStringLiteral("all-time")).has_value());
+    QVERIFY(store->cachedResponse("k").has_value());
+
+    // The guard is those two calls with the scope for a caller: what it wrote
+    // is there once the scope closed.
+    {
+        Store::Batch batch(store.get());
+        QVERIFY(batch.isActive());
+        QVERIFY(store->saveConversation(QStringLiteral("b"), transcript, QStringLiteral("B")));
+    }
+    QVERIFY(store->conversation(QStringLiteral("b")).has_value());
+
+    Store::Batch ended(store.get());
+    QVERIFY(store->saveConversation(QStringLiteral("c"), transcript, QStringLiteral("C")));
+    QVERIFY(ended.commit());
+    // Ended by hand, so the destructor has nothing left to end.
+    QVERIFY(!ended.isActive());
+    QCOMPARE(store->conversations().size(), 3);
+}
+
+void TestStore::nestedBatchesEndWithTheOutermost()
+{
+    // The library batches its own writes -- a cache insert and the prune it
+    // triggers -- inside whatever the application opened, so an inner pair has
+    // to be counted rather than taken for the whole batch.
+    QFETCH(QString, backend);
+    QTemporaryDir root;
+    const auto store = makeStore(backend, root.path());
+    QVERIFY2(store->open(), qPrintable(store->lastError()));
+
+    Transcript transcript;
+    transcript.addUserMessage(QStringLiteral("hello"));
+
+    QVERIFY(store->beginBatch());
+    QVERIFY(store->saveConversation(QStringLiteral("outer"), transcript));
+    QVERIFY(store->beginBatch());
+    QVERIFY(store->saveConversation(QStringLiteral("inner"), transcript));
+    QVERIFY(store->endBatch()); // the inner one: the batch is still open
+    QVERIFY(store->saveConversation(QStringLiteral("after"), transcript));
+    QVERIFY(store->endBatch()); // the outermost one is what settles all three
+    QCOMPARE(store->conversations().size(), 3);
+
+    // An inner drop takes the whole batch with it: an inner caller that could
+    // not finish must not have its half kept by an outer one that cannot know.
+    QVERIFY(store->beginBatch());
+    QVERIFY(store->saveConversation(QStringLiteral("dropped"), transcript));
+    QVERIFY(store->beginBatch());
+    QVERIFY(store->endBatch(false));
+    QVERIFY(store->endBatch());
+    QCOMPARE(store->conversation(QStringLiteral("dropped")).has_value(),
+             !dropsWhatABatchWrote(backend));
+}
+
+void TestStore::anAbortedBatchIsDroppedWhereTheBackendCan()
+{
+    QFETCH(QString, backend);
+    QTemporaryDir root;
+    const auto store = makeStore(backend, root.path());
+    QVERIFY2(store->open(), qPrintable(store->lastError()));
+
+    Transcript transcript;
+    transcript.addUserMessage(QStringLiteral("hello"));
+
+    QVERIFY(store->beginBatch());
+    QVERIFY(store->saveConversation(QStringLiteral("a"), transcript));
+    QVERIFY(store->endBatch(false));
+    QCOMPARE(store->conversation(QStringLiteral("a")).has_value(), !dropsWhatABatchWrote(backend));
+
+    // Either way the store is usable straight after, and the next batch is a
+    // new one rather than the dropped one carried on.
+    Store::Batch batch(store.get());
+    QVERIFY(store->saveConversation(QStringLiteral("b"), transcript));
+    QVERIFY(batch.commit());
+    QVERIFY(store->conversation(QStringLiteral("b")).has_value());
 }
 
 void TestStore::anEmptyTitleKeepsTheStoredOne()
@@ -499,6 +700,14 @@ void TestStore::aClosedStoreFailsRatherThanPretending()
     store->close();
     QVERIFY(!store->isOpen());
     QVERIFY(!store->saveConversation(QStringLiteral("c"), transcript));
+
+    // A bounded listing and a batch refuse for the same reason rather than
+    // reporting an empty store and a batch that nothing started.
+    QVERIFY(store->conversations(10).isEmpty());
+    QVERIFY(!store->beginBatch());
+    QVERIFY(!store->lastError().isEmpty());
+    const Store::Batch batch(store.get());
+    QVERIFY(!batch.isActive());
 }
 
 QTEST_MAIN(TestStore)

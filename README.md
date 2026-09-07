@@ -2717,6 +2717,57 @@ for (const Storage::ConversationRecord &record : store.conversations())
     ui->addRow(record.title, record.updatedAt, record.messageCount);   // no trees read
 ```
 
+**A sidebar shows fifty, so it can ask for fifty.** `conversations(limit,
+offset)` is the same listing bounded, and a backend with an index on that order
+answers it without reading the rest — with ten thousand conversations stored,
+the newest fifty are an index walk rather than ten thousand records built and
+thrown away:
+
+```cpp
+const auto page = store.conversations(50);        // newest fifty
+const auto next = store.conversations(50, 50);    // the page after it
+```
+
+A negative limit is no limit, which is what `conversations()` is; zero reads
+nothing at all. The default implementation slices the full listing, so a backend
+that has nothing better to offer — `JsonFileStore`, which has to read every file
+either way — inherits it and still answers.
+
+### One batch, one commit
+
+Every mutating call stands on its own, which for a database backend means a
+transaction each: ten thousand saves are ten thousand commits, with a journal
+write and an `fsync` apiece. `beginBatch()` and `endBatch()` say that a run of
+writes belongs together:
+
+```cpp
+Storage::Store::Batch batch(&store);              // ends at the closing brace
+for (const auto &[id, transcript] : imported)
+    store.saveConversation(id, transcript);
+if (!batch.commit())                              // or let the guard do it
+    qWarning() << store.lastError();
+```
+
+Measured on a checkout of this library — 2 000 conversations of 20 messages
+through `Sql::SqliteStore`, on ext4 with real `fsync`s:
+
+| | ms | per save |
+|---|---|---|
+| a transaction per save | 2684 | 1.342 ms |
+| all of them in one batch | 316 | 0.158 ms |
+
+That is what an import, a migration between backends, and this library's own
+paired writes are worth: `Autosave::flush()` writes the conversation and the
+metrics snapshot as one batch, and `PersistentResponseCache::insert()` groups
+the insert with the prune it triggers.
+
+The pair is a **hint about grouping, never a promise of atomicity**: a backend
+that cannot batch does nothing and reports success, which is what `JsonFileStore`
+does — a directory of `QSaveFile`s has no cross-file atomicity to offer, and
+claiming otherwise would be a promise it could not keep. Where a backend does
+have a transaction, `endBatch(false)` drops it. Nesting is counted, so a batch
+this library opens inside one the application opened ends with the outermost.
+
 ### Two backends, one interface
 
 | Backend | Module | When it is the right one |

@@ -8,6 +8,7 @@
 #include <QtTest/QtTest>
 
 #include "support/AwaitedReply.h"
+#include "support/BatchCountingStore.h"
 #include "support/StubServer.h"
 
 using namespace QtOpenAi::Core;
@@ -47,6 +48,7 @@ private slots:
     void aCachedAnswerSurvivesTheProcessThatCachedIt();
     void expiredEntriesAreMissesAndAreDropped();
     void theCeilingEvictsTheOldest();
+    void oneInsertIsOneBatch();
     void removeAndClearReachTheStore();
     void aCacheWithoutAStoreIsJustAMiss();
 };
@@ -154,6 +156,30 @@ void TestPersistentCache::theCeilingEvictsTheOldest()
     cache.setMaxEntries(0);
     cache.insert("d", "4");
     QVERIFY(!cache.lookup("d").has_value());
+}
+
+void TestPersistentCache::oneInsertIsOneBatch()
+{
+    // An insert is a save plus the prune it triggers, and every cached
+    // response pays for the pair. The store sees them as one batch, which is
+    // what makes them one commit on a backend with transactions.
+    QTemporaryDir root;
+    BatchCountingStore store(root.path());
+    QVERIFY2(store.open(), qPrintable(store.lastError()));
+
+    PersistentResponseCache cache(&store);
+    cache.setMaxEntries(1);
+    cache.insert("a", "1");
+    QCOMPARE(store.batchesBegun, 1);
+    QCOMPARE(store.batchesEnded, 1);
+    QCOMPARE(store.batchesDropped, 0);
+    QVERIFY(cache.lookup("a").has_value());
+
+    // A cache that stores nothing writes nothing, so there is no batch for it
+    // to write nothing in.
+    cache.setMaxEntries(0);
+    cache.insert("b", "2");
+    QCOMPARE(store.batchesBegun, 1);
 }
 
 void TestPersistentCache::removeAndClearReachTheStore()

@@ -98,6 +98,83 @@ public:
     // Why the last call failed. Cleared by the next call that succeeds.
     QString lastError() const;
 
+    // --- Batching ---------------------------------------------------------
+    // Group the writes between these two calls, where the backend can. A
+    // backend that cannot does nothing and reports success: the pair is a hint
+    // about batching, never a transaction the caller may rely on for
+    // atomicity. Sql::SqliteStore maps them onto one transaction, where ten
+    // thousand saves are one commit rather than ten thousand of them;
+    // JsonFileStore is a directory of files with no cross-file atomicity to
+    // offer, so it inherits the no-ops.
+    //
+    // `endBatch(false)` asks for the batch to be dropped rather than kept,
+    // which a backend that has nothing to drop also reports as success. It is
+    // one call rather than a separate abortBatch() so that every path out of a
+    // batch is the same call, which is what lets Batch below be a guard.
+    //
+    // Nesting is counted: the outermost endBatch() is the one that commits,
+    // and an inner endBatch(false) drops the whole batch rather than the part
+    // of it the inner caller opened. That is what lets this library batch its
+    // own writes -- a cache insert and the prune it triggers -- inside a batch
+    // the application opened.
+    //
+    // **Neither call clears lastError()**, unlike the rest of the interface:
+    // ending a batch is what happens on the way out of a failure, and it must
+    // not erase the reason the caller is about to read.
+    virtual bool beginBatch();
+    virtual bool endBatch(bool commit = true);
+
+    // A scope guard over the two, so that every path out of a batch -- an
+    // early return, a thrown exception -- ends it:
+    //
+    //     Store::Batch batch(&store);
+    //     for (const QString &id : ids)
+    //         store.saveConversation(id, transcripts.value(id));
+    //     if (!batch.commit())
+    //         qWarning() << store.lastError();
+    //
+    // Committed on destruction unless abort() was called; commit() ends it
+    // early and says whether the backend managed it. Header-only and not
+    // virtual: it is the caller's convenience over the two calls above, not a
+    // third thing a backend implements.
+    class Batch
+    {
+    public:
+        explicit Batch(Store *store)
+            : m_store(store && store->beginBatch() ? store : nullptr)
+        { }
+        ~Batch()
+        {
+            if (m_store)
+                m_store->endBatch(m_commit);
+        }
+
+        // False when there was no store, or when the backend refused to start
+        // -- a closed store is the usual reason. The writes that follow are
+        // then unbatched rather than lost, so a caller that does not check is
+        // slower rather than wrong.
+        bool isActive() const { return m_store != nullptr; }
+
+        // Drop the batch instead of keeping it, on this scope's way out.
+        void abort() { m_commit = false; }
+
+        // End it now rather than at the closing brace. False when the backend
+        // could not, with the reason in lastError(), and false as well when
+        // the batch never started -- the failure the constructor could not
+        // report.
+        bool commit()
+        {
+            Store *const store = m_store;
+            m_store = nullptr;
+            return store && store->endBatch(m_commit);
+        }
+
+    private:
+        Q_DISABLE_COPY(Batch)
+        Store *m_store = nullptr;
+        bool m_commit = true;
+    };
+
     // --- Conversations ----------------------------------------------------
     // Insert or replace. `title` is the application's label for the
     // conversation -- an empty one on an existing conversation keeps the title
@@ -111,6 +188,19 @@ public:
     virtual std::optional<ConversationRecord> conversation(const QString &id) = 0;
     // Most recently updated first: the order a conversation list is shown in.
     virtual QList<ConversationRecord> conversations() = 0;
+    // The same listing, bounded: the newest `limit` records, skipping the
+    // first `offset` of them. A conversation sidebar shows fifty and pages
+    // from there, and a backend with an index on that order answers it without
+    // reading the other nine thousand nine hundred and fifty -- which is the
+    // difference between a startup that lists and one that scans. A negative
+    // `limit` is no limit, which is what conversations() is; zero is an empty
+    // listing and reads nothing at all.
+    //
+    // The default asks for the full listing and slices it, so a backend that
+    // has nothing better to offer need not implement anything. A backend that
+    // does -- Sql::SqliteStore -- overrides this one and expresses the other
+    // in terms of it.
+    virtual QList<ConversationRecord> conversations(int limit, int offset = 0);
     virtual bool removeConversation(const QString &id) = 0;
 
     // --- Cached responses -------------------------------------------------
