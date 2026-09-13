@@ -22,6 +22,8 @@ private slots:
     void sendsEventsAsJsonText();
     void queuesEventsSentBeforeTheChannelIsOpen();
     void reportsDisconnection();
+    void audioIsNotQueuedForAChannelThatIsNotOpen();
+    void closingDiscardsWhatWasQueued();
 };
 
 namespace {
@@ -216,6 +218,67 @@ void TestRealtimeConnection::queuesEventsSentBeforeTheChannelIsOpen()
     QTRY_COMPARE(server.received().size(), 2);
     QCOMPARE(server.received().first().value(QStringLiteral("type")).toString(),
              QStringLiteral("conversation.item.create"));
+}
+
+void TestRealtimeConnection::audioIsNotQueuedForAChannelThatIsNotOpen()
+{
+    // Session setup is queued across the asynchronous open; audio is not. Frames
+    // captured before the channel exists would arrive seconds later in a session
+    // that was not configured when they were recorded, and
+    // input_audio_buffer.append carries no timestamp, so nothing downstream
+    // could tell. Retaining them is also what made the queue unbounded.
+    StubWebSocketServer server;
+    RealtimeConnection connection;
+    connection.setUrl(server.url());
+
+    connection.open();
+    connection.sendAudio(QByteArray(2048, '\0'));
+    connection.sendText(QStringLiteral("Hello"));
+
+    // The text event arrives (two events: the item and the response request);
+    // the audio does not, so the count is the same as without it.
+    QTRY_COMPARE(server.received().size(), 2);
+    for (const QJsonObject &event : server.received()) {
+        QVERIFY2(event.value(QStringLiteral("type")).toString()
+                         != QStringLiteral("input_audio_buffer.append"),
+                 "pre-connect audio was delivered into the session");
+    }
+
+    // Once the channel is open, audio goes straight out.
+    connection.sendAudio(QByteArray(2048, '\0'));
+    QTRY_COMPARE(server.received().size(), 3);
+    QCOMPARE(server.received().last().value(QStringLiteral("type")).toString(),
+             QStringLiteral("input_audio_buffer.append"));
+}
+
+void TestRealtimeConnection::closingDiscardsWhatWasQueued()
+{
+    // flush() runs on `connected`, so anything left queued for a channel that
+    // was closed before it opened would be replayed into whatever session opened
+    // next.
+    StubWebSocketServer server;
+    RealtimeConnection connection;
+    connection.setUrl(server.url());
+
+    connection.open();
+    connection.sendText(QStringLiteral("before the close"));
+    connection.close();
+
+    // Reopening must not carry the abandoned run's events with it.
+    connection.open();
+    connection.sendText(QStringLiteral("after the reopen"));
+    QTRY_COMPARE(server.received().size(), 2);
+    QCOMPARE(server.received()
+                     .first()
+                     .value(QStringLiteral("item"))
+                     .toObject()
+                     .value(QStringLiteral("content"))
+                     .toArray()
+                     .first()
+                     .toObject()
+                     .value(QStringLiteral("text"))
+                     .toString(),
+             QStringLiteral("after the reopen"));
 }
 
 void TestRealtimeConnection::reportsDisconnection()
