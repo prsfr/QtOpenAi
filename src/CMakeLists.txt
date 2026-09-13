@@ -7,6 +7,7 @@ set(QTOPENAI_PRIVATE_HEADERS
     "${QTOPENAI_PRIVATE_INCLUDE_DIR}/FormFields_p.h"
     "${QTOPENAI_PRIVATE_INCLUDE_DIR}/JsonHelpers_p.h"
     "${QTOPENAI_PRIVATE_INCLUDE_DIR}/RestPath_p.h"
+    "${QTOPENAI_PRIVATE_INCLUDE_DIR}/WireTable_p.h"
 )
 
 # The component names find_package(QtOpenAi COMPONENTS ...) accepts, which is

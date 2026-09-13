@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/VectorIndex.h"
 
+#include "WireTable_p.h"
+
 #include <QtCore/QJsonArray>
 #include <QtCore/QSharedData>
 
@@ -60,6 +62,21 @@ QList<double> normalized(const QList<double> &vector)
 
 namespace {
 
+// Metric travels on the wire, so it gets one table and both directions derived
+// from it, like the thirteen enums in Enums.cpp. It used to be a switch-shaped
+// chain on encode and a separate if-chain on decode: three values, six
+// spellings, no shared source. "cosine" in particular was written in exactly one
+// place and read in none, being the fallback on both sides -- so renaming it on
+// the encode side alone would have left every test passing over a file no other
+// reader of this format would understand.
+using detail::WireName;
+
+constexpr WireName<VectorIndex::Metric> kMetrics[] = {
+        {VectorIndex::Metric::Cosine, "cosine"},
+        {VectorIndex::Metric::DotProduct, "dot_product"},
+        {VectorIndex::Metric::Euclidean, "euclidean"},
+};
+
 struct Entry
 {
     QList<double> vector;
@@ -71,6 +88,9 @@ struct Entry
 };
 
 } // namespace
+
+QTOPENAI_WIRE_CONVERSIONS(metricToString, metricFromString, VectorIndex::Metric, kMetrics,
+                          VectorIndex::Metric::Cosine)
 
 class VectorIndexData : public QSharedData
 {
@@ -239,24 +259,15 @@ QJsonObject VectorIndex::toJson() const
         entries.append(object);
     }
 
-    QString metric = QStringLiteral("cosine");
-    if (d->metric == Metric::DotProduct)
-        metric = QStringLiteral("dot_product");
-    else if (d->metric == Metric::Euclidean)
-        metric = QStringLiteral("euclidean");
-
-    return {{QStringLiteral("metric"), metric}, {QStringLiteral("entries"), entries}};
+    return {{QStringLiteral("metric"), metricToString(d->metric)},
+            {QStringLiteral("entries"), entries}};
 }
 
 VectorIndex VectorIndex::fromJson(const QJsonObject &json)
 {
     VectorIndex index;
 
-    const QString metric = json.value(QStringLiteral("metric")).toString();
-    if (metric == QLatin1String("dot_product"))
-        index.setMetric(Metric::DotProduct);
-    else if (metric == QLatin1String("euclidean"))
-        index.setMetric(Metric::Euclidean);
+    index.setMetric(metricFromString(json.value(QStringLiteral("metric")).toString()));
 
     const QJsonArray entries = json.value(QStringLiteral("entries")).toArray();
     for (const QJsonValue &value : entries) {
