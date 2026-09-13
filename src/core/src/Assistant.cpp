@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/Assistant.h"
 
+#include "AssistantFields_p.h"
 #include "JsonHelpers_p.h"
 
 #include <QtCore/QSharedData>
@@ -8,22 +9,15 @@
 namespace QtOpenAi {
 namespace Core {
 
-class AssistantData : public QSharedData
+// The ten fields an assistant shares with the body that creates one come from
+// the private base; only what the server stamps on it lives here. See
+// AssistantFields_p.h for why they are not declared twice.
+class AssistantData : public detail::AssistantFieldsData
 {
 public:
     QString id;
     QString object;
     qint64 createdAt = 0;
-    QString name;
-    QString description;
-    QString model;
-    QString instructions;
-    QJsonArray tools;
-    QJsonObject toolResources;
-    QJsonObject metadata;
-    std::optional<double> temperature;
-    std::optional<double> topP;
-    QJsonValue responseFormat = QJsonValue::Undefined;
 };
 
 Assistant::Assistant()
@@ -87,20 +81,7 @@ QJsonObject Assistant::toJson() const
     detail::insertIfNotEmpty(json, QStringLiteral("id"), d->id);
     detail::insertIfNotEmpty(json, QStringLiteral("object"), d->object);
     detail::insertIfNonZero(json, QStringLiteral("created_at"), d->createdAt);
-    detail::insertIfNotEmpty(json, QStringLiteral("name"), d->name);
-    detail::insertIfNotEmpty(json, QStringLiteral("description"), d->description);
-    detail::insertIfNotEmpty(json, QStringLiteral("model"), d->model);
-    detail::insertIfNotEmpty(json, QStringLiteral("instructions"), d->instructions);
-    if (!d->tools.isEmpty())
-        json.insert(QStringLiteral("tools"), d->tools);
-    if (!d->toolResources.isEmpty())
-        json.insert(QStringLiteral("tool_resources"), d->toolResources);
-    if (!d->metadata.isEmpty())
-        json.insert(QStringLiteral("metadata"), d->metadata);
-    detail::insertIfSet(json, QStringLiteral("temperature"), d->temperature);
-    detail::insertIfSet(json, QStringLiteral("top_p"), d->topP);
-    if (!d->responseFormat.isUndefined())
-        json.insert(QStringLiteral("response_format"), d->responseFormat);
+    detail::insertAssistantFields(json, *d);
     return json;
 }
 
@@ -110,30 +91,14 @@ Assistant Assistant::fromJson(const QJsonObject &json)
     assistant.d->id = detail::stringOr(json, QStringLiteral("id"));
     assistant.d->object = detail::stringOr(json, QStringLiteral("object"));
     assistant.d->createdAt = detail::int64Or(json, QStringLiteral("created_at"));
-    assistant.d->name = detail::stringOr(json, QStringLiteral("name"));
-    assistant.d->description = detail::stringOr(json, QStringLiteral("description"));
-    assistant.d->model = detail::stringOr(json, QStringLiteral("model"));
-    assistant.d->instructions = detail::stringOr(json, QStringLiteral("instructions"));
-    assistant.d->tools = json.value(QStringLiteral("tools")).toArray();
-    assistant.d->toolResources = json.value(QStringLiteral("tool_resources")).toObject();
-    assistant.d->metadata = json.value(QStringLiteral("metadata")).toObject();
-    assistant.d->temperature = detail::optionalDouble(json, QStringLiteral("temperature"));
-    assistant.d->topP = detail::optionalDouble(json, QStringLiteral("top_p"));
-    // A null response_format means "not set", the same as an absent one.
-    const QJsonValue format = json.value(QStringLiteral("response_format"));
-    assistant.d->responseFormat = format.isNull() ? QJsonValue(QJsonValue::Undefined) : format;
+    detail::readAssistantFields(*assistant.d, json);
     return assistant;
 }
 
 bool Assistant::operator==(const Assistant &other) const
 {
     return d->id == other.d->id && d->object == other.d->object
-           && d->createdAt == other.d->createdAt && d->name == other.d->name
-           && d->description == other.d->description && d->model == other.d->model
-           && d->instructions == other.d->instructions && d->tools == other.d->tools
-           && d->toolResources == other.d->toolResources && d->metadata == other.d->metadata
-           && d->temperature == other.d->temperature && d->topP == other.d->topP
-           && d->responseFormat == other.d->responseFormat;
+           && d->createdAt == other.d->createdAt && detail::assistantFieldsEqual(*d, *other.d);
 }
 
 } // namespace Core

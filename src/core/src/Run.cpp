@@ -2,6 +2,7 @@
 #include "QtOpenAi/Core/Run.h"
 
 #include "JsonHelpers_p.h"
+#include "RunFields_p.h"
 
 #include <QtCore/QSharedData>
 
@@ -28,14 +29,15 @@ ToolOutput ToolOutput::fromJson(const QJsonObject &json)
 
 // --- Run -------------------------------------------------------------------
 
-class RunData : public QSharedData
+// The thirteen fields a run shares with the body that creates one come from the
+// private base; only what the server assigns lives here. See RunFields_p.h.
+class RunData : public detail::RunFieldsData
 {
 public:
     QString id;
     QString object;
     qint64 createdAt = 0;
     QString threadId;
-    QString assistantId;
     RunStatus status = RunStatus::Queued;
     QString requiredActionType;
     QList<ToolCall> requiredToolCalls;
@@ -47,19 +49,7 @@ public:
     qint64 cancelledAt = 0;
     qint64 failedAt = 0;
     qint64 completedAt = 0;
-    QString model;
-    QString instructions;
-    QJsonArray tools;
-    QJsonObject metadata;
     Usage usage;
-    std::optional<double> temperature;
-    std::optional<double> topP;
-    std::optional<int> maxPromptTokens;
-    std::optional<int> maxCompletionTokens;
-    QJsonObject truncationStrategy;
-    QJsonValue toolChoice = QJsonValue::Undefined;
-    std::optional<bool> parallelToolCalls;
-    QJsonValue responseFormat = QJsonValue::Undefined;
 };
 
 Run::Run()
@@ -188,7 +178,7 @@ QJsonObject Run::toJson() const
     detail::insertIfNotEmpty(json, QStringLiteral("object"), d->object);
     detail::insertIfNonZero(json, QStringLiteral("created_at"), d->createdAt);
     detail::insertIfNotEmpty(json, QStringLiteral("thread_id"), d->threadId);
-    detail::insertIfNotEmpty(json, QStringLiteral("assistant_id"), d->assistantId);
+    detail::insertRunFields(json, *d);
     json.insert(QStringLiteral("status"), runStatusToString(d->status));
     // Keyed on the calls as well as the type, so a run assembled through the
     // setters cannot lose them to an unset sibling field.
@@ -216,24 +206,7 @@ QJsonObject Run::toJson() const
     detail::insertIfNonZero(json, QStringLiteral("cancelled_at"), d->cancelledAt);
     detail::insertIfNonZero(json, QStringLiteral("failed_at"), d->failedAt);
     detail::insertIfNonZero(json, QStringLiteral("completed_at"), d->completedAt);
-    detail::insertIfNotEmpty(json, QStringLiteral("model"), d->model);
-    detail::insertIfNotEmpty(json, QStringLiteral("instructions"), d->instructions);
-    if (!d->tools.isEmpty())
-        json.insert(QStringLiteral("tools"), d->tools);
-    if (!d->metadata.isEmpty())
-        json.insert(QStringLiteral("metadata"), d->metadata);
     json.insert(QStringLiteral("usage"), d->usage.toJson());
-    detail::insertIfSet(json, QStringLiteral("temperature"), d->temperature);
-    detail::insertIfSet(json, QStringLiteral("top_p"), d->topP);
-    detail::insertIfSet(json, QStringLiteral("max_prompt_tokens"), d->maxPromptTokens);
-    detail::insertIfSet(json, QStringLiteral("max_completion_tokens"), d->maxCompletionTokens);
-    if (!d->truncationStrategy.isEmpty())
-        json.insert(QStringLiteral("truncation_strategy"), d->truncationStrategy);
-    if (!d->toolChoice.isUndefined())
-        json.insert(QStringLiteral("tool_choice"), d->toolChoice);
-    detail::insertIfSet(json, QStringLiteral("parallel_tool_calls"), d->parallelToolCalls);
-    if (!d->responseFormat.isUndefined())
-        json.insert(QStringLiteral("response_format"), d->responseFormat);
     return json;
 }
 
@@ -244,7 +217,7 @@ Run Run::fromJson(const QJsonObject &json)
     run.d->object = detail::stringOr(json, QStringLiteral("object"));
     run.d->createdAt = detail::int64Or(json, QStringLiteral("created_at"));
     run.d->threadId = detail::stringOr(json, QStringLiteral("thread_id"));
-    run.d->assistantId = detail::stringOr(json, QStringLiteral("assistant_id"));
+    detail::readRunFields(*run.d, json);
     run.d->status = runStatusFromString(detail::stringOr(json, QStringLiteral("status")));
 
     const QJsonObject requiredAction = json.value(QStringLiteral("required_action")).toObject();
@@ -266,21 +239,7 @@ Run Run::fromJson(const QJsonObject &json)
     run.d->cancelledAt = detail::int64Or(json, QStringLiteral("cancelled_at"));
     run.d->failedAt = detail::int64Or(json, QStringLiteral("failed_at"));
     run.d->completedAt = detail::int64Or(json, QStringLiteral("completed_at"));
-    run.d->model = detail::stringOr(json, QStringLiteral("model"));
-    run.d->instructions = detail::stringOr(json, QStringLiteral("instructions"));
-    run.d->tools = json.value(QStringLiteral("tools")).toArray();
-    run.d->metadata = json.value(QStringLiteral("metadata")).toObject();
     run.d->usage = Usage::fromJson(json.value(QStringLiteral("usage")).toObject());
-    run.d->temperature = detail::optionalDouble(json, QStringLiteral("temperature"));
-    run.d->topP = detail::optionalDouble(json, QStringLiteral("top_p"));
-    run.d->maxPromptTokens = detail::optionalInt(json, QStringLiteral("max_prompt_tokens"));
-    run.d->maxCompletionTokens = detail::optionalInt(json, QStringLiteral("max_completion_tokens"));
-    run.d->truncationStrategy = json.value(QStringLiteral("truncation_strategy")).toObject();
-    const QJsonValue toolChoice = json.value(QStringLiteral("tool_choice"));
-    run.d->toolChoice = toolChoice.isNull() ? QJsonValue(QJsonValue::Undefined) : toolChoice;
-    run.d->parallelToolCalls = detail::optionalBool(json, QStringLiteral("parallel_tool_calls"));
-    const QJsonValue format = json.value(QStringLiteral("response_format"));
-    run.d->responseFormat = format.isNull() ? QJsonValue(QJsonValue::Undefined) : format;
     return run;
 }
 
@@ -288,23 +247,14 @@ bool Run::operator==(const Run &other) const
 {
     return d->id == other.d->id && d->object == other.d->object
            && d->createdAt == other.d->createdAt && d->threadId == other.d->threadId
-           && d->assistantId == other.d->assistantId && d->status == other.d->status
-           && d->requiredActionType == other.d->requiredActionType
+           && d->status == other.d->status && d->requiredActionType == other.d->requiredActionType
            && d->requiredToolCalls == other.d->requiredToolCalls
            && d->errorCode == other.d->errorCode && d->errorMessage == other.d->errorMessage
            && d->incompleteDetails == other.d->incompleteDetails
            && d->expiresAt == other.d->expiresAt && d->startedAt == other.d->startedAt
            && d->cancelledAt == other.d->cancelledAt && d->failedAt == other.d->failedAt
-           && d->completedAt == other.d->completedAt && d->model == other.d->model
-           && d->instructions == other.d->instructions && d->tools == other.d->tools
-           && d->metadata == other.d->metadata && d->usage == other.d->usage
-           && d->temperature == other.d->temperature && d->topP == other.d->topP
-           && d->maxPromptTokens == other.d->maxPromptTokens
-           && d->maxCompletionTokens == other.d->maxCompletionTokens
-           && d->truncationStrategy == other.d->truncationStrategy
-           && d->toolChoice == other.d->toolChoice
-           && d->parallelToolCalls == other.d->parallelToolCalls
-           && d->responseFormat == other.d->responseFormat;
+           && d->completedAt == other.d->completedAt && d->usage == other.d->usage
+           && detail::runFieldsEqual(*d, *other.d);
 }
 
 } // namespace Core
