@@ -20,6 +20,7 @@ private slots:
     void theBodyIsCapped();
     void aRedirectIsNotFollowed();
     void anErrorStatusIsReportedNotReturned();
+    void aRefusalSaysWhichKindItIs();
 };
 
 void TestHttpTools::nothingIsFetchedByDefault()
@@ -138,11 +139,57 @@ void TestHttpTools::anErrorStatusIsReportedNotReturned()
     tools.setRequiresHttps(false);
     tools.addAllowedHost(QStringLiteral("127.0.0.1"));
 
+    QSignalSpy refused(&tools, &HttpTools::refused);
+    QSignalSpy fetched(&tools, &HttpTools::fetched);
+
     const QString result = tools.http_get(server.baseUrl().toString());
     QCOMPARE(result, QStringLiteral("the server answered 404"));
     // The error page's own content is not handed to the model: a 404 body is a
     // page someone else wrote, and it is not the answer to anything.
     QVERIFY(!result.contains(QStringLiteral("Not found")));
+
+    // And it is on the audit trail. It used to appear on neither signal, so a
+    // run of 403s against an allowed host -- a model probing an endpoint it
+    // half-remembers -- left no record at all.
+    QCOMPARE(fetched.count(), 0);
+    QCOMPARE(refused.count(), 1);
+    QCOMPARE(refused.first().at(1).value<HttpTools::Refusal>(), HttpTools::Refusal::HttpError);
+}
+
+void TestHttpTools::aRefusalSaysWhichKindItIs()
+{
+    // The header argues that this is the dangerous tool because a model will
+    // happily be talked into fetching 169.254.169.254 or localhost:8080/admin.
+    // Reporting that as a sentence with the attacker-chosen host interpolated
+    // into it makes an alert rule a substring match; the enum is what a rule
+    // should branch on.
+    HttpTools tools;
+    tools.setRequiresHttps(false);
+    tools.addAllowedHost(QStringLiteral("docs.example.com"));
+    QSignalSpy refused(&tools, &HttpTools::refused);
+
+    const auto reasonOf
+            = [&refused](int index) { return refused.at(index).at(1).value<HttpTools::Refusal>(); };
+
+    // The one worth paging someone about.
+    tools.http_get(QStringLiteral("http://169.254.169.254/latest/meta-data/"));
+    QCOMPARE(refused.count(), 1);
+    QCOMPARE(reasonOf(0), HttpTools::Refusal::HostNotAllowed);
+
+    // Not the same event: a typo cannot be allowed either, but nobody should be
+    // woken for it.
+    tools.http_get(QStringLiteral("not a url"));
+    QCOMPARE(refused.count(), 2);
+    QCOMPARE(reasonOf(1), HttpTools::Refusal::InvalidUrl);
+
+    // And the scheme gate is its own reason, checked before the allow-list.
+    tools.setRequiresHttps(true);
+    tools.http_get(QStringLiteral("http://docs.example.com/page"));
+    QCOMPARE(refused.count(), 3);
+    QCOMPARE(reasonOf(2), HttpTools::Refusal::NotHttps);
+
+    // The sentence is still carried for the model and the log.
+    QVERIFY(!refused.last().at(2).toString().isEmpty());
 }
 
 QTEST_MAIN(TestHttpTools)

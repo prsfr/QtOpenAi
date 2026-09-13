@@ -60,11 +60,23 @@ Q_SIGNALS:
     // Every attempt the sandbox turned down, with the path as the model asked
     // for it. An application that never sees this will not know it is under
     // attack; one that logs it will.
-    void refused(const QString &tool, const QString &path, const QString &reason);
+    //
+    // `reason` is what to branch on -- Rejection::OutsideRoots is a traversal or
+    // symlink escape and worth paging someone about, Rejection::Unreadable is
+    // almost always the model guessing a filename. `message` is the same
+    // sentence the model was given: it is written for the model, so it is for
+    // logs and humans, never for a rule to match on.
+    void refused(const QString &tool, const QString &path,
+                 QtOpenAi::Tools::FileSandbox::Rejection reason, const QString &message);
     // Every call that went through, for an audit trail.
     void performed(const QString &tool, const QString &path);
 
 private:
+    // Emits refused() and returns the sentence to hand back to the model. One
+    // place, because the pair was written out ten times and the describe() call
+    // was evaluated twice in three of them.
+    QString refuse(const QString &tool, const QString &path, FileSandbox::Rejection why);
+
     FileSandbox m_sandbox;
 };
 

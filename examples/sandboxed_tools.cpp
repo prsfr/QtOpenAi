@@ -108,8 +108,15 @@ int main(int argc, char **argv)
 
     if (Tools::FileTools *files = tools.fileTools()) {
         QObject::connect(files, &Tools::FileTools::refused,
-                         [&out](const QString &tool, const QString &path, const QString &reason) {
-                             out << "[refused] " << tool << " " << path << " -- " << reason << "\n";
+                         [&out](const QString &tool, const QString &path,
+                                Tools::FileSandbox::Rejection reason, const QString &message) {
+                             // The enum is what a rule would branch on; an escape
+                             // attempt is not the same event as a mistyped name,
+                             // and the message is written for the model.
+                             const bool escape
+                                     = reason == Tools::FileSandbox::Rejection::OutsideRoots;
+                             out << (escape ? "[BLOCKED ESCAPE] " : "[refused] ") << tool << " "
+                                 << path << " -- " << message << "\n";
                          });
         QObject::connect(files, &Tools::FileTools::performed,
                          [&out](const QString &tool, const QString &path) {

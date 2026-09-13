@@ -3,6 +3,7 @@
 
 #include <QtOpenAi/Tools/GlobalTools.h>
 
+#include <QtCore/QObject>
 #include <QtCore/QSharedDataPointer>
 #include <QtCore/QString>
 #include <QtCore/QStringList>
@@ -49,9 +50,18 @@ class FileSandboxData;
 // that needs it without anyone owning it.
 class QTOPENAI_TOOLS_EXPORT FileSandbox
 {
+    // Q_GADGET only for Q_ENUM below -- Rejection travels on FileTools::refused(),
+    // so it has to be a metatype to survive a queued connection. Nothing else
+    // here is meta-object driven, and the value semantics are unchanged.
+    Q_GADGET
 public:
     // Why a path was refused. Reported to the model so it can correct itself,
     // and to the application so it can log the attempt.
+    //
+    // This, not describe()'s sentence, is what an application should branch on:
+    // OutsideRoots is an escape attempt and Unreadable is usually a model
+    // guessing a filename, and the text that tells them apart is written for the
+    // model and will be reworded.
     enum class Rejection {
         None,
         NoRoots,      // nothing was allowed in the first place
@@ -61,6 +71,7 @@ public:
         Unreadable,   // does not exist, or the OS said no
         InvalidPath   // empty, or not a path at all
     };
+    Q_ENUM(Rejection)
 
     FileSandbox();
     explicit FileSandbox(const QStringList &roots);

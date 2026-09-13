@@ -37,6 +37,7 @@ private slots:
     void sizeIsCapped();
     void writingNeedsAResolvableParent();
     void theToolsRefuseAndSayWhy();
+    void aRefusalSaysWhichKindItIs();
 
 private:
     QTemporaryDir m_temp;
@@ -225,8 +226,12 @@ void TestFileSandbox::theToolsRefuseAndSayWhy()
     // instead of correcting it.
     const QString denied = tools.read_file(m_outside + QStringLiteral("/secret.txt"));
     QVERIFY2(!denied.contains(QStringLiteral("not for the model")), qPrintable(denied));
-    QVERIFY(denied.contains(QStringLiteral("outside")));
     QCOMPARE(refused.count(), 1);
+    // Which refusal it was comes off the signal, not out of the sentence. The
+    // sentence is written for the model and will be reworded; matching it was
+    // what this test used to do.
+    QCOMPARE(refused.first().at(2).value<FileSandbox::Rejection>(),
+             FileSandbox::Rejection::OutsideRoots);
 
     // file_exists answers "false" rather than "not allowed": an existence
     // oracle over the whole filesystem is exactly what it must not be.
@@ -264,6 +269,58 @@ void TestFileSandbox::theToolsRefuseAndSayWhy()
     const QString capped = tools.read_file(m_jail + QStringLiteral("/allowed.txt"));
     QVERIFY(capped.contains(QStringLiteral("larger")));
     QVERIFY(!capped.contains(QStringLiteral("inside the jail")));
+}
+
+void TestFileSandbox::aRefusalSaysWhichKindItIs()
+{
+    // refused() is documented as how an application learns it is under attack.
+    // It can only serve that if an escape attempt is distinguishable from a
+    // model guessing a filename -- and those two are by far the most common
+    // refusals there are. They used to differ only in an English sentence.
+    FileTools tools(FileSandbox({m_jail}));
+    QSignalSpy refused(&tools, &FileTools::refused);
+
+    const auto reasonOf = [&refused](int index) {
+        return refused.at(index).at(2).value<FileSandbox::Rejection>();
+    };
+
+    // Benign: inside the jail, simply not there.
+    tools.read_file(m_jail + QStringLiteral("/typo.txt"));
+    QCOMPARE(refused.count(), 1);
+    QCOMPARE(reasonOf(0), FileSandbox::Rejection::Unreadable);
+
+    // Benign, and reported even though the tool answers "false".
+    QCOMPARE(tools.file_exists(m_jail + QStringLiteral("/typo.txt")), QStringLiteral("false"));
+    QCOMPARE(refused.count(), 2);
+    QCOMPARE(reasonOf(1), FileSandbox::Rejection::Unreadable);
+
+    // Traversal out of the jail: one of the two cases the class exists to stop.
+    tools.read_file(m_jail + QStringLiteral("/../outside/secret.txt"));
+    QCOMPARE(refused.count(), 3);
+    QCOMPARE(reasonOf(2), FileSandbox::Rejection::OutsideRoots);
+
+    // The other one, and the reason containment is by canonical path.
+    QVERIFY(QFile::link(m_outside, m_jail + QStringLiteral("/escape")));
+    tools.read_file(m_jail + QStringLiteral("/escape/secret.txt"));
+    QCOMPARE(refused.count(), 4);
+    QCOMPARE(reasonOf(3), FileSandbox::Rejection::OutsideRoots);
+
+    // Not the same event as either: a cap, on a path that was always allowed.
+    FileSandbox tiny({m_jail});
+    tiny.setMaxBytes(4);
+    tools.setSandbox(tiny);
+    tools.read_file(m_jail + QStringLiteral("/allowed.txt"));
+    QCOMPARE(refused.count(), 5);
+    QCOMPARE(reasonOf(4), FileSandbox::Rejection::TooLarge);
+
+    // A write against a read-only sandbox is its own reason too.
+    tools.setSandbox(FileSandbox({m_jail}));
+    tools.write_file(m_jail + QStringLiteral("/new.txt"), QStringLiteral("x"));
+    QCOMPARE(refused.count(), 6);
+    QCOMPARE(reasonOf(5), FileSandbox::Rejection::ReadOnly);
+
+    // The sentence is still carried, for logs and for the model.
+    QVERIFY(!refused.last().at(3).toString().isEmpty());
 }
 
 QTEST_MAIN(TestFileSandbox)
