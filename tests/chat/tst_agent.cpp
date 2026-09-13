@@ -3,6 +3,9 @@
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/ToolRegistry.h>
 
+#include <QtCore/QEventLoop>
+#include <QtCore/QTimer>
+#include <QtNetwork/QHostAddress>
 #include <QtNetwork/QTcpServer>
 #include <QtNetwork/QTcpSocket>
 #include <QtTest/QtTest>
@@ -27,6 +30,23 @@ QByteArray toolCallBody(const QString &id = QStringLiteral("call_1"))
             {"id":"%1","type":"function",
              "function":{"name":"get_weather","arguments":"%2"}}]}}]})")
             .arg(id, arguments)
+            .toUtf8();
+}
+
+// An assistant turn asking for two tool calls, so a test can watch what
+// happens to the second one after something has stopped the run during the
+// first. Arguments are substituted for the same reason as above.
+QByteArray twoToolCallsBody()
+{
+    const QString arguments = QStringLiteral("{\\\"location\\\":\\\"Berlin\\\"}");
+    return QStringLiteral(R"({"id":"c","object":"chat.completion","created":1,
+        "model":"gpt-4o-mini","choices":[{"index":0,"finish_reason":"tool_calls",
+        "message":{"role":"assistant","content":null,"tool_calls":[
+            {"id":"call_1","type":"function",
+             "function":{"name":"get_weather","arguments":"%1"}},
+            {"id":"call_2","type":"function",
+             "function":{"name":"get_weather","arguments":"%1"}}]}}]})")
+            .arg(arguments)
             .toUtf8();
 }
 
@@ -56,6 +76,11 @@ private slots:
     void reportsATransportFailure();
     void refusesASecondConcurrentRun();
     void accumulatesTheConversationAcrossRuns();
+    void cancelAbortsTheTransferInFlight();
+    void cancelStopsTheRequestAndFailsOnce();
+    void cancelFromTheApprovalCallbackStopsTheToolLoop();
+    void theDeadlineStopsARunBlockedInsideAToolCall();
+    void aCancelledRunDoesNotDispatchIntoTheNextOne();
 
 private:
     static ToolRegistry *weatherRegistry(QObject *parent, int *calls);
@@ -242,6 +267,195 @@ void TestAgent::accumulatesTheConversationAcrossRuns()
     QCOMPARE(agent.transcript().count(), 4);
     QVERIFY(server.requestBodies().value(1).contains("\"one\""));
     QCOMPARE(finishedSpy.at(1).first().value<Message>().content(), QStringLiteral("two"));
+}
+
+// The four below cover cancel() and the deadline. Both are documented in
+// Agent.h as the reason the class exists, and both were untested until #161
+// found that neither actually stopped anything.
+
+void TestAgent::cancelAbortsTheTransferInFlight()
+{
+    // Stopping the run has to stop the transfer, not just stop listening to
+    // it: a provider that is still generating is still charging. StubServer
+    // answers at once, so this needs a server that accepts and then says
+    // nothing, leaving the request genuinely in flight to be aborted.
+    QTcpServer silent;
+    QVERIFY(silent.listen(QHostAddress::LocalHost, 0));
+
+    bool accepted = false;
+    bool disconnected = false;
+    connect(&silent, &QTcpServer::newConnection, this, [&] {
+        QTcpSocket *socket = silent.nextPendingConnection();
+        accepted = true;
+        connect(socket, &QTcpSocket::disconnected, this, [&] { disconnected = true; });
+    });
+
+    Client client(QUrl(QStringLiteral("http://127.0.0.1:%1/v1").arg(silent.serverPort())),
+                  QStringLiteral("k"));
+    client.setRetryPolicy(RetryPolicy::none());
+
+    Agent agent(&client, nullptr);
+    agent.setModel(QStringLiteral("gpt-4o-mini"));
+
+    QVERIFY(agent.run(QStringLiteral("hi")));
+    QTRY_VERIFY_WITH_TIMEOUT(accepted, 5000);
+    QVERIFY(!disconnected);
+
+    agent.cancel();
+
+    // Without a reachable abort the connection just stays open.
+    QTRY_VERIFY_WITH_TIMEOUT(disconnected, 5000);
+}
+
+void TestAgent::cancelStopsTheRequestAndFailsOnce()
+{
+    StubServer server(answerBody());
+    Client client(server.baseUrl(), QStringLiteral("k"));
+    // An aborted transfer must not be retried into a second request.
+    client.setRetryPolicy(RetryPolicy::none());
+
+    Agent agent(&client, nullptr);
+    agent.setModel(QStringLiteral("gpt-4o-mini"));
+
+    QSignalSpy failedSpy(&agent, &Agent::failed);
+    QSignalSpy finishedSpy(&agent, &Agent::finished);
+
+    QVERIFY(agent.run(QStringLiteral("hi")));
+    agent.cancel();
+
+    // Exactly one failure: aborting makes the reply fail too, and that failure
+    // is not a second thing to report.
+    QCOMPARE(failedSpy.count(), 1);
+    QVERIFY(!agent.isRunning());
+
+    // Give the abandoned reply every chance to come back with an answer.
+    QTest::qWait(300);
+    QCOMPARE(finishedSpy.count(), 0);
+    QCOMPARE(failedSpy.count(), 1);
+}
+
+void TestAgent::cancelFromTheApprovalCallbackStopsTheToolLoop()
+{
+    // The approval callback is application code called from inside the tool
+    // loop, and cancelling from it is exactly what a Stop button does.
+    StubServer server(QList<StubServer::Response> {{twoToolCallsBody()}, {answerBody()}});
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    int toolCalls = 0;
+    ToolRegistry *registry = weatherRegistry(this, &toolCalls);
+
+    Agent agent(&client, registry);
+    agent.setModel(QStringLiteral("gpt-4o-mini"));
+
+    int approvals = 0;
+    agent.setApprovalCallback([&agent, &approvals](const ToolCall &) {
+        if (++approvals == 1)
+            agent.cancel();
+        return true;
+    });
+
+    QSignalSpy failedSpy(&agent, &Agent::failed);
+    QSignalSpy invokedSpy(&agent, &Agent::toolInvoked);
+
+    QVERIFY(agent.run(QStringLiteral("go")));
+    QVERIFY(failedSpy.wait(5000));
+    QTest::qWait(300);
+
+    // The run stopped where it was told to: the approved call did not run, the
+    // second call was never even offered for approval, and no further turn was
+    // dispatched.
+    QCOMPARE(approvals, 1);
+    QCOMPARE(toolCalls, 0);
+    QCOMPARE(invokedSpy.count(), 0);
+    QCOMPARE(failedSpy.count(), 1);
+    QCOMPARE(server.requestCount(), 1);
+    QVERIFY(!agent.isRunning());
+}
+
+void TestAgent::theDeadlineStopsARunBlockedInsideAToolCall()
+{
+    // A tool that blocks on a nested event loop delivers the agent's own
+    // deadline while it waits -- HttpTools' http_get documents itself as
+    // working exactly this way, so this needs no application code to reach.
+    StubServer server(QList<StubServer::Response> {{twoToolCallsBody()}, {answerBody()}});
+    Client client(server.baseUrl(), QStringLiteral("k"));
+    client.setRetryPolicy(RetryPolicy::none());
+
+    int toolCalls = 0;
+    auto *registry = new ToolRegistry(this);
+    registry->registerFunction(QStringLiteral("get_weather"), QStringLiteral("Weather"),
+                               QJsonObject {}, [&toolCalls](const QJsonObject &) {
+                                   ++toolCalls;
+                                   QEventLoop inner;
+                                   QTimer::singleShot(300, &inner, &QEventLoop::quit);
+                                   inner.exec();
+                                   return QStringLiteral("sunny");
+                               });
+
+    Agent agent(&client, registry);
+    agent.setModel(QStringLiteral("gpt-4o-mini"));
+    agent.setTimeoutMs(150);
+
+    QSignalSpy failedSpy(&agent, &Agent::failed);
+    QVERIFY(agent.run(QStringLiteral("go")));
+    QVERIFY(failedSpy.wait(5000));
+    QTest::qWait(400);
+
+    // The first tool was already running when the deadline fired, so it
+    // finishes; the second must not start, and the run must not go on to ask
+    // the model again -- that request would be unguarded, since the deadline
+    // has been stopped.
+    QCOMPARE(toolCalls, 1);
+    QCOMPARE(server.requestCount(), 1);
+    QCOMPARE(failedSpy.count(), 1);
+    QVERIFY(failedSpy.first().first().value<ClientError>().message().contains(
+            QStringLiteral("exceeded")));
+    QVERIFY(!agent.isRunning());
+}
+
+void TestAgent::aCancelledRunDoesNotDispatchIntoTheNextOne()
+{
+    // The composed failure: a cancelled run that still dispatches leaves a
+    // reply nobody owns, and the next run answers the previous question.
+    // Only two responses are queued, and the queue repeats its last entry. A
+    // run that dispatched after being cancelled would burn the second one on
+    // the orphan request, so the count below is what catches it.
+    StubServer server(QList<StubServer::Response> {{twoToolCallsBody()},
+                                                   {answerBody(QStringLiteral("second answer"))}});
+    Client client(server.baseUrl(), QStringLiteral("k"));
+
+    int toolCalls = 0;
+    ToolRegistry *registry = weatherRegistry(this, &toolCalls);
+
+    Agent agent(&client, registry);
+    agent.setModel(QStringLiteral("gpt-4o-mini"));
+
+    bool cancelled = false;
+    agent.setApprovalCallback([&agent, &cancelled](const ToolCall &) {
+        if (!cancelled) {
+            cancelled = true;
+            agent.cancel();
+        }
+        return true;
+    });
+
+    QSignalSpy failedSpy(&agent, &Agent::failed);
+    QVERIFY(agent.run(QStringLiteral("first")));
+    QVERIFY(failedSpy.wait(5000));
+    QTest::qWait(200);
+
+    // cancel() invites a fresh run: isRunning() is false, so run() is accepted.
+    agent.setApprovalCallback(nullptr);
+    QSignalSpy finishedSpy(&agent, &Agent::finished);
+    QVERIFY(agent.run(QStringLiteral("second")));
+    QVERIFY(finishedSpy.wait(5000));
+
+    // Two requests in total, not three: the cancelled run dispatched nothing,
+    // so the answer the application is shown is the answer to its own prompt.
+    QCOMPARE(server.requestCount(), 2);
+    QCOMPARE(finishedSpy.count(), 1);
+    QCOMPARE(finishedSpy.first().first().value<Message>().content(),
+             QStringLiteral("second answer"));
 }
 
 QTEST_MAIN(TestAgent)

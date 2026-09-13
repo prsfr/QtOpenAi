@@ -4,6 +4,8 @@
 #include <QtOpenAi/Client/ChatCompletionReply.h>
 #include <QtOpenAi/Client/ChatCompletionStreamReply.h>
 #include <QtOpenAi/Client/Client.h>
+#include <QtOpenAi/Client/RestReplyBase.h>
+#include <QtOpenAi/Client/StreamReplyBase.h>
 #include <QtOpenAi/Client/ToolRegistry.h>
 
 #include "JsonHelpers_p.h"
@@ -47,7 +49,14 @@ public:
 
     bool running = false;
     int iteration = 0;
-    QPointer<QObject> reply; // the request in flight, whichever kind
+    // The request in flight, held as the two kinds it can actually be rather
+    // than as a bare QObject. abort() is a plain public member on both bases,
+    // not a slot and not Q_INVOKABLE, so it is absent from the meta-object:
+    // reaching it by name left both stop paths doing nothing but printing a
+    // warning. Two typed pointers cost one branch and let the compiler check
+    // the call. Only one is ever non-null.
+    QPointer<Client::RestReplyBase> onceReply;
+    QPointer<Client::StreamReplyBase> streamReply;
     QTimer deadline;
 
     void setRunning(bool value)
@@ -65,10 +74,42 @@ public:
         Q_EMIT q->failed(Client::ClientError(kind, message));
     }
 
+    // Lets go of the reply without touching the transfer: the right thing when
+    // it has already settled and handed us its answer.
+    void forgetReply()
+    {
+        onceReply = nullptr;
+        streamReply = nullptr;
+    }
+
+    // Stops the transfer as well, which is what cancel() and the deadline want:
+    // otherwise the provider goes on generating -- and billing -- an answer
+    // that nothing will read.
+    //
+    // Our connections go first. abort() makes the reply fail, and that failure
+    // is no longer ours to report: the caller is about to emit a failed() of
+    // its own saying why the run stopped, and without the disconnect one
+    // cancel() would deliver two.
+    void abortReply()
+    {
+        Client::RestReplyBase *once = onceReply.data();
+        Client::StreamReplyBase *stream = streamReply.data();
+        forgetReply();
+
+        if (once) {
+            QObject::disconnect(once, nullptr, q, nullptr);
+            once->abort();
+        }
+        if (stream) {
+            QObject::disconnect(stream, nullptr, q, nullptr);
+            stream->abort();
+        }
+    }
+
     void finish()
     {
         deadline.stop();
-        reply = nullptr;
+        forgetReply();
         setRunning(false);
     }
 
@@ -100,9 +141,10 @@ void AgentPrivate::step()
         Q_EMIT q->failed(error);
     };
 
+    forgetReply();
     if (streaming) {
         Client::ChatCompletionStreamReply *stream = client->createChatCompletionStream(request);
-        reply = stream;
+        streamReply = stream;
         QObject::connect(stream, &Client::ChatCompletionStreamReply::contentDelta, q,
                          &Agent::contentDelta);
         QObject::connect(stream, &Client::ChatCompletionStreamReply::failed, q, onFailed);
@@ -111,7 +153,7 @@ void AgentPrivate::step()
                 [this](const Core::ChatCompletionResponse &response) { handleAnswer(response); });
     } else {
         Client::ChatCompletionReply *once = client->createChatCompletion(request);
-        reply = once;
+        onceReply = once;
         QObject::connect(once, &Client::ChatCompletionReply::failed, q, onFailed);
         QObject::connect(
                 once, &Client::ChatCompletionReply::finished, q,
@@ -124,7 +166,7 @@ void AgentPrivate::handleAnswer(const Core::ChatCompletionResponse &response)
     // A cancelled run may still see its reply land; it is no longer ours.
     if (!running)
         return;
-    reply = nullptr;
+    forgetReply();
 
     const Core::Message message = response.firstMessage();
     transcript.addMessage(message);
@@ -138,7 +180,20 @@ void AgentPrivate::handleAnswer(const Core::ChatCompletionResponse &response)
         return;
     }
 
+    // `running` can go false part-way through this loop, and the loop has to
+    // notice. Three things in it call out to code the agent does not control --
+    // the approval callback, the tool handler, and whatever is connected to
+    // toolInvoked/toolRejected -- and any of them may legitimately call
+    // cancel(). The deadline can fire here too, without any application code
+    // at all: a tool that blocks on a nested event loop delivers the agent's
+    // own timer while it waits, which is exactly what HttpTools' http_get
+    // documents itself as doing. Without these checks a cancelled run keeps
+    // invoking the remaining tools and then dispatches another turn, whose
+    // answer arrives unowned and lands in whichever run comes next.
     for (const Core::ToolCall &call : calls) {
+        if (!running)
+            return;
+
         const QString name = call.function().name();
         if (approval && !approval(call)) {
             // Refusing has to look like a result, or the model cannot react.
@@ -146,6 +201,11 @@ void AgentPrivate::handleAnswer(const Core::ChatCompletionResponse &response)
             Q_EMIT q->toolRejected(name);
             continue;
         }
+        // Approving and cancelling are not exclusive: a callback that stops the
+        // run and still returns true has approved a call that must no longer
+        // happen, so this cannot wait for the next turn of the loop.
+        if (!running)
+            return;
 
         const Core::Message result
                 = tools ? tools->invoke(call)
@@ -153,6 +213,9 @@ void AgentPrivate::handleAnswer(const Core::ChatCompletionResponse &response)
         transcript.addMessage(result);
         Q_EMIT q->toolInvoked(name, result.content());
     }
+
+    if (!running)
+        return;
 
     ++iteration;
     step();
@@ -171,8 +234,7 @@ Agent::Agent(Client::Client *client, Client::ToolRegistry *tools, QObject *paren
         Q_D(Agent);
         // A run that stopped making progress is worse than one that failed:
         // nothing will ever arrive to end it.
-        if (d->reply)
-            QMetaObject::invokeMethod(d->reply, "abort");
+        d->abortReply();
         d->fail(QStringLiteral("the run exceeded %1 ms").arg(d->timeoutMs));
     });
 }
@@ -318,8 +380,7 @@ void Agent::cancel()
     Q_D(Agent);
     if (!d->running)
         return;
-    if (d->reply)
-        QMetaObject::invokeMethod(d->reply, "abort");
+    d->abortReply();
     d->fail(QStringLiteral("the run was cancelled"));
 }
 
