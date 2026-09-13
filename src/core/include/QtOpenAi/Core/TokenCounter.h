@@ -57,6 +57,16 @@ public:
 
     void swap(TokenCounter &other) noexcept { d.swap(other.d); }
 
+    // The heuristic estimate for a payload of `bytes` UTF-8 bytes, without
+    // decoding it. For a caller that holds bytes and wants the same generous
+    // guess a counter with no encoding would make -- the rate limiter's budget
+    // is the one in this library -- and would otherwise transcode the whole body
+    // to UTF-16 only to measure the result. Errs high, since a UTF-8 byte count
+    // is an upper bound on the UTF-16 length, which is the direction a budget
+    // wants. Here rather than at the call site so there is one heuristic and not
+    // two to keep in step.
+    static int heuristicCountForBytes(qsizetype bytes);
+
     // A counter for whatever encoding ModelCatalog names for this model.
     static TokenCounter forModel(const QString &model);
 

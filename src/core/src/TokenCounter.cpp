@@ -185,12 +185,14 @@ int bytePairEncode(const QByteArray &piece, const Encoding &encoding, QList<int>
     return int(boundaries.size()) - 1;
 }
 
-int heuristicCount(const QString &text)
+int heuristicCountForLength(qsizetype length)
 {
-    if (text.isEmpty())
+    if (length <= 0)
         return 0;
-    return qMax(1, (int(text.size()) + kCharactersPerToken - 1) / kCharactersPerToken);
+    return qMax(1, int((length + kCharactersPerToken - 1) / kCharactersPerToken));
 }
+
+int heuristicCount(const QString &text) { return heuristicCountForLength(text.size()); }
 
 // Split `text` with the encoding's pre-tokenizer and merge each piece. Returns
 // the token count; `tokens` collects the ranks when a caller wants them.
@@ -259,6 +261,8 @@ TokenCounter::TokenCounter(TokenCounter &&other) noexcept = default;
 TokenCounter &TokenCounter::operator=(const TokenCounter &other) = default;
 TokenCounter &TokenCounter::operator=(TokenCounter &&other) noexcept = default;
 TokenCounter::~TokenCounter() = default;
+
+int TokenCounter::heuristicCountForBytes(qsizetype bytes) { return heuristicCountForLength(bytes); }
 
 TokenCounter TokenCounter::forModel(const QString &model)
 {
