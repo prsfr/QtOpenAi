@@ -37,6 +37,7 @@ private slots:
     void utilitiesNeedNoPolicy();
     void fileAccessNeedsASandboxWithRoots();
     void writingNeedsBothSwitches();
+    void theSizeCapNeverWidensWhatTheSandboxAllows();
     void httpNeedsAnAllowList();
     void theApprovalHandlerGatesSideEffects();
     void readsAreNotGatedUnlessAsked();
@@ -122,6 +123,44 @@ void TestDefaultTools::fileAccessNeedsASandboxWithRoots()
             call(QStringLiteral("read_file"),
                  {{QStringLiteral("path"), m_jail + QStringLiteral("/notes.txt")}}));
     QCOMPARE(read.content(), QStringLiteral("the notes"));
+}
+
+void TestDefaultTools::theSizeCapNeverWidensWhatTheSandboxAllows()
+{
+    // The other half of "two switches": of the two limits an application can
+    // put on a FileSandbox before handing it over, isReadOnly() was honoured
+    // and maxBytes() was overwritten from a policy field the caller never
+    // touched -- silently, and upwards, so the tighter setting was the one
+    // that got lost.
+    ToolRegistry registry;
+    DefaultTools tools;
+    ToolPolicy policy;
+    policy.fileRead = true;
+    policy.sandbox = FileSandbox({m_jail});
+    policy.sandbox.setMaxBytes(256 * 1024); // as FileSandbox.h's own example does
+
+    QVERIFY(!tools.install(&registry, policy).isEmpty());
+    // policy.maxFileBytes is still its 1 MiB default, which must not widen it.
+    QCOMPARE(tools.fileTools()->sandbox().maxBytes(), qint64(256 * 1024));
+
+    // Tightening from the policy side still works, which is the direction that
+    // was never broken.
+    policy.maxFileBytes = 64 * 1024;
+    QVERIFY(!tools.install(&registry, policy).isEmpty());
+    QCOMPARE(tools.fileTools()->sandbox().maxBytes(), qint64(64 * 1024));
+
+    // 0 means "no limit" on both sides, so it is the widest value rather than
+    // the narrowest: a policy that sets no cap must not remove the sandbox's,
+    // and a sandbox with no cap still takes the policy's.
+    policy.maxFileBytes = 0;
+    policy.sandbox.setMaxBytes(128 * 1024);
+    QVERIFY(!tools.install(&registry, policy).isEmpty());
+    QCOMPARE(tools.fileTools()->sandbox().maxBytes(), qint64(128 * 1024));
+
+    policy.maxFileBytes = 32 * 1024;
+    policy.sandbox.setMaxBytes(0);
+    QVERIFY(!tools.install(&registry, policy).isEmpty());
+    QCOMPARE(tools.fileTools()->sandbox().maxBytes(), qint64(32 * 1024));
 }
 
 void TestDefaultTools::writingNeedsBothSwitches()
