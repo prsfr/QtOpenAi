@@ -3,6 +3,7 @@
 
 #include "JsonHelpers_p.h"
 
+#include <QtCore/QHash>
 #include <QtCore/QJsonArray>
 #include <QtCore/QRegularExpression>
 
@@ -91,6 +92,14 @@ private:
     void checkString(const QJsonObject &schema, const QJsonValue &value, const QString &path);
     void checkArray(const QJsonObject &schema, const QJsonValue &value, const QString &path);
     void checkObject(const QJsonObject &schema, const QJsonValue &value, const QString &path);
+
+    // Compiled `pattern` regexes, keyed by the pattern. One Validator exists per
+    // validate() call, which is the right lifetime: a schema is walked once, but
+    // an array's item schema is walked once *per element*, and compiling the same
+    // expression for each of them was the whole cost. Not a static cache --
+    // patterns come from user schemas, so an unbounded process-wide table keyed
+    // by them is not something to add quietly.
+    QHash<QString, QRegularExpression> compiledPatterns;
 };
 
 void Validator::checkType(const QJsonObject &schema, const QJsonValue &value, const QString &path)
@@ -129,16 +138,23 @@ void Validator::checkValues(const QJsonObject &schema, const QJsonValue &value, 
         return;
 
     const QJsonArray values = allowed.toArray();
-    QStringList rendered;
     for (const QJsonValue &candidate : values) {
         if (candidate == value)
             return;
+    }
+    if (values.isEmpty())
+        return;
+
+    // Rendering is deferred to the failure path on purpose. display() runs a
+    // JSON writer per candidate, and on the success path -- which is the common
+    // one, and the only one a well-behaved model takes -- every one of those
+    // strings was built and thrown away.
+    QStringList rendered;
+    rendered.reserve(values.size());
+    for (const QJsonValue &candidate : values)
         rendered.append(display(candidate));
-    }
-    if (!rendered.isEmpty()) {
-        fail(path, QStringLiteral("expected one of %1, got %2")
-                           .arg(rendered.join(QStringLiteral(", ")), display(value)));
-    }
+    fail(path, QStringLiteral("expected one of %1, got %2")
+                       .arg(rendered.join(QStringLiteral(", ")), display(value)));
 }
 
 void Validator::checkNumber(const QJsonObject &schema, const QJsonValue &value, const QString &path)
@@ -186,7 +202,13 @@ void Validator::checkString(const QJsonObject &schema, const QJsonValue &value, 
 
     const QString pattern = schema.value(QLatin1String("pattern")).toString();
     if (!pattern.isEmpty()) {
-        const QRegularExpression expression(pattern);
+        // Compiled once per pattern rather than once per string. Building a
+        // QRegularExpression throws away the compiled program, so validating an
+        // array of n patterned strings compiled the same expression n times.
+        auto it = compiledPatterns.constFind(pattern);
+        if (it == compiledPatterns.constEnd())
+            it = compiledPatterns.insert(pattern, QRegularExpression(pattern));
+        const QRegularExpression &expression = it.value();
         // An unparseable pattern constrains nothing -- rejecting the data for a
         // fault in the schema would blame the wrong side.
         if (expression.isValid() && !expression.match(text).hasMatch())
