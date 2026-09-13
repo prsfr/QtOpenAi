@@ -1,19 +1,16 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Admin/AuditLogQuery.h"
 
+#include "UrlQuery_p.h"
+
 namespace QtOpenAi {
 namespace Admin {
 
 namespace {
 
-// Repeated items rather than one comma-joined value, as UsageQuery sends its
-// arrays -- but note the key: the audit-log filters carry the `[]` in the
-// parameter name itself, which is how the API spells them.
-void addEach(QUrlQuery &query, const QString &key, const QStringList &values)
-{
-    for (const QString &value : values)
-        query.addQueryItem(key, value);
-}
+// Note the keys passed to detail::appendEach() below: the audit-log filters
+// carry the `[]` in the parameter name itself, which is how the API spells them
+// and is not something the helper adds.
 
 // One bound of the effective_at filter, as `effective_at[gt]=...`. Omitted at 0
 // rather than sent: an unset bound and "at the epoch" are different requests,
@@ -35,11 +32,11 @@ QUrlQuery AuditLogQuery::toQuery() const
     addBound(query, QStringLiteral("lt"), effectiveAtLt);
     addBound(query, QStringLiteral("lte"), effectiveAtLte);
 
-    addEach(query, QStringLiteral("project_ids[]"), projectIds);
-    addEach(query, QStringLiteral("event_types[]"), eventTypes);
-    addEach(query, QStringLiteral("actor_ids[]"), actorIds);
-    addEach(query, QStringLiteral("actor_emails[]"), actorEmails);
-    addEach(query, QStringLiteral("resource_ids[]"), resourceIds);
+    Core::detail::appendEach(query, QStringLiteral("project_ids[]"), projectIds);
+    Core::detail::appendEach(query, QStringLiteral("event_types[]"), eventTypes);
+    Core::detail::appendEach(query, QStringLiteral("actor_ids[]"), actorIds);
+    Core::detail::appendEach(query, QStringLiteral("actor_emails[]"), actorEmails);
+    Core::detail::appendEach(query, QStringLiteral("resource_ids[]"), resourceIds);
 
     // Only when true: false is the server's own default, and sending it would
     // add noise to every query for no change in the answer.

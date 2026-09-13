@@ -1,22 +1,10 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Admin/UsageQuery.h"
 
+#include "UrlQuery_p.h"
+
 namespace QtOpenAi {
 namespace Admin {
-
-namespace {
-
-// Array parameters go out as repeated items -- `models=a&models=b` -- which is
-// the `form`/explode style of OpenAI's OpenAPI document and what its own clients
-// send. Not comma-joined: a model name is free to contain a comma, and one that
-// did would split into two filters that match nothing.
-void addEach(QUrlQuery &query, const QString &key, const QStringList &values)
-{
-    for (const QString &value : values)
-        query.addQueryItem(key, value);
-}
-
-} // namespace
 
 QUrlQuery UsageQuery::toQuery() const
 {
@@ -29,15 +17,15 @@ QUrlQuery UsageQuery::toQuery() const
         query.addQueryItem(QStringLiteral("end_time"), QString::number(endTime));
     if (!bucketWidth.isEmpty())
         query.addQueryItem(QStringLiteral("bucket_width"), bucketWidth);
-    addEach(query, QStringLiteral("group_by"), groupBy);
+    Core::detail::appendEach(query, QStringLiteral("group_by"), groupBy);
     if (limit >= 0)
         query.addQueryItem(QStringLiteral("limit"), QString::number(limit));
     if (!page.isEmpty())
         query.addQueryItem(QStringLiteral("page"), page);
-    addEach(query, QStringLiteral("project_ids"), projectIds);
-    addEach(query, QStringLiteral("user_ids"), userIds);
-    addEach(query, QStringLiteral("api_key_ids"), apiKeyIds);
-    addEach(query, QStringLiteral("models"), models);
+    Core::detail::appendEach(query, QStringLiteral("project_ids"), projectIds);
+    Core::detail::appendEach(query, QStringLiteral("user_ids"), userIds);
+    Core::detail::appendEach(query, QStringLiteral("api_key_ids"), apiKeyIds);
+    Core::detail::appendEach(query, QStringLiteral("models"), models);
     if (batch)
         query.addQueryItem(QStringLiteral("batch"),
                            *batch ? QStringLiteral("true") : QStringLiteral("false"));

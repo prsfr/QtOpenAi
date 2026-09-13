@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Admin/Organization.h"
 
+#include "UrlQuery_p.h"
+
 #include <QtOpenAi/Client/Client.h>
 
 #include "JsonHelpers_p.h"
@@ -13,6 +15,27 @@ namespace QtOpenAi {
 namespace Admin {
 
 namespace {
+
+// A write body: what the caller is asking for, with what the server assigns
+// stripped off. Sending those back would be describing the resource rather than
+// requesting it.
+//
+// Named here because the rule was applied at four write paths that each
+// maintained their own list, with nothing tying any of them to the toJson() they
+// strip -- no compile-time link, no test. A field the API adds to a resource
+// lands in toJson() and then silently starts going back out on every write. The
+// universal three are below; `alsoDrop` carries what is server-assigned for one
+// resource in particular, like a spend limit's `enforcement`.
+QJsonObject requestBody(QJsonObject body, const QStringList &alsoDrop = {})
+{
+    for (const QString &key :
+         {QStringLiteral("id"), QStringLiteral("object"), QStringLiteral("deleted")}) {
+        body.remove(key);
+    }
+    for (const QString &key : alsoDrop)
+        body.remove(key);
+    return body;
+}
 
 // The collections this module's endpoint families hang off. Spelled once, as
 // the endpoint paths in Client are.
@@ -416,10 +439,7 @@ ProjectRateLimitReply *Organization::modifyProjectRateLimit(const QString &proje
     // object and model it may carry from a previous read are dropped here --
     // they identify the limit rather than change it, and the id is already in
     // the path.
-    QJsonObject body = limits.toJson();
-    body.remove(QStringLiteral("id"));
-    body.remove(QStringLiteral("object"));
-    body.remove(QStringLiteral("model"));
+    const QJsonObject body = requestBody(limits.toJson(), {QStringLiteral("model")});
     return d->client.issueRequest<ProjectRateLimitReply>(
             Client::Client::Verb::Post, projectPath(projectId, kRateLimits, rateLimitId), {},
             compactJson(body));
@@ -755,9 +775,7 @@ Organization::setProjectModelPermissions(const QString &projectId,
     // request the server rejects. The object and the deletion flag a read may
     // have left on the value identify it rather than change it, so they are
     // dropped.
-    QJsonObject body = permissions.toJson();
-    body.remove(QStringLiteral("object"));
-    body.remove(QStringLiteral("deleted"));
+    const QJsonObject body = requestBody(permissions.toJson());
     return d->client.issueRequest<ProjectModelPermissionsReply>(
             Client::Client::Verb::Post, projectPath(projectId, kModelPermissions), {},
             compactJson(body));
@@ -829,16 +847,7 @@ namespace {
 
 // The body both the create and the update take: the same four required fields,
 // which is why updateSpendAlert() replaces rather than patches.
-QJsonObject spendAlertBody(const Core::SpendAlert &alert)
-{
-    QJsonObject body = alert.toJson();
-    // The server assigns these; sending them back would be describing the
-    // resource rather than requesting it.
-    body.remove(QStringLiteral("id"));
-    body.remove(QStringLiteral("object"));
-    body.remove(QStringLiteral("deleted"));
-    return body;
-}
+QJsonObject spendAlertBody(const Core::SpendAlert &alert) { return requestBody(alert.toJson()); }
 
 // The update body of either data-retention endpoint. The field is
 // `retention_type` here and `type` on the resource -- see Core::DataRetention.
@@ -940,11 +949,9 @@ namespace {
 // nor does the object or the deletion flag.
 QJsonObject spendLimitBody(const Core::SpendLimit &limit)
 {
-    QJsonObject body = limit.toJson();
-    body.remove(QStringLiteral("object"));
-    body.remove(QStringLiteral("enforcement"));
-    body.remove(QStringLiteral("deleted"));
-    return body;
+    // `enforcement` is the server's report of whether the limit is biting, not a
+    // setting, so it never goes out either.
+    return requestBody(limit.toJson(), {QStringLiteral("enforcement")});
 }
 
 } // namespace
@@ -1048,11 +1055,7 @@ UserListReply *Organization::listUsers(const Client::ListParams &params, const Q
 {
     Q_D(Organization);
     QUrlQuery query = params.toQuery();
-    // Repeated items rather than comma-joined, the same convention UsageQuery
-    // sends its array parameters with -- and an address is free to contain a
-    // comma in the quoted form the RFC allows.
-    for (const QString &email : emails)
-        query.addQueryItem(QStringLiteral("emails"), email);
+    Core::detail::appendEach(query, QStringLiteral("emails"), emails);
 
     return d->client.issueRequest<UserListReply>(Client::Client::Verb::Get, kUsers, query);
 }
