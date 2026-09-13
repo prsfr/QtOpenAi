@@ -3,20 +3,64 @@
 include(CMakeFindDependencyMacro)
 
 # QtOpenAi::Core needs Qt6::Core; QtOpenAi::Client also needs Qt6::Network.
-find_dependency(Qt6 REQUIRED COMPONENTS Core Network)
+#
+# No REQUIRED here, in any of the three calls below: find_dependency() already
+# forwards the REQUIRED and QUIET of the find_package(QtOpenAi) that led here,
+# which is the reason it exists. Spelling it out would override that and turn a
+# deliberate find_package(QtOpenAi QUIET) -- a project deciding whether it can
+# enable an optional feature -- into a fatal error about Qt6.
+find_dependency(Qt6 COMPONENTS Core Network)
 
 # QtOpenAi::Realtime additionally needs Qt6::WebSockets. It is only in the
 # export set when it was built, so the dependency is asked for only then.
 if(@QTOPENAI_BUILD_REALTIME@)
-    find_dependency(Qt6 REQUIRED COMPONENTS WebSockets)
+    find_dependency(Qt6 COMPONENTS WebSockets)
 endif()
 
 # QtOpenAi::Sql additionally needs Qt6::Sql, and is in the export set only when
 # it was built -- the same arrangement as Realtime above.
 if(@QTOPENAI_BUILD_SQL@)
-    find_dependency(Qt6 REQUIRED COMPONENTS Sql)
+    find_dependency(Qt6 COMPONENTS Sql)
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/QtOpenAiTargets.cmake")
+
+# check_required_components() below fails the package for any requested
+# component whose QtOpenAi_<name>_FOUND is not true, so the flags have to exist
+# or *every* component name is rejected -- reported to the consumer as "QtOpenAi
+# is not installed", which is both wrong and unactionable. The list is the set
+# of modules this package was built with (src/CMakeLists.txt), so asking for a
+# module that was left out fails here, by name, instead of surfacing later as an
+# unexplained missing target.
+foreach(_qtopenai_component @QTOPENAI_COMPONENTS@)
+    set(QtOpenAi_${_qtopenai_component}_FOUND TRUE)
+endforeach()
+unset(_qtopenai_component)
+
+# check_required_components() rejects the package but reports only that QtOpenAi
+# was "not found", which for a missing module is the wrong thing to tell anyone:
+# the package is installed, one optional module of it was not built. Name the
+# modules that are missing, and the ones this build does carry, since a build
+# configured without Qt6::WebSockets or Qt6::Sql is the usual reason.
+#
+# Only components the caller marked as required count here; OPTIONAL_COMPONENTS
+# are theirs to check, and must not fail the package.
+set(_qtopenai_missing "")
+foreach(_qtopenai_requested ${QtOpenAi_FIND_COMPONENTS})
+    if(NOT QtOpenAi_${_qtopenai_requested}_FOUND
+       AND QtOpenAi_FIND_REQUIRED_${_qtopenai_requested})
+        list(APPEND _qtopenai_missing "${_qtopenai_requested}")
+    endif()
+endforeach()
+if(_qtopenai_missing)
+    string(REPLACE ";" ", " _qtopenai_missing_text "${_qtopenai_missing}")
+    string(REPLACE ";" ", " _qtopenai_built_text "@QTOPENAI_COMPONENTS@")
+    set(QtOpenAi_NOT_FOUND_MESSAGE
+        "this QtOpenAi build does not provide the requested module(s): ${_qtopenai_missing_text}. Modules in this build: ${_qtopenai_built_text}.")
+    unset(_qtopenai_missing_text)
+    unset(_qtopenai_built_text)
+endif()
+unset(_qtopenai_missing)
+unset(_qtopenai_requested)
 
 check_required_components(QtOpenAi)

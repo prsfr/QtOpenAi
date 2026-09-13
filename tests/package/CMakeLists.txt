@@ -8,7 +8,12 @@ project(qtopenai_package_consumer LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(QtOpenAi REQUIRED)
+# Asked for by component, not bare: the bare form works even when the package
+# sets no QtOpenAi_<name>_FOUND flags at all, so it cannot tell whether
+# find_package(QtOpenAi COMPONENTS ...) -- the spelling a consumer reaches for
+# to require an optional module -- actually works. These six are the modules
+# every build has.
+find_package(QtOpenAi REQUIRED COMPONENTS Core Client Chat Tools Storage Admin)
 
 add_executable(consumer main.cpp)
 target_link_libraries(consumer

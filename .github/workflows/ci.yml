@@ -180,11 +180,22 @@ jobs:
           modules: qtwebsockets
           cache: true
 
+      # Installed with a deliberately non-default CMAKE_INSTALL_INCLUDEDIR. At
+      # the default an exported include directory hardcoded to <prefix>/include
+      # happens to be right, so the job could not tell whether the package
+      # honours the variable -- and versioned or namespaced include directories
+      # are routine for distribution packagers.
+      #
+      # CMAKE_INSTALL_LIBDIR is deliberately left alone: CMake only searches
+      # <prefix>/lib64/cmake when FIND_LIBRARY_USE_LIB64_PATHS is set, which it
+      # is not on Debian/Ubuntu multiarch, so overriding it here would make the
+      # consumer fail to find the package at all rather than test anything.
       - name: Build & install QtOpenAi
         run: >
           cmake -S . -B build
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_INSTALL_PREFIX=$PWD/_prefix
+          -DCMAKE_INSTALL_INCLUDEDIR=include/qtopenai-ci
           -DQTOPENAI_BUILD_TESTS=OFF
           -DQTOPENAI_BUILD_EXAMPLES=OFF
           -DQTOPENAI_BUILD_SHARED=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} &&
