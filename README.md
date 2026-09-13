@@ -843,7 +843,7 @@ Two properties matter more than the table itself:
   release:
 
 ```cpp
-Core::ModelCatalog::shared().merge(QJsonDocument::fromJson(file.readAll()).object());
+Core::ModelCatalog::mergeShared(QJsonDocument::fromJson(file.readAll()).object());
 ```
 
 `Core::TokenCounter` answers the other half — how much of that window a prompt

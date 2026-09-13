@@ -262,6 +262,12 @@ TokenCounter::~TokenCounter() = default;
 
 TokenCounter TokenCounter::forModel(const QString &model)
 {
+    // Both process-wide singletons in one line, and both are safe to read while
+    // another thread writes: the encoding registry takes the mutex in lookup()
+    // below, and ModelCatalog::shared() hands back a snapshot by value. They
+    // used to disagree -- the catalog returned a mutable reference -- which was
+    // the more dangerous half, because a reader beside the guarded one had every
+    // reason to assume it was equally safe.
     return TokenCounter(ModelCatalog::shared().model(model).encoding());
 }
 

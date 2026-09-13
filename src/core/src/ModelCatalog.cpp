@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/ModelCatalog.h"
 
+#include <QtCore/QMutex>
+
 #include <QtCore/QHash>
 #include <QtCore/QSharedData>
 
@@ -124,10 +126,41 @@ ModelCatalog ModelCatalog::defaults()
     return catalog;
 }
 
-ModelCatalog &ModelCatalog::shared()
+namespace {
+
+// Guards the shared catalog for the whole of a read or a write. Held only long
+// enough to copy or replace a d-pointer, so contention is not a consideration:
+// what it buys is that a reader never sees a half-replaced catalog.
+QMutex &sharedMutex()
 {
-    static ModelCatalog catalog = defaults();
+    static QMutex mutex;
+    return mutex;
+}
+
+ModelCatalog &sharedCatalog()
+{
+    static ModelCatalog catalog = ModelCatalog::defaults();
     return catalog;
+}
+
+} // namespace
+
+ModelCatalog ModelCatalog::shared()
+{
+    QMutexLocker locker(&sharedMutex());
+    return sharedCatalog();
+}
+
+void ModelCatalog::setShared(const ModelCatalog &catalog)
+{
+    QMutexLocker locker(&sharedMutex());
+    sharedCatalog() = catalog;
+}
+
+void ModelCatalog::mergeShared(const QJsonObject &json)
+{
+    QMutexLocker locker(&sharedMutex());
+    sharedCatalog().merge(json);
 }
 
 ModelInfo ModelCatalog::model(const QString &id) const
