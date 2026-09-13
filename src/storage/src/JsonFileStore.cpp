@@ -16,6 +16,16 @@ namespace {
 
 // The three collections, as subdirectories of the root.
 constexpr auto ConversationsDir = "conversations";
+// The record fields of each conversation, written beside the conversation
+// itself. A conversation file carries its transcript, so listing conversations
+// out of them read and parsed every message in the store to answer a question
+// about five fields -- and Store.h promises the opposite: "separating them is
+// what keeps the first cheap". This is that separation, on disk.
+//
+// The conversation file stays the authority and still carries these fields, so a
+// store written before this existed, or one whose records are deleted, is read
+// correctly -- just not cheaply.
+constexpr auto RecordsDir = "records";
 constexpr auto CacheDir = "cache";
 constexpr auto MetricsDir = "metrics";
 constexpr auto MetaFile = "store.json";
@@ -112,7 +122,7 @@ bool JsonFileStore::open()
         return fail(QStringLiteral("JsonFileStore: no root path given."));
 
     QDir root(d->root);
-    for (const char *collection : {ConversationsDir, CacheDir, MetricsDir}) {
+    for (const char *collection : {ConversationsDir, RecordsDir, CacheDir, MetricsDir}) {
         if (!root.mkpath(QString::fromLatin1(collection))) {
             return fail(QStringLiteral("JsonFileStore: cannot create %1/%2.")
                                 .arg(d->root, QString::fromLatin1(collection)));
@@ -179,7 +189,13 @@ bool JsonFileStore::saveConversation(const QString &id, const Chat::Transcript &
         return fail(QStringLiteral("JsonFileStore: a conversation needs a non-empty id."));
 
     const QString path = d->path(ConversationsDir, fileNameFor(id));
-    const std::optional<QJsonObject> existing = JsonFileStorePrivate::read(path);
+    const QString recordPath = d->path(RecordsDir, fileNameFor(id));
+    // What a save needs from the previous version is a title and a created_at --
+    // five fields, not a transcript. The record beside it carries exactly those;
+    // the conversation file is only opened when there is no record yet.
+    std::optional<QJsonObject> existing = JsonFileStorePrivate::read(recordPath);
+    if (!existing)
+        existing = JsonFileStorePrivate::read(path);
 
     const QDateTime now = QDateTime::currentDateTimeUtc();
     QJsonObject json;
@@ -198,6 +214,20 @@ bool JsonFileStore::saveConversation(const QString &id, const Chat::Transcript &
 
     if (!JsonFileStorePrivate::write(path, json))
         return fail(QStringLiteral("JsonFileStore: cannot write %1.").arg(path));
+
+    // The record, without the transcript, and written second on purpose: the
+    // conversation above is the authority, this is a cache of the five fields a
+    // listing needs. So a failure here is not a failed save -- the conversation
+    // is on disk and conversations() falls back to reading it. What must not
+    // survive is a *stale* record, which would be listed as current, so it is
+    // removed when it cannot be replaced.
+    QJsonObject record = json;
+    record.remove(QLatin1String("transcript"));
+    if (!JsonFileStorePrivate::write(recordPath, record)) {
+        QDir().mkpath(d->dir(RecordsDir).absolutePath());
+        if (!JsonFileStorePrivate::write(recordPath, record))
+            QFile::remove(recordPath);
+    }
     return true;
 }
 
@@ -222,8 +252,10 @@ std::optional<ConversationRecord> JsonFileStore::conversation(const QString &id)
         fail(QStringLiteral("JsonFileStore: not open."));
         return std::nullopt;
     }
-    const std::optional<QJsonObject> json
-            = JsonFileStorePrivate::read(d->path(ConversationsDir, fileNameFor(id)));
+    std::optional<QJsonObject> json
+            = JsonFileStorePrivate::read(d->path(RecordsDir, fileNameFor(id)));
+    if (!json)
+        json = JsonFileStorePrivate::read(d->path(ConversationsDir, fileNameFor(id)));
     if (!json)
         return std::nullopt;
     return recordFromJson(*json);
@@ -240,8 +272,15 @@ QList<ConversationRecord> JsonFileStore::conversations()
     QList<ConversationRecord> records;
     const QFileInfoList files
             = d->dir(ConversationsDir).entryInfoList({QStringLiteral("*.json")}, QDir::Files);
+    records.reserve(files.size());
     for (const QFileInfo &file : files) {
-        const std::optional<QJsonObject> json = JsonFileStorePrivate::read(file.absoluteFilePath());
+        // The record first: it is the same five fields without the transcript,
+        // so this is the whole point of writing it. A conversation stored before
+        // records existed has none, and is read the old way.
+        std::optional<QJsonObject> json
+                = JsonFileStorePrivate::read(d->path(RecordsDir, file.fileName()));
+        if (!json)
+            json = JsonFileStorePrivate::read(file.absoluteFilePath());
         if (!json)
             continue;
         const ConversationRecord record = recordFromJson(*json);
@@ -266,6 +305,11 @@ bool JsonFileStore::removeConversation(const QString &id)
     if (!d->open)
         return fail(QStringLiteral("JsonFileStore: not open."));
     const QString path = d->path(ConversationsDir, fileNameFor(id));
+    const QString recordPath = d->path(RecordsDir, fileNameFor(id));
+    // The record goes first: a record without its conversation would be listed
+    // as a conversation that cannot be loaded.
+    if (QFile::exists(recordPath) && !QFile::remove(recordPath))
+        return fail(QStringLiteral("JsonFileStore: cannot remove %1.").arg(recordPath));
     if (!QFile::exists(path))
         return true; // Removing what is not there is the state the caller wanted.
     if (!QFile::remove(path))
