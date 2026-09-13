@@ -1918,8 +1918,14 @@ size ceiling and a time limit, both because both failure modes are real: without
 a size limit a long-running process grows without bound, and without a time
 limit a cached answer outlives the question.
 
+The size ceiling is in **bytes**, not entries, because bytes are what runs out.
+The values are whole response bodies, and an `/embeddings` response — cacheable
+by default — is a JSON array of float vectors, so a count of entries authorises
+an amount of memory nobody can predict from it.
+
 ```cpp
-Client::MemoryResponseCache store(512);
+Client::MemoryResponseCache store;
+store.setMaxBytes(16 * 1024 * 1024);               // default 64 MiB
 store.setTtlSeconds(60);                           // 0 disables expiry
 cache.setCache(&store);                            // not owned; nullptr restores the default
 ```

@@ -7,6 +7,7 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QObject>
 #include <QtCore/QUrl>
+#include <QtCore/QVariant>
 #include <QtNetwork/QNetworkRequest>
 
 #include <optional>
@@ -29,6 +30,20 @@ struct QTOPENAI_CLIENT_EXPORT InterceptedRequest
     // multipart uploads, whose body is assembled per attempt and can be a whole
     // file -- an interceptor that hashes or logs bodies must not assume one.
     QByteArray body;
+
+    // Scratch space for an interceptor, carried from beforeRequest() to the
+    // afterResponse() of the same exchange and never sent anywhere.
+    //
+    // It exists because the two hooks are otherwise unable to share a
+    // computation: an interceptor had either to redo the work -- the cache
+    // hashed the whole body twice per miss -- or to keep its own table keyed by
+    // something, which is the correlation problem InterceptedResponse::request
+    // notes below. Several requests are in flight at once, and this travels
+    // with the one it belongs to.
+    //
+    // Every interceptor in the chain sees the same hash, so prefix keys with
+    // something unambiguous; the built-in ones use "QtOpenAi::<Class>/...".
+    QVariantHash scratch;
 
     QUrl url() const { return request.url(); }
 };
