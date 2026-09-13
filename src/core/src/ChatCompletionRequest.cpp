@@ -293,40 +293,28 @@ ChatCompletionRequest ChatCompletionRequest::fromJson(const QJsonObject &json)
     if (json.contains(QStringLiteral("response_format")))
         request.d->responseFormat = ResponseFormat::fromJson(
                 json.value(QStringLiteral("response_format")).toObject());
-    if (json.contains(QStringLiteral("temperature")))
-        request.d->temperature = json.value(QStringLiteral("temperature")).toDouble();
-    if (json.contains(QStringLiteral("top_p")))
-        request.d->topP = json.value(QStringLiteral("top_p")).toDouble();
-    if (json.contains(QStringLiteral("max_completion_tokens")))
-        request.d->maxCompletionTokens
-                = json.value(QStringLiteral("max_completion_tokens")).toInt();
-    if (json.contains(QStringLiteral("n")))
-        request.d->n = json.value(QStringLiteral("n")).toInt();
-    if (json.contains(QStringLiteral("stream")))
-        request.d->stream = json.value(QStringLiteral("stream")).toBool();
-    if (json.contains(QStringLiteral("frequency_penalty")))
-        request.d->frequencyPenalty = json.value(QStringLiteral("frequency_penalty")).toDouble();
-    if (json.contains(QStringLiteral("presence_penalty")))
-        request.d->presencePenalty = json.value(QStringLiteral("presence_penalty")).toDouble();
+    request.d->temperature = detail::optionalDouble(json, QStringLiteral("temperature"));
+    request.d->topP = detail::optionalDouble(json, QStringLiteral("top_p"));
+    request.d->maxCompletionTokens
+            = detail::optionalInt(json, QStringLiteral("max_completion_tokens"));
+    request.d->n = detail::optionalInt(json, QStringLiteral("n"));
+    request.d->stream = detail::optionalBool(json, QStringLiteral("stream"));
+    request.d->frequencyPenalty = detail::optionalDouble(json, QStringLiteral("frequency_penalty"));
+    request.d->presencePenalty = detail::optionalDouble(json, QStringLiteral("presence_penalty"));
     request.d->logitBias = json.value(QStringLiteral("logit_bias")).toObject();
-    if (json.contains(QStringLiteral("seed")))
-        request.d->seed = json.value(QStringLiteral("seed")).toInt();
+    request.d->seed = detail::optionalInt(json, QStringLiteral("seed"));
     if (json.contains(QStringLiteral("stop")))
         request.d->stop = json.value(QStringLiteral("stop"));
-    if (json.contains(QStringLiteral("logprobs")))
-        request.d->logprobs = json.value(QStringLiteral("logprobs")).toBool();
-    if (json.contains(QStringLiteral("top_logprobs")))
-        request.d->topLogprobs = json.value(QStringLiteral("top_logprobs")).toInt();
+    request.d->logprobs = detail::optionalBool(json, QStringLiteral("logprobs"));
+    request.d->topLogprobs = detail::optionalInt(json, QStringLiteral("top_logprobs"));
     request.d->streamOptions = json.value(QStringLiteral("stream_options")).toObject();
     request.d->modalities = detail::stringListOr(json, QStringLiteral("modalities"));
     request.d->prediction = json.value(QStringLiteral("prediction")).toObject();
-    if (json.contains(QStringLiteral("parallel_tool_calls")))
-        request.d->parallelToolCalls = json.value(QStringLiteral("parallel_tool_calls")).toBool();
-    if (json.contains(QStringLiteral("max_tokens")))
-        request.d->maxTokens = json.value(QStringLiteral("max_tokens")).toInt();
+    request.d->parallelToolCalls
+            = detail::optionalBool(json, QStringLiteral("parallel_tool_calls"));
+    request.d->maxTokens = detail::optionalInt(json, QStringLiteral("max_tokens"));
     request.d->serviceTier = detail::stringOr(json, QStringLiteral("service_tier"));
-    if (json.contains(QStringLiteral("store")))
-        request.d->store = json.value(QStringLiteral("store")).toBool();
+    request.d->store = detail::optionalBool(json, QStringLiteral("store"));
     request.d->metadata = json.value(QStringLiteral("metadata")).toObject();
     request.d->user = detail::stringOr(json, QStringLiteral("user"));
     request.d->safetyIdentifier = detail::stringOr(json, QStringLiteral("safety_identifier"));
