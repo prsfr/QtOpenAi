@@ -36,49 +36,15 @@ set(QTOPENAI_ADMIN_PUBLIC_HEADERS
     include/QtOpenAi/Admin/ProjectPermissionsReply.h
 )
 
-add_library(QtOpenAiAdmin
-    ${QTOPENAI_ADMIN_PUBLIC_HEADERS}
-    src/Organization.cpp
-    src/AuditLogQuery.cpp
-    src/UsageQuery.cpp
-)
-
-add_library(QtOpenAi::Admin ALIAS QtOpenAiAdmin)
-
-target_link_libraries(QtOpenAiAdmin
-    PUBLIC
+qtopenai_add_module(Admin
+    HEADERS
+        ${QTOPENAI_ADMIN_PUBLIC_HEADERS}
+    SOURCES
+        src/Organization.cpp
+        src/AuditLogQuery.cpp
+        src/UsageQuery.cpp
+    LIBS
         QtOpenAi::Client
         QtOpenAi::Core
         Qt6::Core
 )
-
-target_include_directories(QtOpenAiAdmin
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
-)
-
-target_compile_definitions(QtOpenAiAdmin PRIVATE QTOPENAI_ADMIN_LIBRARY)
-if(NOT BUILD_SHARED_LIBS)
-    target_compile_definitions(QtOpenAiAdmin PUBLIC QTOPENAI_ADMIN_STATIC)
-endif()
-
-set_target_properties(QtOpenAiAdmin PROPERTIES
-    OUTPUT_NAME QtOpenAiAdmin
-    EXPORT_NAME Admin
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-)
-
-if(QTOPENAI_INSTALL)
-    install(TARGETS QtOpenAiAdmin
-        EXPORT QtOpenAiTargets
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    # Preserves the QtOpenAi/Admin/... include layout.
-    install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-endif()

@@ -16,47 +16,13 @@ set(QTOPENAI_SQL_PUBLIC_HEADERS
     include/QtOpenAi/Sql/SqliteStore.h
 )
 
-add_library(QtOpenAiSql
-    ${QTOPENAI_SQL_PUBLIC_HEADERS}
-    src/SqliteStore.cpp
-)
-
-add_library(QtOpenAi::Sql ALIAS QtOpenAiSql)
-
-target_link_libraries(QtOpenAiSql
-    PUBLIC
+qtopenai_add_module(Sql
+    HEADERS
+        ${QTOPENAI_SQL_PUBLIC_HEADERS}
+    SOURCES
+        src/SqliteStore.cpp
+    LIBS
         QtOpenAi::Storage
         Qt6::Core
         Qt6::Sql
 )
-
-target_include_directories(QtOpenAiSql
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
-)
-
-target_compile_definitions(QtOpenAiSql PRIVATE QTOPENAI_SQL_LIBRARY)
-if(NOT BUILD_SHARED_LIBS)
-    target_compile_definitions(QtOpenAiSql PUBLIC QTOPENAI_SQL_STATIC)
-endif()
-
-set_target_properties(QtOpenAiSql PROPERTIES
-    OUTPUT_NAME QtOpenAiSql
-    EXPORT_NAME Sql
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-)
-
-if(QTOPENAI_INSTALL)
-    install(TARGETS QtOpenAiSql
-        EXPORT QtOpenAiTargets
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    # Preserves the QtOpenAi/Sql/... include layout.
-    install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-endif()

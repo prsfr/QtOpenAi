@@ -114,145 +114,113 @@ set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/SchemaValidator.h
 )
 
-add_library(QtOpenAiCore
-    ${QTOPENAI_CORE_PUBLIC_HEADERS}
-    ${QTOPENAI_PRIVATE_HEADERS}
-    src/Enums.cpp
-    src/FunctionCall.cpp
-    src/ToolCall.cpp
-    src/ContentPart.cpp
-    src/Message.cpp
-    src/Tool.cpp
-    src/Usage.cpp
-    src/Choice.cpp
-    src/ResponseFormat.cpp
-    src/ChatCompletionRequest.cpp
-    src/ChatCompletionResponse.cpp
-    src/ChatCompletionChunk.cpp
-    src/ResponseUsage.cpp
-    src/ResponseOutputItem.cpp
-    src/Response.cpp
-    src/ResponseRequest.cpp
-    src/Conversation.cpp
-    src/ModerationRequest.cpp
-    src/ModerationResponse.cpp
-    src/CompletionChoice.cpp
-    src/CompletionResponse.cpp
-    src/CompletionRequest.cpp
-    src/EmbeddingRequest.cpp
-    src/EmbeddingResponse.cpp
-    src/FileObject.cpp
-    src/FileUploadRequest.cpp
-    src/Model.cpp
-    src/TranscriptionRequest.cpp
-    src/TranscriptionResponse.cpp
-    src/TranslationRequest.cpp
-    src/ImageGenerationRequest.cpp
-    src/ImageEditRequest.cpp
-    src/ImageVariationRequest.cpp
-    src/ImageResponse.cpp
-    src/SpeechRequest.cpp
-    src/VideoCharacter.cpp
-    src/VideoJob.cpp
-    src/Upload.cpp
-    src/CreateUploadRequest.cpp
-    src/VectorStore.cpp
-    src/VectorStoreFile.cpp
-    src/VectorStoreSearch.cpp
-    src/CreateVectorStoreRequest.cpp
-    src/Container.cpp
-    src/CreateContainerRequest.cpp
-    src/CreateVideoRequest.cpp
-    src/VideoSourceRequest.cpp
-    src/Voice.cpp
-    src/CreateVoiceRequest.cpp
-    src/Batch.cpp
-    src/CreateBatchRequest.cpp
-    src/FineTuningJob.cpp
-    src/FineTuningCheckpoint.cpp
-    src/CreateFineTuningJobRequest.cpp
-    src/Eval.cpp
-    src/EvalRun.cpp
-    src/CreateEvalRequest.cpp
-    src/Assistant.cpp
-    src/CreateAssistantRequest.cpp
-    src/Thread.cpp
-    src/ThreadMessage.cpp
-    src/CreateThreadRequest.cpp
-    src/Run.cpp
-    src/RunStep.cpp
-    src/CreateRunRequest.cpp
-    src/Project.cpp
-    src/OrganizationUsage.cpp
-    src/OrganizationCosts.cpp
-    src/OrganizationUser.cpp
-    src/Invite.cpp
-    src/CreateInviteRequest.cpp
-    src/ProjectServiceAccount.cpp
-    src/SpendLimit.cpp
-    src/SpendAlert.cpp
-    src/DataRetention.cpp
-    src/AuditLog.cpp
-    src/AdminApiKey.cpp
-    src/ProjectApiKey.cpp
-    src/ProjectRateLimit.cpp
-    src/OrganizationRole.cpp
-    src/RoleRequest.cpp
-    src/RoleAssignment.cpp
-    src/Group.cpp
-    src/Certificate.cpp
-    src/ProjectPermissions.cpp
-    src/Skill.cpp
-    src/SkillVersion.cpp
-    src/CreateSkillRequest.cpp
-    src/ChatKitSession.cpp
-    src/ChatKitThread.cpp
-    src/ChatKitThreadItem.cpp
-    src/CreateChatKitSessionRequest.cpp
-    src/RealtimeSessionConfig.cpp
-    src/RealtimeClientSecret.cpp
-    src/RealtimeEvent.cpp
-    src/MetaSchema.cpp
-    src/MetaJson.cpp
-    src/ModelInfo.cpp
-    src/ModelCatalog.cpp
-    src/TokenCounter.cpp
-    src/VectorIndex.cpp
-    src/SchemaValidator.cpp
+qtopenai_add_module(Core
+    HEADERS
+        ${QTOPENAI_CORE_PUBLIC_HEADERS}
+        ${QTOPENAI_PRIVATE_HEADERS}
+    SOURCES
+        src/Enums.cpp
+        src/FunctionCall.cpp
+        src/ToolCall.cpp
+        src/ContentPart.cpp
+        src/Message.cpp
+        src/Tool.cpp
+        src/Usage.cpp
+        src/Choice.cpp
+        src/ResponseFormat.cpp
+        src/ChatCompletionRequest.cpp
+        src/ChatCompletionResponse.cpp
+        src/ChatCompletionChunk.cpp
+        src/ResponseUsage.cpp
+        src/ResponseOutputItem.cpp
+        src/Response.cpp
+        src/ResponseRequest.cpp
+        src/Conversation.cpp
+        src/ModerationRequest.cpp
+        src/ModerationResponse.cpp
+        src/CompletionChoice.cpp
+        src/CompletionResponse.cpp
+        src/CompletionRequest.cpp
+        src/EmbeddingRequest.cpp
+        src/EmbeddingResponse.cpp
+        src/FileObject.cpp
+        src/FileUploadRequest.cpp
+        src/Model.cpp
+        src/TranscriptionRequest.cpp
+        src/TranscriptionResponse.cpp
+        src/TranslationRequest.cpp
+        src/ImageGenerationRequest.cpp
+        src/ImageEditRequest.cpp
+        src/ImageVariationRequest.cpp
+        src/ImageResponse.cpp
+        src/SpeechRequest.cpp
+        src/VideoCharacter.cpp
+        src/VideoJob.cpp
+        src/Upload.cpp
+        src/CreateUploadRequest.cpp
+        src/VectorStore.cpp
+        src/VectorStoreFile.cpp
+        src/VectorStoreSearch.cpp
+        src/CreateVectorStoreRequest.cpp
+        src/Container.cpp
+        src/CreateContainerRequest.cpp
+        src/CreateVideoRequest.cpp
+        src/VideoSourceRequest.cpp
+        src/Voice.cpp
+        src/CreateVoiceRequest.cpp
+        src/Batch.cpp
+        src/CreateBatchRequest.cpp
+        src/FineTuningJob.cpp
+        src/FineTuningCheckpoint.cpp
+        src/CreateFineTuningJobRequest.cpp
+        src/Eval.cpp
+        src/EvalRun.cpp
+        src/CreateEvalRequest.cpp
+        src/Assistant.cpp
+        src/CreateAssistantRequest.cpp
+        src/Thread.cpp
+        src/ThreadMessage.cpp
+        src/CreateThreadRequest.cpp
+        src/Run.cpp
+        src/RunStep.cpp
+        src/CreateRunRequest.cpp
+        src/Project.cpp
+        src/OrganizationUsage.cpp
+        src/OrganizationCosts.cpp
+        src/OrganizationUser.cpp
+        src/Invite.cpp
+        src/CreateInviteRequest.cpp
+        src/ProjectServiceAccount.cpp
+        src/SpendLimit.cpp
+        src/SpendAlert.cpp
+        src/DataRetention.cpp
+        src/AuditLog.cpp
+        src/AdminApiKey.cpp
+        src/ProjectApiKey.cpp
+        src/ProjectRateLimit.cpp
+        src/OrganizationRole.cpp
+        src/RoleRequest.cpp
+        src/RoleAssignment.cpp
+        src/Group.cpp
+        src/Certificate.cpp
+        src/ProjectPermissions.cpp
+        src/Skill.cpp
+        src/SkillVersion.cpp
+        src/CreateSkillRequest.cpp
+        src/ChatKitSession.cpp
+        src/ChatKitThread.cpp
+        src/ChatKitThreadItem.cpp
+        src/CreateChatKitSessionRequest.cpp
+        src/RealtimeSessionConfig.cpp
+        src/RealtimeClientSecret.cpp
+        src/RealtimeEvent.cpp
+        src/MetaSchema.cpp
+        src/MetaJson.cpp
+        src/ModelInfo.cpp
+        src/ModelCatalog.cpp
+        src/TokenCounter.cpp
+        src/VectorIndex.cpp
+        src/SchemaValidator.cpp
+    LIBS
+        Qt6::Core
 )
-
-# Namespaced alias so consumers can link QtOpenAi::Core.
-add_library(QtOpenAi::Core ALIAS QtOpenAiCore)
-
-target_link_libraries(QtOpenAiCore PUBLIC Qt6::Core)
-
-target_include_directories(QtOpenAiCore
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
-)
-
-target_compile_definitions(QtOpenAiCore PRIVATE QTOPENAI_CORE_LIBRARY)
-if(NOT BUILD_SHARED_LIBS)
-    target_compile_definitions(QtOpenAiCore PUBLIC QTOPENAI_CORE_STATIC)
-endif()
-
-set_target_properties(QtOpenAiCore PROPERTIES
-    OUTPUT_NAME QtOpenAiCore
-    EXPORT_NAME Core
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-)
-
-if(QTOPENAI_INSTALL)
-    install(TARGETS QtOpenAiCore
-        EXPORT QtOpenAiTargets
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    # Preserves the QtOpenAi/Core/... include layout.
-    install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-endif()

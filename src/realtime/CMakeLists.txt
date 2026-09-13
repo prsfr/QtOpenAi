@@ -13,47 +13,13 @@ set(QTOPENAI_REALTIME_PUBLIC_HEADERS
     include/QtOpenAi/Realtime/RealtimeConnection.h
 )
 
-add_library(QtOpenAiRealtime
-    ${QTOPENAI_REALTIME_PUBLIC_HEADERS}
-    src/RealtimeConnection.cpp
-)
-
-add_library(QtOpenAi::Realtime ALIAS QtOpenAiRealtime)
-
-target_link_libraries(QtOpenAiRealtime
-    PUBLIC
+qtopenai_add_module(Realtime
+    HEADERS
+        ${QTOPENAI_REALTIME_PUBLIC_HEADERS}
+    SOURCES
+        src/RealtimeConnection.cpp
+    LIBS
         QtOpenAi::Core
         Qt6::Core
         Qt6::WebSockets
 )
-
-target_include_directories(QtOpenAiRealtime
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
-)
-
-target_compile_definitions(QtOpenAiRealtime PRIVATE QTOPENAI_REALTIME_LIBRARY)
-if(NOT BUILD_SHARED_LIBS)
-    target_compile_definitions(QtOpenAiRealtime PUBLIC QTOPENAI_REALTIME_STATIC)
-endif()
-
-set_target_properties(QtOpenAiRealtime PROPERTIES
-    OUTPUT_NAME QtOpenAiRealtime
-    EXPORT_NAME Realtime
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-)
-
-if(QTOPENAI_INSTALL)
-    install(TARGETS QtOpenAiRealtime
-        EXPORT QtOpenAiTargets
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    # Preserves the QtOpenAi/Realtime/... include layout.
-    install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-endif()

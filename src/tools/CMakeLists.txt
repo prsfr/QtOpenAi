@@ -18,52 +18,18 @@ set(QTOPENAI_TOOLS_PUBLIC_HEADERS
     include/QtOpenAi/Tools/DefaultTools.h
 )
 
-add_library(QtOpenAiTools
-    ${QTOPENAI_TOOLS_PUBLIC_HEADERS}
-    src/FileSandbox.cpp
-    src/FileTools.cpp
-    src/HttpTools.cpp
-    src/UtilityTools.cpp
-    src/DefaultTools.cpp
-)
-
-add_library(QtOpenAi::Tools ALIAS QtOpenAiTools)
-
-target_link_libraries(QtOpenAiTools
-    PUBLIC
+qtopenai_add_module(Tools
+    HEADERS
+        ${QTOPENAI_TOOLS_PUBLIC_HEADERS}
+    SOURCES
+        src/FileSandbox.cpp
+        src/FileTools.cpp
+        src/HttpTools.cpp
+        src/UtilityTools.cpp
+        src/DefaultTools.cpp
+    LIBS
         QtOpenAi::Client
         QtOpenAi::Core
         Qt6::Core
         Qt6::Network
 )
-
-target_include_directories(QtOpenAiTools
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
-)
-
-target_compile_definitions(QtOpenAiTools PRIVATE QTOPENAI_TOOLS_LIBRARY)
-if(NOT BUILD_SHARED_LIBS)
-    target_compile_definitions(QtOpenAiTools PUBLIC QTOPENAI_TOOLS_STATIC)
-endif()
-
-set_target_properties(QtOpenAiTools PROPERTIES
-    OUTPUT_NAME QtOpenAiTools
-    EXPORT_NAME Tools
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-)
-
-if(QTOPENAI_INSTALL)
-    install(TARGETS QtOpenAiTools
-        EXPORT QtOpenAiTargets
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    # Preserves the QtOpenAi/Tools/... include layout.
-    install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-endif()

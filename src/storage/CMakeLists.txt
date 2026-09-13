@@ -21,51 +21,17 @@ set(QTOPENAI_STORAGE_PUBLIC_HEADERS
     include/QtOpenAi/Storage/Autosave.h
 )
 
-add_library(QtOpenAiStorage
-    ${QTOPENAI_STORAGE_PUBLIC_HEADERS}
-    src/Store.cpp
-    src/JsonFileStore.cpp
-    src/PersistentResponseCache.cpp
-    src/Autosave.cpp
-)
-
-add_library(QtOpenAi::Storage ALIAS QtOpenAiStorage)
-
-target_link_libraries(QtOpenAiStorage
-    PUBLIC
+qtopenai_add_module(Storage
+    HEADERS
+        ${QTOPENAI_STORAGE_PUBLIC_HEADERS}
+    SOURCES
+        src/Store.cpp
+        src/JsonFileStore.cpp
+        src/PersistentResponseCache.cpp
+        src/Autosave.cpp
+    LIBS
         QtOpenAi::Chat
         QtOpenAi::Client
         QtOpenAi::Core
         Qt6::Core
 )
-
-target_include_directories(QtOpenAiStorage
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
-)
-
-target_compile_definitions(QtOpenAiStorage PRIVATE QTOPENAI_STORAGE_LIBRARY)
-if(NOT BUILD_SHARED_LIBS)
-    target_compile_definitions(QtOpenAiStorage PUBLIC QTOPENAI_STORAGE_STATIC)
-endif()
-
-set_target_properties(QtOpenAiStorage PROPERTIES
-    OUTPUT_NAME QtOpenAiStorage
-    EXPORT_NAME Storage
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-)
-
-if(QTOPENAI_INSTALL)
-    install(TARGETS QtOpenAiStorage
-        EXPORT QtOpenAiTargets
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    # Preserves the QtOpenAi/Storage/... include layout.
-    install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-endif()
