@@ -91,10 +91,17 @@ public:
 
     QSqlQuery query() const { return QSqlQuery(database()); }
 
-    // Statements are prepared per call rather than cached. The store is not on
-    // a hot path -- it is written once per autosave interval and read once per
-    // conversation opened -- and a cache of prepared statements would have to
-    // be invalidated on close and guarded per thread for no measurable gain.
+    // Statements are prepared per call rather than cached, and the decision is
+    // right for a reason the comment here used to get wrong. It said the store
+    // is not on a hot path; it is -- PersistentResponseCache puts it on the
+    // request path, so a cache lookup and insert run per cached response, not
+    // once per autosave interval.
+    //
+    // Caching them still does not pay: reusing a prepared statement was measured
+    // at 11 us per cache lookup, about 0.3% of the surrounding save, against a
+    // cache that would have to be invalidated on close and guarded per thread.
+    // So: prepared per call, deliberately, and not because nothing calls it
+    // often.
     bool exec(QSqlQuery &query, const QString &statement, const QVariantList &values = {})
     {
         if (!query.prepare(statement))
@@ -142,8 +149,7 @@ QString SqliteStorePrivate::prepareSchema(int *version)
                               "id TEXT PRIMARY KEY, snapshot TEXT NOT NULL)")};
     for (const QString &statement : schema) {
         if (!query.exec(statement)) {
-            return QStringLiteral("SqliteStore: cannot create the schema: %1")
-                    .arg(query.lastError().text());
+            return QStringLiteral("cannot create the schema: %1").arg(query.lastError().text());
         }
     }
 
@@ -160,7 +166,7 @@ QString SqliteStorePrivate::prepareSchema(int *version)
                   QStringLiteral("INSERT OR REPLACE INTO meta (key, value) "
                                  "VALUES ('schema_version', ?)"),
                   {QString::number(SqliteStore::CurrentSchemaVersion)})) {
-            return QStringLiteral("SqliteStore: cannot record the schema version: %1")
+            return QStringLiteral("cannot record the schema version: %1")
                     .arg(query.lastError().text());
         }
         found = SqliteStore::CurrentSchemaVersion;
@@ -168,7 +174,7 @@ QString SqliteStorePrivate::prepareSchema(int *version)
         // Refused rather than read on a guess: the file belongs to a newer
         // library that knows what it put there, and writing to it with this
         // one's assumptions is how the newer version's data gets lost.
-        return QStringLiteral("SqliteStore: %1 has schema version %2, newer than the %3 this "
+        return QStringLiteral("%1 has schema version %2, newer than the %3 this "
                               "build writes.")
                 .arg(filePath)
                 .arg(found)
@@ -177,7 +183,7 @@ QString SqliteStorePrivate::prepareSchema(int *version)
         // Migration room. Version 1 is the first, so there is no step to run
         // yet; the branch is here so the next version has one place to add one,
         // and so an older database is never read as if it were current.
-        return QStringLiteral("SqliteStore: no migration from schema version %1.").arg(found);
+        return QStringLiteral("no migration from schema version %1.").arg(found);
     }
 
     *version = found;
@@ -185,7 +191,8 @@ QString SqliteStorePrivate::prepareSchema(int *version)
 }
 
 SqliteStore::SqliteStore(const QString &filePath)
-    : d(new SqliteStorePrivate)
+    : Store(QStringLiteral("SqliteStore"))
+    , d(new SqliteStorePrivate)
 {
     d->filePath = filePath;
     // Unique per store: two stores sharing a connection name would share a
@@ -209,18 +216,17 @@ bool SqliteStore::open()
     if (d->open)
         return true;
     if (!isAvailable()) {
-        return fail(QStringLiteral("SqliteStore: this Qt build has no %1 driver.")
-                            .arg(QLatin1String(DriverName)));
+        return fail(
+                QStringLiteral("this Qt build has no %1 driver.").arg(QLatin1String(DriverName)));
     }
     if (d->filePath.isEmpty())
-        return fail(QStringLiteral("SqliteStore: no file path given."));
+        return fail(QStringLiteral("no file path given."));
 
     // ":memory:" is a database, not a file, so it has no directory to create.
     if (d->filePath != QLatin1String(":memory:")) {
         const QDir directory = QFileInfo(d->filePath).absoluteDir();
         if (!directory.exists() && !QDir().mkpath(directory.absolutePath())) {
-            return fail(
-                    QStringLiteral("SqliteStore: cannot create %1.").arg(directory.absolutePath()));
+            return fail(QStringLiteral("cannot create %1.").arg(directory.absolutePath()));
         }
     }
 
@@ -233,7 +239,7 @@ bool SqliteStore::open()
                 = QSqlDatabase::addDatabase(QLatin1String(DriverName), d->connectionName);
         database.setDatabaseName(d->filePath);
         if (!database.open()) {
-            error = QStringLiteral("SqliteStore: cannot open %1: %2")
+            error = QStringLiteral("cannot open %1: %2")
                             .arg(d->filePath, database.lastError().text());
         } else {
             error = d->prepareSchema(&found);
@@ -283,7 +289,7 @@ bool SqliteStore::beginBatch()
     // is ended on the way out of a failure, and clearing would erase the
     // reason the caller is about to read.
     if (!d->open)
-        return fail(QStringLiteral("SqliteStore: not open."));
+        return fail(QStringLiteral("not open."));
     if (d->batchDepth > 0) {
         ++d->batchDepth;
         return true;
@@ -291,8 +297,7 @@ bool SqliteStore::beginBatch()
 
     QSqlDatabase database = d->database();
     if (!database.transaction()) {
-        return fail(QStringLiteral("SqliteStore: cannot begin a batch: %1")
-                            .arg(database.lastError().text()));
+        return fail(QStringLiteral("cannot begin a batch: %1").arg(database.lastError().text()));
     }
     d->batchDepth = 1;
     d->batchAborted = false;
@@ -302,7 +307,7 @@ bool SqliteStore::beginBatch()
 bool SqliteStore::endBatch(bool commit)
 {
     if (d->batchDepth == 0)
-        return fail(QStringLiteral("SqliteStore: no batch to end."));
+        return fail(QStringLiteral("no batch to end."));
     if (!commit)
         d->batchAborted = true;
     if (--d->batchDepth > 0)
@@ -313,7 +318,7 @@ bool SqliteStore::endBatch(bool commit)
     d->batchAborted = false;
     if (dropping ? database.rollback() : database.commit())
         return true;
-    return fail(QStringLiteral("SqliteStore: cannot %1 a batch: %2")
+    return fail(QStringLiteral("cannot %1 a batch: %2")
                         .arg(dropping ? QStringLiteral("roll back") : QStringLiteral("commit"),
                              database.lastError().text()));
 }
@@ -321,11 +326,10 @@ bool SqliteStore::endBatch(bool commit)
 bool SqliteStore::saveConversation(const QString &id, const Chat::Transcript &transcript,
                                    const QString &title)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
+        return false;
     if (id.isEmpty())
-        return fail(QStringLiteral("SqliteStore: a conversation needs a non-empty id."));
+        return fail(QStringLiteral("a conversation needs a non-empty id."));
 
     QSqlQuery query = d->query();
     QString keptTitle;
@@ -350,7 +354,7 @@ bool SqliteStore::saveConversation(const QString &id, const Chat::Transcript &tr
                                 "VALUES (?, ?, ?, ?, ?, ?)"),
                  {id, storedTitle, createdAt, now, transcript.count(),
                   compactJsonText(transcript.toJson())})) {
-        return fail(QStringLiteral("SqliteStore: cannot save conversation %1: %2")
+        return fail(QStringLiteral("cannot save conversation %1: %2")
                             .arg(id, query.lastError().text()));
     }
     return true;
@@ -358,11 +362,8 @@ bool SqliteStore::saveConversation(const QString &id, const Chat::Transcript &tr
 
 std::optional<Chat::Transcript> SqliteStore::loadConversation(const QString &id)
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
         return std::nullopt;
-    }
     QSqlQuery query = d->query();
     if (!d->exec(query, QStringLiteral("SELECT transcript FROM conversations WHERE id = ?"), {id})
         || !query.next()) {
@@ -373,11 +374,8 @@ std::optional<Chat::Transcript> SqliteStore::loadConversation(const QString &id)
 
 std::optional<ConversationRecord> SqliteStore::conversation(const QString &id)
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
         return std::nullopt;
-    }
     QSqlQuery query = d->query();
     if (!d->exec(query, conversationSelect() + QStringLiteral(" WHERE id = ?"), {id})
         || !query.next()) {
@@ -390,11 +388,8 @@ QList<ConversationRecord> SqliteStore::conversations() { return conversations(-1
 
 QList<ConversationRecord> SqliteStore::conversations(int limit, int offset)
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
         return {};
-    }
     if (limit == 0)
         return {};
 
@@ -408,8 +403,7 @@ QList<ConversationRecord> SqliteStore::conversations(int limit, int offset)
                  conversationSelect()
                          + QStringLiteral(" ORDER BY updated_at DESC, id ASC LIMIT ? OFFSET ?"),
                  {limit < 0 ? -1 : limit, qMax(0, offset)})) {
-        fail(QStringLiteral("SqliteStore: cannot list conversations: %1")
-                     .arg(query.lastError().text()));
+        fail(QStringLiteral("cannot list conversations: %1").arg(query.lastError().text()));
         return {};
     }
 
@@ -421,12 +415,11 @@ QList<ConversationRecord> SqliteStore::conversations(int limit, int offset)
 
 bool SqliteStore::removeConversation(const QString &id)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
+        return false;
     QSqlQuery query = d->query();
     if (!d->exec(query, QStringLiteral("DELETE FROM conversations WHERE id = ?"), {id})) {
-        return fail(QStringLiteral("SqliteStore: cannot remove conversation %1: %2")
+        return fail(QStringLiteral("cannot remove conversation %1: %2")
                             .arg(id, query.lastError().text()));
     }
     return true;
@@ -434,11 +427,10 @@ bool SqliteStore::removeConversation(const QString &id)
 
 bool SqliteStore::saveCachedResponse(const CachedResponse &response)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
+        return false;
     if (response.key.isEmpty())
-        return fail(QStringLiteral("SqliteStore: a cached response needs a key."));
+        return fail(QStringLiteral("a cached response needs a key."));
 
     const qint64 storedAt = response.storedAt.isValid() ? toStamp(response.storedAt)
                                                         : QDateTime::currentMSecsSinceEpoch();
@@ -447,19 +439,16 @@ bool SqliteStore::saveCachedResponse(const CachedResponse &response)
                  QStringLiteral("INSERT OR REPLACE INTO cache (key, body, stored_at) "
                                 "VALUES (?, ?, ?)"),
                  {response.key, response.body, storedAt})) {
-        return fail(QStringLiteral("SqliteStore: cannot save a cached response: %1")
-                            .arg(query.lastError().text()));
+        return fail(
+                QStringLiteral("cannot save a cached response: %1").arg(query.lastError().text()));
     }
     return true;
 }
 
 std::optional<CachedResponse> SqliteStore::cachedResponse(const QByteArray &key)
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
         return std::nullopt;
-    }
     QSqlQuery query = d->query();
     if (!d->exec(query, QStringLiteral("SELECT body, stored_at FROM cache WHERE key = ?"), {key})
         || !query.next()) {
@@ -475,12 +464,11 @@ std::optional<CachedResponse> SqliteStore::cachedResponse(const QByteArray &key)
 
 bool SqliteStore::removeCachedResponse(const QByteArray &key)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
+        return false;
     QSqlQuery query = d->query();
     if (!d->exec(query, QStringLiteral("DELETE FROM cache WHERE key = ?"), {key})) {
-        return fail(QStringLiteral("SqliteStore: cannot remove a cached response: %1")
+        return fail(QStringLiteral("cannot remove a cached response: %1")
                             .arg(query.lastError().text()));
     }
     return true;
@@ -488,24 +476,19 @@ bool SqliteStore::removeCachedResponse(const QByteArray &key)
 
 bool SqliteStore::clearCachedResponses()
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
+        return false;
     QSqlQuery query = d->query();
     if (!d->exec(query, QStringLiteral("DELETE FROM cache"))) {
-        return fail(QStringLiteral("SqliteStore: cannot clear the cache: %1")
-                            .arg(query.lastError().text()));
+        return fail(QStringLiteral("cannot clear the cache: %1").arg(query.lastError().text()));
     }
     return true;
 }
 
 int SqliteStore::cachedResponseCount()
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
         return 0;
-    }
     QSqlQuery query = d->query();
     if (!d->exec(query, QStringLiteral("SELECT COUNT(*) FROM cache")) || !query.next())
         return 0;
@@ -514,9 +497,8 @@ int SqliteStore::cachedResponseCount()
 
 bool SqliteStore::pruneCachedResponses(int maxEntries, const QDateTime &oldest)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
+        return false;
 
     // The two halves are one batch: two autocommits are two commits, and a
     // prune that expired the old entries and then failed to apply the ceiling
@@ -541,8 +523,8 @@ bool SqliteStore::pruneCachedResponses(int maxEntries, const QDateTime &oldest)
         && !d->exec(query, QStringLiteral("DELETE FROM cache WHERE stored_at < ?"),
                     {toStamp(oldest)})) {
         batch.abort();
-        return fail(QStringLiteral("SqliteStore: cannot expire cached responses: %1")
-                            .arg(query.lastError().text()));
+        return fail(
+                QStringLiteral("cannot expire cached responses: %1").arg(query.lastError().text()));
     }
 
     // Everything outside the newest `maxEntries` rows, in one statement over
@@ -553,37 +535,32 @@ bool SqliteStore::pruneCachedResponses(int maxEntries, const QDateTime &oldest)
                                    "(SELECT key FROM cache ORDER BY stored_at DESC LIMIT ?)"),
                     {maxEntries})) {
         batch.abort();
-        return fail(QStringLiteral("SqliteStore: cannot prune cached responses: %1")
-                            .arg(query.lastError().text()));
+        return fail(
+                QStringLiteral("cannot prune cached responses: %1").arg(query.lastError().text()));
     }
     return batch.commit();
 }
 
 bool SqliteStore::saveMetrics(const QString &id, const Client::MetricsSnapshot &snapshot)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
+        return false;
     if (id.isEmpty())
-        return fail(QStringLiteral("SqliteStore: a metrics snapshot needs a non-empty id."));
+        return fail(QStringLiteral("a metrics snapshot needs a non-empty id."));
 
     QSqlQuery query = d->query();
     if (!d->exec(query,
                  QStringLiteral("INSERT OR REPLACE INTO metrics (id, snapshot) VALUES (?, ?)"),
                  {id, compactJsonText(snapshot.toJson())})) {
-        return fail(QStringLiteral("SqliteStore: cannot save metrics %1: %2")
-                            .arg(id, query.lastError().text()));
+        return fail(QStringLiteral("cannot save metrics %1: %2").arg(id, query.lastError().text()));
     }
     return true;
 }
 
 std::optional<Client::MetricsSnapshot> SqliteStore::loadMetrics(const QString &id)
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
         return std::nullopt;
-    }
     QSqlQuery query = d->query();
     if (!d->exec(query, QStringLiteral("SELECT snapshot FROM metrics WHERE id = ?"), {id})
         || !query.next()) {
@@ -594,27 +571,23 @@ std::optional<Client::MetricsSnapshot> SqliteStore::loadMetrics(const QString &i
 
 bool SqliteStore::removeMetrics(const QString &id)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
+        return false;
     QSqlQuery query = d->query();
     if (!d->exec(query, QStringLiteral("DELETE FROM metrics WHERE id = ?"), {id})) {
-        return fail(QStringLiteral("SqliteStore: cannot remove metrics %1: %2")
-                            .arg(id, query.lastError().text()));
+        return fail(
+                QStringLiteral("cannot remove metrics %1: %2").arg(id, query.lastError().text()));
     }
     return true;
 }
 
 QStringList SqliteStore::metricsIds()
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("SqliteStore: not open."));
+    if (!requireOpen())
         return {};
-    }
     QSqlQuery query = d->query();
     if (!d->exec(query, QStringLiteral("SELECT id FROM metrics ORDER BY id ASC"))) {
-        fail(QStringLiteral("SqliteStore: cannot list metrics: %1").arg(query.lastError().text()));
+        fail(QStringLiteral("cannot list metrics: %1").arg(query.lastError().text()));
         return {};
     }
     QStringList ids;

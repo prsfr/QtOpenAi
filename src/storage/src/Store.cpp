@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Storage/Store.h"
 
+#include <utility>
+
 namespace QtOpenAi {
 namespace Storage {
 
@@ -8,11 +10,19 @@ class StorePrivate
 {
 public:
     QString lastError;
+    // Prefixed onto every fail() message, so a backend names itself once.
+    QString backendName;
 };
 
 Store::Store()
     : d(new StorePrivate)
 { }
+
+Store::Store(QString backendName)
+    : d(new StorePrivate)
+{
+    d->backendName = std::move(backendName);
+}
 
 Store::~Store() = default;
 
@@ -46,8 +56,15 @@ QList<ConversationRecord> Store::conversations(int limit, int offset)
 
 bool Store::fail(const QString &message)
 {
-    d->lastError = message;
+    d->lastError
+            = d->backendName.isEmpty() ? message : d->backendName + QStringLiteral(": ") + message;
     return false;
+}
+
+bool Store::requireOpen()
+{
+    clearError();
+    return isOpen() || fail(QStringLiteral("not open."));
 }
 
 void Store::clearError() { d->lastError.clear(); }

@@ -104,7 +104,8 @@ public:
 };
 
 JsonFileStore::JsonFileStore(const QString &rootPath)
-    : d(new JsonFileStorePrivate)
+    : Store(QStringLiteral("JsonFileStore"))
+    , d(new JsonFileStorePrivate)
 {
     d->root = rootPath;
 }
@@ -119,12 +120,12 @@ bool JsonFileStore::open()
     if (d->open)
         return true;
     if (d->root.isEmpty())
-        return fail(QStringLiteral("JsonFileStore: no root path given."));
+        return fail(QStringLiteral("no root path given."));
 
     QDir root(d->root);
     for (const char *collection : {ConversationsDir, RecordsDir, CacheDir, MetricsDir}) {
         if (!root.mkpath(QString::fromLatin1(collection))) {
-            return fail(QStringLiteral("JsonFileStore: cannot create %1/%2.")
+            return fail(QStringLiteral("cannot create %1/%2.")
                                 .arg(d->root, QString::fromLatin1(collection)));
         }
     }
@@ -136,7 +137,7 @@ bool JsonFileStore::open()
         // version is what makes it a store rather than a directory.
         if (!JsonFileStorePrivate::write(metaPath, QJsonObject {{QLatin1String("schema_version"),
                                                                  CurrentSchemaVersion}}))
-            return fail(QStringLiteral("JsonFileStore: cannot write %1.").arg(metaPath));
+            return fail(QStringLiteral("cannot write %1.").arg(metaPath));
         d->schemaVersion = CurrentSchemaVersion;
         d->open = true;
         return true;
@@ -147,21 +148,20 @@ bool JsonFileStore::open()
         // Refused rather than read on a guess: the file belongs to a newer
         // library that knows what it put there, and writing to it with this
         // one's assumptions is how the newer version's data gets lost.
-        return fail(QStringLiteral("JsonFileStore: %1 has schema version %2, newer than the %3 "
+        return fail(QStringLiteral("%1 has schema version %2, newer than the %3 "
                                    "this build writes.")
                             .arg(d->root)
                             .arg(found)
                             .arg(CurrentSchemaVersion));
     }
     if (found < 1)
-        return fail(QStringLiteral("JsonFileStore: %1 has no usable schema version.").arg(d->root));
+        return fail(QStringLiteral("%1 has no usable schema version.").arg(d->root));
 
     // Migration room. Version 1 is the first, so there is no step to run yet;
     // the branch is here so the next version has one place to add one, and so
     // that an older store is never silently read as if it were current.
     if (found < CurrentSchemaVersion) {
-        return fail(
-                QStringLiteral("JsonFileStore: no migration from schema version %1.").arg(found));
+        return fail(QStringLiteral("no migration from schema version %1.").arg(found));
     }
 
     d->schemaVersion = found;
@@ -182,11 +182,10 @@ int JsonFileStore::schemaVersion() const { return d->schemaVersion; }
 bool JsonFileStore::saveConversation(const QString &id, const Chat::Transcript &transcript,
                                      const QString &title)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
+        return false;
     if (id.isEmpty())
-        return fail(QStringLiteral("JsonFileStore: a conversation needs a non-empty id."));
+        return fail(QStringLiteral("a conversation needs a non-empty id."));
 
     const QString path = d->path(ConversationsDir, fileNameFor(id));
     const QString recordPath = d->path(RecordsDir, fileNameFor(id));
@@ -213,7 +212,7 @@ bool JsonFileStore::saveConversation(const QString &id, const Chat::Transcript &
     json.insert(QLatin1String("transcript"), transcript.toJson());
 
     if (!JsonFileStorePrivate::write(path, json))
-        return fail(QStringLiteral("JsonFileStore: cannot write %1.").arg(path));
+        return fail(QStringLiteral("cannot write %1.").arg(path));
 
     // The record, without the transcript, and written second on purpose: the
     // conversation above is the authority, this is a cache of the five fields a
@@ -233,11 +232,8 @@ bool JsonFileStore::saveConversation(const QString &id, const Chat::Transcript &
 
 std::optional<Chat::Transcript> JsonFileStore::loadConversation(const QString &id)
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
         return std::nullopt;
-    }
     const std::optional<QJsonObject> json
             = JsonFileStorePrivate::read(d->path(ConversationsDir, fileNameFor(id)));
     if (!json)
@@ -247,11 +243,8 @@ std::optional<Chat::Transcript> JsonFileStore::loadConversation(const QString &i
 
 std::optional<ConversationRecord> JsonFileStore::conversation(const QString &id)
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
         return std::nullopt;
-    }
     std::optional<QJsonObject> json
             = JsonFileStorePrivate::read(d->path(RecordsDir, fileNameFor(id)));
     if (!json)
@@ -263,11 +256,8 @@ std::optional<ConversationRecord> JsonFileStore::conversation(const QString &id)
 
 QList<ConversationRecord> JsonFileStore::conversations()
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
         return {};
-    }
 
     QList<ConversationRecord> records;
     const QFileInfoList files
@@ -301,29 +291,27 @@ QList<ConversationRecord> JsonFileStore::conversations()
 
 bool JsonFileStore::removeConversation(const QString &id)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
+        return false;
     const QString path = d->path(ConversationsDir, fileNameFor(id));
     const QString recordPath = d->path(RecordsDir, fileNameFor(id));
     // The record goes first: a record without its conversation would be listed
     // as a conversation that cannot be loaded.
     if (QFile::exists(recordPath) && !QFile::remove(recordPath))
-        return fail(QStringLiteral("JsonFileStore: cannot remove %1.").arg(recordPath));
+        return fail(QStringLiteral("cannot remove %1.").arg(recordPath));
     if (!QFile::exists(path))
         return true; // Removing what is not there is the state the caller wanted.
     if (!QFile::remove(path))
-        return fail(QStringLiteral("JsonFileStore: cannot remove %1.").arg(path));
+        return fail(QStringLiteral("cannot remove %1.").arg(path));
     return true;
 }
 
 bool JsonFileStore::saveCachedResponse(const CachedResponse &response)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
+        return false;
     if (response.key.isEmpty())
-        return fail(QStringLiteral("JsonFileStore: a cached response needs a key."));
+        return fail(QStringLiteral("a cached response needs a key."));
 
     const QDateTime storedAt
             = response.storedAt.isValid() ? response.storedAt : QDateTime::currentDateTimeUtc();
@@ -335,17 +323,14 @@ bool JsonFileStore::saveCachedResponse(const CachedResponse &response)
 
     const QString path = d->path(CacheDir, fileNameFor(response.key));
     if (!JsonFileStorePrivate::write(path, json))
-        return fail(QStringLiteral("JsonFileStore: cannot write %1.").arg(path));
+        return fail(QStringLiteral("cannot write %1.").arg(path));
     return true;
 }
 
 std::optional<CachedResponse> JsonFileStore::cachedResponse(const QByteArray &key)
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
         return std::nullopt;
-    }
     const std::optional<QJsonObject> json
             = JsonFileStorePrivate::read(d->path(CacheDir, fileNameFor(key)));
     if (!json)
@@ -361,26 +346,23 @@ std::optional<CachedResponse> JsonFileStore::cachedResponse(const QByteArray &ke
 
 bool JsonFileStore::removeCachedResponse(const QByteArray &key)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
+        return false;
     const QString path = d->path(CacheDir, fileNameFor(key));
     if (QFile::exists(path) && !QFile::remove(path))
-        return fail(QStringLiteral("JsonFileStore: cannot remove %1.").arg(path));
+        return fail(QStringLiteral("cannot remove %1.").arg(path));
     return true;
 }
 
 bool JsonFileStore::clearCachedResponses()
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
+        return false;
     QDir dir = d->dir(CacheDir);
     const QFileInfoList files = dir.entryInfoList({QStringLiteral("*.json")}, QDir::Files);
     for (const QFileInfo &file : files) {
         if (!QFile::remove(file.absoluteFilePath())) {
-            return fail(QStringLiteral("JsonFileStore: cannot remove %1.")
-                                .arg(file.absoluteFilePath()));
+            return fail(QStringLiteral("cannot remove %1.").arg(file.absoluteFilePath()));
         }
     }
     return true;
@@ -388,19 +370,15 @@ bool JsonFileStore::clearCachedResponses()
 
 int JsonFileStore::cachedResponseCount()
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
         return 0;
-    }
     return int(d->dir(CacheDir).entryList({QStringLiteral("*.json")}, QDir::Files).size());
 }
 
 bool JsonFileStore::pruneCachedResponses(int maxEntries, const QDateTime &oldest)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
+        return false;
 
     struct Entry
     {
@@ -432,8 +410,7 @@ bool JsonFileStore::pruneCachedResponses(int maxEntries, const QDateTime &oldest
     }
 
     const auto drop = [this](const QString &path) {
-        return QFile::remove(path)
-               || fail(QStringLiteral("JsonFileStore: cannot remove %1.").arg(path));
+        return QFile::remove(path) || fail(QStringLiteral("cannot remove %1.").arg(path));
     };
 
     if (oldest.isValid()) {
@@ -461,27 +438,23 @@ bool JsonFileStore::pruneCachedResponses(int maxEntries, const QDateTime &oldest
 
 bool JsonFileStore::saveMetrics(const QString &id, const Client::MetricsSnapshot &snapshot)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
+        return false;
     if (id.isEmpty())
-        return fail(QStringLiteral("JsonFileStore: a metrics snapshot needs a non-empty id."));
+        return fail(QStringLiteral("a metrics snapshot needs a non-empty id."));
 
     const QJsonObject json {{QLatin1String("id"), id},
                             {QLatin1String("snapshot"), snapshot.toJson()}};
     const QString path = d->path(MetricsDir, fileNameFor(id));
     if (!JsonFileStorePrivate::write(path, json))
-        return fail(QStringLiteral("JsonFileStore: cannot write %1.").arg(path));
+        return fail(QStringLiteral("cannot write %1.").arg(path));
     return true;
 }
 
 std::optional<Client::MetricsSnapshot> JsonFileStore::loadMetrics(const QString &id)
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
         return std::nullopt;
-    }
     const std::optional<QJsonObject> json
             = JsonFileStorePrivate::read(d->path(MetricsDir, fileNameFor(id)));
     if (!json)
@@ -491,22 +464,18 @@ std::optional<Client::MetricsSnapshot> JsonFileStore::loadMetrics(const QString 
 
 bool JsonFileStore::removeMetrics(const QString &id)
 {
-    clearError();
-    if (!d->open)
-        return fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
+        return false;
     const QString path = d->path(MetricsDir, fileNameFor(id));
     if (QFile::exists(path) && !QFile::remove(path))
-        return fail(QStringLiteral("JsonFileStore: cannot remove %1.").arg(path));
+        return fail(QStringLiteral("cannot remove %1.").arg(path));
     return true;
 }
 
 QStringList JsonFileStore::metricsIds()
 {
-    clearError();
-    if (!d->open) {
-        fail(QStringLiteral("JsonFileStore: not open."));
+    if (!requireOpen())
         return {};
-    }
     QStringList ids;
     const QFileInfoList files
             = d->dir(MetricsDir).entryInfoList({QStringLiteral("*.json")}, QDir::Files);
