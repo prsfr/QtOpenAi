@@ -23,7 +23,14 @@ public:
     QPointer<Client::MetricsCollector> collector;
 
     bool enabled = true;
-    bool dirty = false;
+    // Tracked apart because they are written apart. One flag meant that
+    // recording a request -- which is a counter changing -- marked the
+    // transcript dirty too, and the next flush serialised the whole conversation
+    // to save it. The transcript grows; the metrics snapshot does not.
+    bool conversationDirty = false;
+    bool metricsDirty = false;
+
+    bool dirty() const { return conversationDirty || metricsDirty; }
 };
 
 Autosave::Autosave(Store *store, QObject *parent)
@@ -69,8 +76,9 @@ void Autosave::setMetrics(const QString &id, Client::MetricsCollector *collector
     d->metricsId = id;
     d->collector = collector;
     if (collector) {
-        connect(collector, &Client::MetricsCollector::requestRecorded, this, &Autosave::touch);
-        connect(collector, &Client::MetricsCollector::usageRecorded, this, &Autosave::touch);
+        connect(collector, &Client::MetricsCollector::requestRecorded, this,
+                &Autosave::touchMetrics);
+        connect(collector, &Client::MetricsCollector::usageRecorded, this, &Autosave::touchMetrics);
     }
 }
 
@@ -110,23 +118,34 @@ void Autosave::setEnabled(bool enabled)
     }
     // Re-enabling saves what happened while it was off; the change is still
     // recorded, only the writing of it was suspended.
-    if (d->dirty)
+    if (d->dirty())
         d->timer.start();
 }
 
 bool Autosave::isDirty() const
 {
     Q_D(const Autosave);
-    return d->dirty;
+    return d->dirty();
 }
 
 void Autosave::touch()
 {
     Q_D(Autosave);
-    if (!d->dirty) {
-        d->dirty = true;
+    // The generic mark: whatever changed, both halves are written. Its meaning is
+    // unchanged -- it is the metrics signals that no longer come through here.
+    markDirty(true, true);
+}
+
+void Autosave::touchMetrics() { markDirty(false, true); }
+
+void Autosave::markDirty(bool conversation, bool metrics)
+{
+    Q_D(Autosave);
+    const bool was = d->dirty();
+    d->conversationDirty = d->conversationDirty || conversation;
+    d->metricsDirty = d->metricsDirty || metrics;
+    if (!was && d->dirty())
         Q_EMIT dirtyChanged();
-    }
     if (!d->enabled)
         return;
     if (d->timer.interval() == 0) {
@@ -143,7 +162,7 @@ bool Autosave::flush()
 {
     Q_D(Autosave);
     d->timer.stop();
-    if (!d->dirty)
+    if (!d->dirty())
         return true;
     if (!d->store) {
         Q_EMIT failed(QStringLiteral("Autosave: no store."));
@@ -156,13 +175,16 @@ bool Autosave::flush()
     Store::Batch batch(d->store);
 
     bool ok = true;
-    if (!d->conversationId.isEmpty() && d->conversationSource) {
+    // Only what changed. The transcript is the expensive half -- serialising it
+    // grows with the conversation -- and a recorded request is not a reason to
+    // write it again.
+    if (d->conversationDirty && !d->conversationId.isEmpty() && d->conversationSource) {
         if (!d->store->saveConversation(d->conversationId, d->conversationSource())) {
             ok = false;
             Q_EMIT failed(d->store->lastError());
         }
     }
-    if (ok && !d->metricsId.isEmpty() && d->collector) {
+    if (ok && d->metricsDirty && !d->metricsId.isEmpty() && d->collector) {
         if (!d->store->saveMetrics(d->metricsId, d->collector->snapshot())) {
             ok = false;
             Q_EMIT failed(d->store->lastError());
@@ -182,7 +204,8 @@ bool Autosave::flush()
         return false;
     }
 
-    d->dirty = false;
+    d->conversationDirty = false;
+    d->metricsDirty = false;
     Q_EMIT dirtyChanged();
     Q_EMIT saved();
     return true;

@@ -523,6 +523,18 @@ bool SqliteStore::pruneCachedResponses(int maxEntries, const QDateTime &oldest)
     // is a state no caller asked for. Nested inside the caller's batch when
     // there is one -- PersistentResponseCache::insert() opens one around the
     // save and this prune.
+    // With no age bound and room under the ceiling there is nothing to delete,
+    // and a COUNT(*) over the primary key is orders of magnitude cheaper than the
+    // NOT IN DELETE below. This runs after every cached response, so the common
+    // case is worth a question.
+    QSqlQuery guard = d->query();
+    if (!oldest.isValid() && maxEntries >= 0) {
+        if (d->exec(guard, QStringLiteral("SELECT COUNT(*) FROM cache"), {}) && guard.next()
+            && guard.value(0).toInt() <= maxEntries) {
+            return true;
+        }
+    }
+
     Batch batch(this);
     QSqlQuery query = d->query();
     if (oldest.isValid()

@@ -98,6 +98,15 @@ Q_SIGNALS:
     void dirtyChanged();
 
 private:
+    void markDirty(bool conversation, bool metrics);
+
+private Q_SLOTS:
+    // What the MetricsCollector's signals connect to. Separate from touch()
+    // because a recorded request says nothing about the transcript, and flushing
+    // it as though it did rewrote the whole conversation to save a counter.
+    void touchMetrics();
+
+private:
     Q_DECLARE_PRIVATE(Autosave)
     QScopedPointer<AutosavePrivate> d_ptr;
 };

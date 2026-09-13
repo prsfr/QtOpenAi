@@ -24,6 +24,7 @@ private slots:
     void disablingSuspendsTheWriteButNotTheChange();
     void oneFlushIsOneBatch();
     void aFailedSaveIsReportedAndStaysDirty();
+    void aRecordedRequestDoesNotRewriteTheTranscript();
 };
 
 void TestAutosave::manyChangesInOneIntervalAreOneSave()
@@ -115,6 +116,50 @@ void TestAutosave::aCollectorMarksItselfDirty()
     restored.restore(*saved);
     QCOMPARE(restored.snapshot().requests, 1);
     QCOMPARE(restored.metrics(QStringLiteral("gpt-4o-mini")).requests, 1);
+}
+
+void TestAutosave::aRecordedRequestDoesNotRewriteTheTranscript()
+{
+    // The two halves are written apart because they change apart. One dirty flag
+    // meant a recorded request -- a counter moving -- rewrote the whole
+    // conversation, and the cost of that grows with the conversation while the
+    // snapshot it was saving does not.
+    QTemporaryDir root;
+    JsonFileStore store(root.path());
+    QVERIFY2(store.open(), qPrintable(store.lastError()));
+
+    int transcriptReads = 0;
+    Transcript transcript;
+    transcript.addUserMessage(QStringLiteral("first"));
+
+    MetricsCollector collector;
+    Autosave autosave(&store);
+    autosave.setIntervalMs(0);
+    autosave.setConversation(QStringLiteral("conv"), [&] {
+        ++transcriptReads;
+        return transcript;
+    });
+    autosave.setMetrics(QStringLiteral("all-time"), &collector);
+
+    // A conversation change writes the conversation.
+    autosave.touch();
+    QCOMPARE(transcriptReads, 1);
+    QVERIFY(store.loadConversation(QStringLiteral("conv")).has_value());
+
+    // A recorded request writes the metrics and leaves the transcript alone:
+    // the source is not even asked for it.
+    RequestMetrics request;
+    request.model = QStringLiteral("gpt-4o-mini");
+    request.ok = true;
+    collector.recordRequest(request);
+    QCOMPARE(transcriptReads, 1);
+
+    const std::optional<MetricsSnapshot> saved = store.loadMetrics(QStringLiteral("all-time"));
+    QVERIFY(saved.has_value());
+    QCOMPARE(saved->requests, 1);
+
+    // ... and it is not dirty afterwards, so nothing is left pending.
+    QVERIFY(!autosave.isDirty());
 }
 
 void TestAutosave::disablingSuspendsTheWriteButNotTheChange()

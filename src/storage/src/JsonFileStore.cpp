@@ -363,13 +363,25 @@ bool JsonFileStore::pruneCachedResponses(int maxEntries, const QDateTime &oldest
         QString path;
         QDateTime storedAt;
     };
-    QList<Entry> entries;
     const QFileInfoList files
             = d->dir(CacheDir).entryInfoList({QStringLiteral("*.json")}, QDir::Files);
+
+    // Neither bound can drop anything, so do not touch a single file. This runs
+    // after every insert, and at the default ceiling with room to spare it used
+    // to read and parse the entire cache to discover it had nothing to do.
+    const bool overCeiling = maxEntries >= 0 && files.size() > maxEntries;
+    if (!oldest.isValid() && !overCeiling)
+        return true;
+
+    // Only now is a file opened. stored_at is what the caller recorded and can
+    // differ from when the file was written -- saveCachedResponse() takes it --
+    // so the file's own modification time is not a substitute for it.
+    QList<Entry> entries;
+    entries.reserve(files.size());
     for (const QFileInfo &file : files) {
         const std::optional<QJsonObject> json = JsonFileStorePrivate::read(file.absoluteFilePath());
-        // A file that cannot be parsed is a cache entry that can never be a
-        // hit, so pruning is exactly the moment to be rid of it.
+        // A file that cannot be parsed is a cache entry that can never be a hit,
+        // so pruning is exactly the moment to be rid of it.
         const QDateTime storedAt
                 = json ? dateTimeFromIso(json->value(QLatin1String("stored_at"))) : QDateTime();
         entries.append({file.absoluteFilePath(), storedAt});
