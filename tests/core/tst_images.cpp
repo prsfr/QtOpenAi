@@ -24,7 +24,7 @@ private slots:
     void parsesUrlResponseWithUsage();
 };
 
-static QString fieldValue(const QList<ImageEditRequest::FormField> &fields, const QString &name)
+static QString fieldValue(const FormFields &fields, const QString &name)
 {
     for (const auto &field : fields)
         if (field.first == name)

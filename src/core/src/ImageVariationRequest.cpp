@@ -61,7 +61,7 @@ void ImageVariationRequest::setResponseFormat(const QString &format) { d->respon
 QString ImageVariationRequest::user() const { return d->user; }
 void ImageVariationRequest::setUser(const QString &user) { d->user = user; }
 
-QList<ImageVariationRequest::FormField> ImageVariationRequest::formFields() const
+FormFields ImageVariationRequest::formFields() const
 {
     detail::FormFields fields;
     detail::appendIfNotEmpty(fields, QStringLiteral("model"), d->model);

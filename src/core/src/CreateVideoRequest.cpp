@@ -63,12 +63,12 @@ bool CreateVideoRequest::hasInputReference() const { return !d->inputReferenceDa
 QJsonObject CreateVideoRequest::extraBody() const { return d->extraBody; }
 void CreateVideoRequest::setExtraBody(const QJsonObject &extra) { d->extraBody = extra; }
 
-QList<CreateVideoRequest::FormField> CreateVideoRequest::formFields() const
+FormFields CreateVideoRequest::formFields() const
 {
     // Derive the multipart fields from the JSON body so the two encodings stay
     // in lock-step (and extra_body flows to both); scalar JSON values are
     // stringified for form transport.
-    QList<FormField> fields;
+    FormFields fields;
     const QJsonObject json = toJson();
     for (auto it = json.constBegin(); it != json.constEnd(); ++it)
         fields.append({it.key(), it.value().toVariant().toString()});

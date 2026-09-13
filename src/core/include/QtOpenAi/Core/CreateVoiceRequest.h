@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/FormField.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 
 #include <QtCore/QByteArray>
@@ -21,7 +22,6 @@ class QTOPENAI_CORE_EXPORT CreateVoiceRequest
 public:
     // One multipart form field. The audio sample travels separately as the file
     // part, mirroring FileUploadRequest.
-    using FormField = QPair<QString, QString>;
 
     CreateVoiceRequest();
     CreateVoiceRequest(QString name, QString consentId, QByteArray audioSample, QString fileName);
@@ -47,7 +47,7 @@ public:
     void setFileName(const QString &fileName);
 
     // The non-file form fields, in wire order.
-    QList<FormField> formFields() const;
+    FormFields formFields() const;
 
     bool operator==(const CreateVoiceRequest &other) const;
     bool operator!=(const CreateVoiceRequest &other) const { return !(*this == other); }
@@ -63,8 +63,6 @@ class CreateVoiceConsentRequestData;
 class QTOPENAI_CORE_EXPORT CreateVoiceConsentRequest
 {
 public:
-    using FormField = QPair<QString, QString>;
-
     CreateVoiceConsentRequest();
     CreateVoiceConsentRequest(QString name, QString language, QByteArray recording,
                               QString fileName);
@@ -89,7 +87,7 @@ public:
     QString fileName() const;
     void setFileName(const QString &fileName);
 
-    QList<FormField> formFields() const;
+    FormFields formFields() const;
 
     bool operator==(const CreateVoiceConsentRequest &other) const;
     bool operator!=(const CreateVoiceConsentRequest &other) const { return !(*this == other); }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/FormField.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 
 #include <QtCore/QByteArray>
@@ -25,8 +26,6 @@ class TranscriptionRequestData;
 class QTOPENAI_CORE_EXPORT TranscriptionRequest
 {
 public:
-    using FormField = QPair<QString, QString>;
-
     TranscriptionRequest();
     TranscriptionRequest(QByteArray fileData, QString fileName, QString model);
     TranscriptionRequest(const TranscriptionRequest &other);
@@ -75,7 +74,7 @@ public:
     void setStream(bool stream);
 
     // The non-file form fields, in a stable order, ready for multipart encoding.
-    QList<FormField> formFields() const;
+    FormFields formFields() const;
 
     bool operator==(const TranscriptionRequest &other) const;
     bool operator!=(const TranscriptionRequest &other) const { return !(*this == other); }

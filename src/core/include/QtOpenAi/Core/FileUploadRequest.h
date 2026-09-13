@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/FormField.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 
 #include <QtCore/QByteArray>
@@ -23,8 +24,6 @@ class FileUploadRequestData;
 class QTOPENAI_CORE_EXPORT FileUploadRequest
 {
 public:
-    using FormField = QPair<QString, QString>;
-
     FileUploadRequest();
     FileUploadRequest(QByteArray fileData, QString fileName, QString purpose);
     FileUploadRequest(const FileUploadRequest &other);
@@ -55,7 +54,7 @@ public:
     void setExpiresAfter(const QString &anchor, qint64 seconds);
 
     // The non-file form fields, in a stable order, ready for multipart encoding.
-    QList<FormField> formFields() const;
+    FormFields formFields() const;
 
     bool operator==(const FileUploadRequest &other) const;
     bool operator!=(const FileUploadRequest &other) const { return !(*this == other); }

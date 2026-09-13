@@ -75,7 +75,9 @@ public:
     Reply *post(const QString &path, const QByteArray &body = {}, const char *beta = nullptr,
                 const QByteArray &contentType = {}) const;
     template <typename Reply>
-    Reply *postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
+    // `fields` and `files` are sinks: both are moved into the per-attempt
+    // factory, so by value is one move rather than a copy.
+    Reply *postMultipart(const QString &path, Core::FormFields fields,
                          QList<detail::FormFilePart> files, const char *beta = nullptr) const;
     template <typename Reply>
     Reply *remove(const QString &path, const char *beta = nullptr) const;
@@ -426,7 +428,7 @@ void applyQuery(QNetworkRequest &request, const QUrlQuery &extra)
 std::function<QNetworkReply *()> multipartPostFactory(const ClientPrivate *d,
                                                       QNetworkAccessManager *manager,
                                                       QNetworkRequest request,
-                                                      QList<QPair<QString, QString>> fields,
+                                                      Core::FormFields fields,
                                                       QList<detail::FormFilePart> files)
 {
     applyIdempotencyKey(d, request);
@@ -808,7 +810,7 @@ Reply *ClientPrivate::post(const QString &path, const QByteArray &body, const ch
 }
 
 template <typename Reply>
-Reply *ClientPrivate::postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
+Reply *ClientPrivate::postMultipart(const QString &path, Core::FormFields fields,
                                     QList<detail::FormFilePart> files, const char *beta) const
 {
     QNetworkAccessManager *manager = q->networkAccessManager();

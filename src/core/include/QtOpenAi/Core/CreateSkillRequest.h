@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/FormField.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 
 #include <QtCore/QByteArray>
@@ -30,7 +31,6 @@ class CreateSkillRequestData;
 class QTOPENAI_CORE_EXPORT CreateSkillRequest
 {
 public:
-    using FormField = QPair<QString, QString>;
     // A named bundle file: (fileName, bytes).
     using SkillFile = QPair<QString, QByteArray>;
 
@@ -57,7 +57,7 @@ public:
     void setMakeDefault(bool makeDefault);
 
     // The non-file form fields, in a stable order, ready for multipart encoding.
-    QList<FormField> formFields() const;
+    FormFields formFields() const;
 
     bool operator==(const CreateSkillRequest &other) const;
     bool operator!=(const CreateSkillRequest &other) const { return !(*this == other); }

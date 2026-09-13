@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/FormField.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 
 #include <QtCore/QByteArray>
@@ -34,8 +35,6 @@ class VideoSourceRequestData;
 class QTOPENAI_CORE_EXPORT VideoSourceRequest
 {
 public:
-    using FormField = QPair<QString, QString>;
-
     VideoSourceRequest();
     // The common case: edit or extend a video the API already holds.
     VideoSourceRequest(QString sourceVideoId, QString prompt);
@@ -80,7 +79,7 @@ public:
 
     // The non-file form fields, in a stable order, for multipart encoding.
     // `withSeconds` is false for an edit, which has no such parameter.
-    QList<FormField> formFields(bool withSeconds) const;
+    FormFields formFields(bool withSeconds) const;
 
     // The JSON body. `withSeconds` as above.
     QJsonObject toJson(bool withSeconds) const;

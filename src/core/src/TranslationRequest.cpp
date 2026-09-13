@@ -55,7 +55,7 @@ void TranslationRequest::setResponseFormat(const QString &format) { d->responseF
 std::optional<double> TranslationRequest::temperature() const { return d->temperature; }
 void TranslationRequest::setTemperature(double temperature) { d->temperature = temperature; }
 
-QList<TranslationRequest::FormField> TranslationRequest::formFields() const
+FormFields TranslationRequest::formFields() const
 {
     detail::FormFields fields;
     fields.append({QStringLiteral("model"), d->model});

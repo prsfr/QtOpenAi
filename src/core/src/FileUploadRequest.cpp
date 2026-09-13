@@ -56,9 +56,9 @@ void FileUploadRequest::setExpiresAfter(const QString &anchor, qint64 seconds)
     d->expiresAfterSeconds = seconds;
 }
 
-QList<FileUploadRequest::FormField> FileUploadRequest::formFields() const
+FormFields FileUploadRequest::formFields() const
 {
-    QList<FormField> fields;
+    FormFields fields;
     fields.append({QStringLiteral("purpose"), d->purpose});
     // Nested objects are sent with the bracket convention multipart uses.
     if (d->expiresAfterSeconds) {

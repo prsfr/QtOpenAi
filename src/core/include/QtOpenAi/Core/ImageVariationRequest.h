@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/FormField.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 
 #include <QtCore/QByteArray>
@@ -22,8 +23,6 @@ class ImageVariationRequestData;
 class QTOPENAI_CORE_EXPORT ImageVariationRequest
 {
 public:
-    using FormField = QPair<QString, QString>;
-
     ImageVariationRequest();
     ImageVariationRequest(QByteArray imageData, QString fileName, QString model = {});
     ImageVariationRequest(const ImageVariationRequest &other);
@@ -55,7 +54,7 @@ public:
     QString user() const;
     void setUser(const QString &user);
 
-    QList<FormField> formFields() const;
+    FormFields formFields() const;
 
     bool operator==(const ImageVariationRequest &other) const;
     bool operator!=(const ImageVariationRequest &other) const { return !(*this == other); }

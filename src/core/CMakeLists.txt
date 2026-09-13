@@ -5,6 +5,7 @@
 set(QTOPENAI_CORE_PUBLIC_HEADERS
     include/QtOpenAi/Core/GlobalCore.h
     include/QtOpenAi/Core/Enums.h
+    include/QtOpenAi/Core/FormField.h
     include/QtOpenAi/Core/FunctionCall.h
     include/QtOpenAi/Core/ToolCall.h
     include/QtOpenAi/Core/ContentPart.h

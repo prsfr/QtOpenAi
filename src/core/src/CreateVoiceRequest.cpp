@@ -52,9 +52,9 @@ void CreateVoiceRequest::setAudioSample(const QByteArray &audioSample)
 QString CreateVoiceRequest::fileName() const { return d->fileName; }
 void CreateVoiceRequest::setFileName(const QString &fileName) { d->fileName = fileName; }
 
-QList<CreateVoiceRequest::FormField> CreateVoiceRequest::formFields() const
+FormFields CreateVoiceRequest::formFields() const
 {
-    QList<FormField> fields;
+    FormFields fields;
     fields.append({QStringLiteral("name"), d->name});
     fields.append({QStringLiteral("consent"), d->consentId});
     return fields;
@@ -118,9 +118,9 @@ void CreateVoiceConsentRequest::setRecording(const QByteArray &recording)
 QString CreateVoiceConsentRequest::fileName() const { return d->fileName; }
 void CreateVoiceConsentRequest::setFileName(const QString &fileName) { d->fileName = fileName; }
 
-QList<CreateVoiceConsentRequest::FormField> CreateVoiceConsentRequest::formFields() const
+FormFields CreateVoiceConsentRequest::formFields() const
 {
-    QList<FormField> fields;
+    FormFields fields;
     fields.append({QStringLiteral("name"), d->name});
     fields.append({QStringLiteral("language"), d->language});
     return fields;

@@ -44,7 +44,7 @@ void CreateSkillRequest::addFile(const QString &fileName, const QByteArray &data
 std::optional<bool> CreateSkillRequest::makeDefault() const { return d->makeDefault; }
 void CreateSkillRequest::setMakeDefault(bool makeDefault) { d->makeDefault = makeDefault; }
 
-QList<CreateSkillRequest::FormField> CreateSkillRequest::formFields() const
+FormFields CreateSkillRequest::formFields() const
 {
     detail::FormFields fields;
     detail::appendIfSet(fields, QStringLiteral("default"), d->makeDefault);

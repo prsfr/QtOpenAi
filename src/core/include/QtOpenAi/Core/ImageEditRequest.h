@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/FormField.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 
 #include <QtCore/QByteArray>
@@ -23,7 +24,6 @@ class ImageEditRequestData;
 class QTOPENAI_CORE_EXPORT ImageEditRequest
 {
 public:
-    using FormField = QPair<QString, QString>;
     // A named image blob: (fileName, bytes).
     using ImageFile = QPair<QString, QByteArray>;
 
@@ -74,7 +74,7 @@ public:
     void setUser(const QString &user);
 
     // The non-file form fields, in a stable order, ready for multipart encoding.
-    QList<FormField> formFields() const;
+    FormFields formFields() const;
 
     bool operator==(const ImageEditRequest &other) const;
     bool operator!=(const ImageEditRequest &other) const { return !(*this == other); }
