@@ -104,13 +104,7 @@ QStringList DefaultTools::install(Client::ToolRegistry *registry, const ToolPoli
             // The tool registerMethod() just derived from the method, so the
             // gated version is described to the model exactly as the ungated
             // one would have been.
-            const Core::Tool tool = [registry, &name]() {
-                for (const Core::Tool &candidate : registry->tools()) {
-                    if (candidate.function().name() == name)
-                        return candidate;
-                }
-                return Core::Tool();
-            }();
+            const Core::Tool tool = registry->tool(name);
             const Core::FunctionDefinition definition = tool.function();
 
             // The same method again on the dispatch registry, so an approved

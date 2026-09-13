@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#include <QtOpenAi/Client/ToolRegistry.h>
 #include <QtOpenAi/Core/MetaSchema.h>
 #include <QtOpenAi/Tools/DefaultTools.h>
 #include <QtOpenAi/Tools/FileTools.h>
@@ -42,6 +43,7 @@ private slots:
     void theApprovalHandlerGatesSideEffects();
     void readsAreNotGatedUnlessAsked();
     void schemasComeFromTheMethods();
+    void aGatedToolIsDescribedLikeTheUngatedOne();
     void everyAnnotationOnTheseToolsDescribesSomething();
 
 private:
@@ -296,6 +298,38 @@ void TestDefaultTools::readsAreNotGatedUnlessAsked()
                     .content()
                     .contains(QStringLiteral("not approved")));
     QCOMPARE(asked, 1);
+}
+
+void TestDefaultTools::aGatedToolIsDescribedLikeTheUngatedOne()
+{
+    // The gated variant re-registers the tool with the definition the ungated
+    // registration derived, so the two must be indistinguishable to the model.
+    // schemasComeFromTheMethods() above only ever sees ungated tools, so this
+    // is the one that covers how install() gets that definition back.
+    ToolRegistry ungated;
+    ToolRegistry gated;
+    ToolPolicy policy;
+    policy.fileRead = true;
+    policy.sandbox = FileSandbox({m_jail});
+
+    DefaultTools plain;
+    plain.install(&ungated, policy);
+
+    DefaultTools approving;
+    approving.setApproveReads(true);
+    approving.setApprovalHandler([](const QString &, const QJsonObject &) { return true; });
+    approving.install(&gated, policy);
+
+    QCOMPARE(gated.toolNames(), ungated.toolNames());
+    QVERIFY(!gated.toolNames().isEmpty());
+    for (const QString &name : ungated.toolNames()) {
+        const FunctionDefinition before = ungated.tool(name).function();
+        const FunctionDefinition after = gated.tool(name).function();
+        QCOMPARE(after.name(), before.name());
+        QVERIFY2(!after.description().isEmpty(), qPrintable(name));
+        QCOMPARE(after.description(), before.description());
+        QCOMPARE(after.parameters(), before.parameters());
+    }
 }
 
 void TestDefaultTools::schemasComeFromTheMethods()
