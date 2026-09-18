@@ -16,49 +16,15 @@ set(QTOPENAI_CHAT_PUBLIC_HEADERS
     include/QtOpenAi/Chat/Agent.h
 )
 
-add_library(QtOpenAiChat
-    ${QTOPENAI_CHAT_PUBLIC_HEADERS}
-    src/TrimPolicy.cpp
-    src/Transcript.cpp
-    src/Agent.cpp
-)
-
-add_library(QtOpenAi::Chat ALIAS QtOpenAiChat)
-
-target_link_libraries(QtOpenAiChat
-    PUBLIC
+qtopenai_add_module(Chat
+    HEADERS
+        ${QTOPENAI_CHAT_PUBLIC_HEADERS}
+    SOURCES
+        src/TrimPolicy.cpp
+        src/Transcript.cpp
+        src/Agent.cpp
+    LIBS
         QtOpenAi::Client
         QtOpenAi::Core
         Qt6::Core
 )
-
-target_include_directories(QtOpenAiChat
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
-)
-
-target_compile_definitions(QtOpenAiChat PRIVATE QTOPENAI_CHAT_LIBRARY)
-if(NOT BUILD_SHARED_LIBS)
-    target_compile_definitions(QtOpenAiChat PUBLIC QTOPENAI_CHAT_STATIC)
-endif()
-
-set_target_properties(QtOpenAiChat PROPERTIES
-    OUTPUT_NAME QtOpenAiChat
-    EXPORT_NAME Chat
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-)
-
-if(QTOPENAI_INSTALL)
-    install(TARGETS QtOpenAiChat
-        EXPORT QtOpenAiTargets
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    # Preserves the QtOpenAi/Chat/... include layout.
-    install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-endif()

@@ -56,24 +56,25 @@ QNetworkAccessManager *HttpTools::networkAccessManager() const
 
 QString HttpTools::http_get(const QString &url)
 {
-    const auto refuseWith = [this, &url](const QString &reason) {
-        Q_EMIT refused(url, reason);
-        return reason;
+    const auto refuseWith = [this, &url](Refusal reason, const QString &message) {
+        Q_EMIT refused(url, reason, message);
+        return message;
     };
 
     const QUrl parsed(url);
     if (!parsed.isValid() || parsed.host().isEmpty())
-        return refuseWith(QStringLiteral("that is not a valid absolute URL"));
+        return refuseWith(Refusal::InvalidUrl, QStringLiteral("that is not a valid absolute URL"));
 
     if (m_requiresHttps
         && parsed.scheme().compare(QLatin1String("https"), Qt::CaseInsensitive) != 0)
-        return refuseWith(QStringLiteral("only https URLs may be fetched"));
+        return refuseWith(Refusal::NotHttps, QStringLiteral("only https URLs may be fetched"));
 
     // The allow-list before anything else. With nothing allowed, nothing is
     // fetched -- which is what makes this deny-by-default rather than a filter
     // someone forgot to configure.
     if (!m_allowedHosts.contains(parsed.host().toLower())) {
-        return refuseWith(QStringLiteral("%1 is not one of the hosts this tool may fetch from")
+        return refuseWith(Refusal::HostNotAllowed,
+                          QStringLiteral("%1 is not one of the hosts this tool may fetch from")
                                   .arg(parsed.host()));
     }
 
@@ -118,13 +119,18 @@ QString HttpTools::http_get(const QString &url)
     reply->deleteLater();
 
     if (overLimit)
-        return refuseWith(QStringLiteral("the response is larger than this tool may handle"));
+        return refuseWith(Refusal::TooLarge,
+                          QStringLiteral("the response is larger than this tool may handle"));
     if (error != QNetworkReply::NoError && status == 0)
-        return refuseWith(QStringLiteral("the request failed or timed out"));
+        return refuseWith(Refusal::Failed, QStringLiteral("the request failed or timed out"));
     if (status >= 300 && status < 400)
-        return refuseWith(QStringLiteral("the server redirected, which this tool does not follow"));
-    if (status >= 400)
-        return QStringLiteral("the server answered %1").arg(status);
+        return refuseWith(Refusal::Redirected,
+                          QStringLiteral("the server redirected, which this tool does not follow"));
+    if (status >= 400) {
+        // Reported like every other refusal: the audit trail had a hole here,
+        // and repeated 4xx against an allowed host is exactly what it is for.
+        return refuseWith(Refusal::HttpError, QStringLiteral("the server answered %1").arg(status));
+    }
 
     Q_EMIT fetched(url, status, body.size());
     return QString::fromUtf8(body);

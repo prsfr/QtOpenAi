@@ -27,7 +27,7 @@ private slots:
     void createRequestInputReference();
 };
 
-static QString fieldValue(const QList<CreateVideoRequest::FormField> &fields, const QString &name)
+static QString fieldValue(const FormFields &fields, const QString &name)
 {
     for (const auto &field : fields)
         if (field.first == name)
@@ -180,7 +180,7 @@ void TestVideo::createRequestFormFields()
     // extra_body must reach the multipart path too, not just the JSON body.
     request.setExtraBody({{QStringLiteral("model_variant"), QStringLiteral("pro")}});
 
-    const QList<CreateVideoRequest::FormField> fields = request.formFields();
+    const FormFields fields = request.formFields();
     QCOMPARE(fieldValue(fields, QStringLiteral("prompt")), QStringLiteral("a cat surfing"));
     QCOMPARE(fieldValue(fields, QStringLiteral("model")), QStringLiteral("sora-2"));
     QCOMPARE(fieldValue(fields, QStringLiteral("model_variant")), QStringLiteral("pro"));

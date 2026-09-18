@@ -84,6 +84,12 @@ public:
     bool contains(const QString &name) const;
     QStringList toolNames() const;
 
+    // The tool registered under `name`, or a default-constructed Tool when
+    // nothing is. The storage is keyed by exactly this name, so a caller that
+    // wants one definition back -- to describe the same tool a second time,
+    // say -- does not have to build the whole list and search it.
+    Core::Tool tool(const QString &name) const;
+
     // The tool definitions to advertise in a ChatCompletionRequest.
     QList<Core::Tool> tools() const;
 

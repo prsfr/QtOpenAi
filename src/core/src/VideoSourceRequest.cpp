@@ -69,7 +69,7 @@ void VideoSourceRequest::setSeconds(const QString &seconds) { d->seconds = secon
 QJsonObject VideoSourceRequest::extraBody() const { return d->extraBody; }
 void VideoSourceRequest::setExtraBody(const QJsonObject &extra) { d->extraBody = extra; }
 
-QList<VideoSourceRequest::FormField> VideoSourceRequest::formFields(bool withSeconds) const
+FormFields VideoSourceRequest::formFields(bool withSeconds) const
 {
     detail::FormFields fields;
     detail::appendIfNotEmpty(fields, QStringLiteral("prompt"), d->prompt);

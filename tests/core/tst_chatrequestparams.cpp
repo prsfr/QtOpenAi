@@ -23,7 +23,42 @@ private slots:
     void omitsAllWhenUnset();
     void emitsWhenSet();
     void roundTrip();
+    void aNullIsUnsetRatherThanZero();
 };
+
+void TestChatRequestParams::aNullIsUnsetRatherThanZero()
+{
+    // Providers spell "not set" as null, and the API's own responses do too.
+    // Decoding asked contains() -- which is true for a null -- and then called
+    // toDouble()/toInt()/toBool() on it, each of which answers 0 or false for a
+    // null. So a null-heavy body came back with invented values, and re-sending
+    // it would have asked for temperature 0 (a materially different request
+    // from unset) and n 0 and max_completion_tokens 0 (which are not requests
+    // at all).
+    const QByteArray body = R"({"model":"m","messages":[],
+        "temperature":null,"top_p":null,"seed":null,"n":null,
+        "max_completion_tokens":null,"stream":null,"frequency_penalty":null,
+        "presence_penalty":null})";
+    const ChatCompletionRequest request
+            = ChatCompletionRequest::fromJson(QJsonDocument::fromJson(body).object());
+
+    QVERIFY(!request.temperature().has_value());
+    QVERIFY(!request.topP().has_value());
+    QVERIFY(!request.seed().has_value());
+    QVERIFY(!request.n().has_value());
+    QVERIFY(!request.maxCompletionTokens().has_value());
+    QVERIFY(!request.frequencyPenalty().has_value());
+    QVERIFY(!request.presencePenalty().has_value());
+
+    // And nothing invented comes back out.
+    const QJsonObject out = request.toJson();
+    for (const QString &key :
+         {QStringLiteral("temperature"), QStringLiteral("top_p"), QStringLiteral("seed"),
+          QStringLiteral("n"), QStringLiteral("max_completion_tokens"),
+          QStringLiteral("frequency_penalty"), QStringLiteral("presence_penalty")}) {
+        QVERIFY2(!out.contains(key), qPrintable(key));
+    }
+}
 
 void TestChatRequestParams::omitsAllWhenUnset()
 {

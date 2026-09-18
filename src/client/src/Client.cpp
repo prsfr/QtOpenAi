@@ -75,7 +75,9 @@ public:
     Reply *post(const QString &path, const QByteArray &body = {}, const char *beta = nullptr,
                 const QByteArray &contentType = {}) const;
     template <typename Reply>
-    Reply *postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
+    // `fields` and `files` are sinks: both are moved into the per-attempt
+    // factory, so by value is one move rather than a copy.
+    Reply *postMultipart(const QString &path, Core::FormFields fields,
                          QList<detail::FormFilePart> files, const char *beta = nullptr) const;
     template <typename Reply>
     Reply *remove(const QString &path, const char *beta = nullptr) const;
@@ -426,7 +428,7 @@ void applyQuery(QNetworkRequest &request, const QUrlQuery &extra)
 std::function<QNetworkReply *()> multipartPostFactory(const ClientPrivate *d,
                                                       QNetworkAccessManager *manager,
                                                       QNetworkRequest request,
-                                                      QList<QPair<QString, QString>> fields,
+                                                      Core::FormFields fields,
                                                       QList<detail::FormFilePart> files)
 {
     applyIdempotencyKey(d, request);
@@ -672,9 +674,14 @@ void ClientPrivate::gateDispatch(RestReplyBase *reply, const QByteArray &body) c
 
     // Deliberately generous: the estimate runs over the serialised body, so it
     // counts the JSON framing as well as the prompt. A token budget that
-    // undercounts is a budget that does not work, and the heuristic counter is
-    // the same one Core uses rather than a second estimator to keep in step.
-    const int estimatedTokens = Core::TokenCounter().count(QString::fromUtf8(body));
+    // undercounts is a budget that does not work, and the heuristic is the one
+    // Core uses rather than a second estimator to keep in step.
+    //
+    // From the bytes directly. This used to build a default-constructed counter
+    // and hand it QString::fromUtf8(body) -- but a counter with no encoding can
+    // only reach its heuristic, which reads a length, so the whole body was
+    // transcoded to UTF-16 in order to divide that length by four.
+    const int estimatedTokens = Core::TokenCounter::heuristicCountForBytes(body.size());
 
     reply->d_func()->engine->setGate([limiter = limiter, estimatedTokens,
                                       reply = QPointer<RestReplyBase>(reply)](
@@ -808,7 +815,7 @@ Reply *ClientPrivate::post(const QString &path, const QByteArray &body, const ch
 }
 
 template <typename Reply>
-Reply *ClientPrivate::postMultipart(const QString &path, QList<QPair<QString, QString>> fields,
+Reply *ClientPrivate::postMultipart(const QString &path, Core::FormFields fields,
                                     QList<detail::FormFilePart> files, const char *beta) const
 {
     QNetworkAccessManager *manager = q->networkAccessManager();

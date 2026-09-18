@@ -69,8 +69,7 @@ EmbeddingRequest EmbeddingRequest::fromJson(const QJsonObject &json)
     EmbeddingRequest request;
     request.d->model = detail::stringOr(json, QStringLiteral("model"));
     request.d->input = json.value(QStringLiteral("input"));
-    if (json.contains(QStringLiteral("dimensions")))
-        request.d->dimensions = json.value(QStringLiteral("dimensions")).toInt();
+    request.d->dimensions = detail::optionalInt(json, QStringLiteral("dimensions"));
     request.d->encodingFormat = detail::stringOr(json, QStringLiteral("encoding_format"));
     request.d->user = detail::stringOr(json, QStringLiteral("user"));
     return request;

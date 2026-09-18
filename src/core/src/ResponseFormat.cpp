@@ -126,8 +126,11 @@ ResponseFormat ResponseFormat::fromJson(const QJsonObject &json)
     format.d->name = detail::stringOr(source, QStringLiteral("name"));
     format.d->description = detail::stringOr(source, QStringLiteral("description"));
     format.d->schema = source.value(QStringLiteral("schema")).toObject();
-    if (source.contains(QStringLiteral("strict")))
-        format.d->strict = source.value(QStringLiteral("strict")).toBool();
+    // A plain bool rather than an optional, and its default is *true*, so an
+    // absent or null `strict` has to leave the constructed value alone rather
+    // than fall back to false.
+    format.d->strict
+            = detail::optionalBool(source, QStringLiteral("strict")).value_or(format.d->strict);
     return format;
 }
 

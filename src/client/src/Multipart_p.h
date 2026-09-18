@@ -9,6 +9,8 @@
 // factory can rebuild the body on every retry attempt (a QHttpMultiPart is
 // consumed once it has been posted).
 
+#include <QtOpenAi/Core/FormField.h>
+
 #include <QtCore/QByteArray>
 #include <QtCore/QList>
 #include <QtCore/QPair>
@@ -40,7 +42,7 @@ struct FormFilePart
 // Build a multipart/form-data body from scalar text fields and file parts.
 // Ownership of the returned object is the caller's; parent it to the reply so it
 // is freed when the request completes.
-inline QHttpMultiPart *buildMultipart(const QList<QPair<QString, QString>> &fields,
+inline QHttpMultiPart *buildMultipart(const Core::FormFields &fields,
                                       const QList<FormFilePart> &files)
 {
     auto *multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);

@@ -78,7 +78,7 @@ void TranscriptionRequest::setInclude(const QStringList &include) { d->include =
 std::optional<bool> TranscriptionRequest::stream() const { return d->stream; }
 void TranscriptionRequest::setStream(bool stream) { d->stream = stream; }
 
-QList<TranscriptionRequest::FormField> TranscriptionRequest::formFields() const
+FormFields TranscriptionRequest::formFields() const
 {
     detail::FormFields fields;
     fields.append({QStringLiteral("model"), d->model});

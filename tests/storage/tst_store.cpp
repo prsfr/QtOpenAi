@@ -231,6 +231,7 @@ private slots:
     void pruningDropsTheOldestBeyondTheCeiling_data() { addBackends(); }
 
     void pruningDropsEverythingOlderThanTheCutoff();
+    void aConversationWithoutItsRecordIsStillListed();
     void pruningDropsEverythingOlderThanTheCutoff_data() { addBackends(); }
 
     void aMetricsSnapshotSurvivesSaveAndLoad();
@@ -584,6 +585,38 @@ void TestStore::pruningDropsTheOldestBeyondTheCeiling()
     // this prune has nothing to do.
     QVERIFY(store->pruneCachedResponses(-1, QDateTime()));
     QCOMPARE(store->cachedResponseCount(), 2);
+}
+
+void TestStore::aConversationWithoutItsRecordIsStillListed()
+{
+    // The record beside a conversation is a cache of its five listable fields,
+    // not the authority: a store written before records existed, or one whose
+    // records were removed, still lists and reads correctly -- just not cheaply.
+    QTemporaryDir root;
+    JsonFileStore store(root.path());
+    QVERIFY2(store.open(), qPrintable(store.lastError()));
+
+    Transcript transcript;
+    transcript.addUserMessage(QStringLiteral("hello"));
+    QVERIFY(store.saveConversation(QStringLiteral("legacy"), transcript,
+                                   QStringLiteral("Legacy title")));
+
+    QVERIFY(QDir(root.path() + QStringLiteral("/records")).removeRecursively());
+
+    const QList<ConversationRecord> listed = store.conversations();
+    QCOMPARE(listed.size(), 1);
+    QCOMPARE(listed.first().id, QStringLiteral("legacy"));
+    QCOMPARE(listed.first().title, QStringLiteral("Legacy title"));
+    QCOMPARE(listed.first().messageCount, 1);
+
+    const std::optional<ConversationRecord> one = store.conversation(QStringLiteral("legacy"));
+    QVERIFY(one.has_value());
+    QCOMPARE(one->title, QStringLiteral("Legacy title"));
+
+    // And a save with no title keeps the one on disk, which is the field the
+    // record was standing in for.
+    QVERIFY(store.saveConversation(QStringLiteral("legacy"), transcript, QString()));
+    QCOMPARE(store.conversation(QStringLiteral("legacy"))->title, QStringLiteral("Legacy title"));
 }
 
 void TestStore::pruningDropsEverythingOlderThanTheCutoff()

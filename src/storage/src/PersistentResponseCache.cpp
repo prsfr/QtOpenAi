@@ -3,8 +3,17 @@
 
 #include "QtOpenAi/Storage/Store.h"
 
+#include <QtCore/QElapsedTimer>
+
 namespace QtOpenAi {
 namespace Storage {
+
+// How often the age sweep may run, at most. The ceiling is enforced on every
+// insert because it is a hard bound on what the store holds; the age bound is
+// not, because lookup() already refuses and drops a stale entry the moment it
+// finds one. So the sweep is housekeeping, and a minute of slack in housekeeping
+// costs nothing an application can observe.
+constexpr qint64 kSweepIntervalMs = 60 * 1000;
 
 class PersistentResponseCachePrivate
 {
@@ -12,6 +21,11 @@ public:
     Store *store = nullptr;
     int ttlSeconds = 300;
     int maxEntries = 1024;
+
+    // Never restarted, so elapsed() is monotonic from construction; the first
+    // insert sweeps because 0 is already past the interval from -kSweepIntervalMs.
+    QElapsedTimer since;
+    qint64 lastSweepMs = -kSweepIntervalMs;
 
     // The instant before which an entry is stale, or an invalid QDateTime when
     // expiry is off -- which is also what the store reads as "no age bound".
@@ -25,6 +39,7 @@ PersistentResponseCache::PersistentResponseCache(Store *store)
     : d(new PersistentResponseCachePrivate)
 {
     d->store = store;
+    d->since.start();
 }
 
 PersistentResponseCache::~PersistentResponseCache() = default;
@@ -72,7 +87,24 @@ void PersistentResponseCache::insert(const QByteArray &key, const QByteArray &bo
         batch.abort();
         return;
     }
-    d->store->pruneCachedResponses(d->maxEntries, d->cutoff());
+
+    // Pruning used to run in full on every insert, which meant every cached
+    // response paid for a pass over the whole cache -- on the JSON backend, a
+    // read and a parse of every file in it, to discover in the common case that
+    // there was nothing to drop.
+    //
+    // The two bounds are not equally urgent. The ceiling is a promise about how
+    // much the store holds, so it is passed every time -- and both backends
+    // answer "already under it" from something they needed anyway, so asking
+    // costs nothing. The age bound is not a promise about the store's contents at
+    // all: a stale entry is never served, because lookup() drops it when it finds
+    // it. Sweeping for it is housekeeping, and it runs at most once a minute.
+    const qint64 now = d->since.elapsed();
+    const bool sweepAge = d->ttlSeconds > 0 && now - d->lastSweepMs >= kSweepIntervalMs;
+    if (sweepAge)
+        d->lastSweepMs = now;
+
+    d->store->pruneCachedResponses(d->maxEntries, sweepAge ? d->cutoff() : QDateTime());
 }
 
 void PersistentResponseCache::remove(const QByteArray &key)

@@ -61,6 +61,7 @@ public:
     // Send now, or hold until the channel opens.
     void enqueue(const Core::RealtimeEvent &event);
     void flush();
+    void discardPending();
 
     RealtimeConnection *q;
     QUrl url = QUrl(QLatin1String(kDefaultUrl));
@@ -108,7 +109,18 @@ void RealtimeConnectionPrivate::enqueue(const Core::RealtimeEvent &event)
 {
     if (socket.state() != QAbstractSocket::ConnectedState) {
         // Opening is asynchronous, so a caller that configures the session on
-        // the line after open() would otherwise lose those events.
+        // the line after open() would otherwise lose those events. That is what
+        // this queue is for -- session setup, which is a handful of events.
+        //
+        // Audio is not queued, and not because of the memory. A microphone
+        // pushing frames at a channel that is not open yet would have them
+        // delivered seconds later into a session that had not been configured
+        // when they were captured, and input_audio_buffer.append carries no
+        // timestamp, so nothing downstream could tell. Retaining it was also
+        // what made the queue unbounded: 24 kHz PCM16 held as base64 in a
+        // UTF-16 QString is ~128 kB per second of a channel that never opens.
+        if (event.type() == QLatin1String("input_audio_buffer.append"))
+            return;
         pending.append(event);
         return;
     }
@@ -122,6 +134,11 @@ void RealtimeConnectionPrivate::flush()
     for (const Core::RealtimeEvent &event : queued)
         enqueue(event);
 }
+
+// Nothing queued for a channel that is not going to open, or has been told to
+// close, is worth keeping: flush() only runs on `connected`, so a backlog left
+// behind would be replayed into whatever session opened next.
+void RealtimeConnectionPrivate::discardPending() { pending.clear(); }
 
 RealtimeConnection::RealtimeConnection(QObject *parent)
     : QObject(parent)
@@ -140,6 +157,8 @@ RealtimeConnection::RealtimeConnection(QObject *parent)
     // QWebSocket renamed its failure signal in 6.5; the library supports 6.4+,
     // so both spellings are wired here rather than raising the floor.
     const auto reportSocketError = [this, d](QAbstractSocket::SocketError) {
+        // The channel is not going to carry what was queued for it.
+        d->discardPending();
         Q_EMIT socketError(d->socket.errorString());
     };
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
@@ -233,6 +252,7 @@ void RealtimeConnection::open()
 void RealtimeConnection::close()
 {
     Q_D(RealtimeConnection);
+    d->discardPending();
     d->socket.close();
 }
 

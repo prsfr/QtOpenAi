@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include <QtOpenAi/Core/Enums.h>
+#include <QtOpenAi/Core/VectorIndex.h>
 
 #include <QtCore/QMetaEnum>
 #include <QtTest/QtTest>
@@ -34,6 +35,7 @@ private slots:
     void unknownStatusIsNeverTerminal();
     void unknownWireValueDecodesToTheDocumentedFallback();
     void spellingsAreDistinct();
+    void vectorIndexMetricRoundTripsEveryValue();
 };
 
 namespace {
@@ -75,6 +77,24 @@ void checkRoundTrip(ToString toString, FromString fromString)
 } // namespace
 
 void TestEnums::roleRoundTripsEveryValue() { checkRoundTrip<Role>(roleToString, roleFromString); }
+
+void TestEnums::vectorIndexMetricRoundTripsEveryValue()
+{
+    // Metric is wire-mapped like the thirteen above but is declared on
+    // VectorIndex rather than in Enums.h, and it used to be hand-mapped in both
+    // directions with nothing able to see the two halves disagree. It is here so
+    // a fourth metric added to the enum without a wire spelling fails a test
+    // rather than encoding as the fallback and never decoding back.
+    checkRoundTrip<VectorIndex::Metric>(
+            [](VectorIndex::Metric m) {
+                VectorIndex index;
+                index.setMetric(m);
+                return index.toJson().value(QStringLiteral("metric")).toString();
+            },
+            [](const QString &wire) {
+                return VectorIndex::fromJson({{QStringLiteral("metric"), wire}}).metric();
+            });
+}
 
 void TestEnums::finishReasonRoundTripsEveryValue()
 {

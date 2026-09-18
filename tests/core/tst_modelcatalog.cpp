@@ -126,11 +126,13 @@ void TestModelCatalog::theSharedCatalogIsReplaceable()
 
     ModelInfo custom(QStringLiteral("gpt-4o"));
     custom.setContextWindow(42);
-    ModelCatalog::shared().insert(custom);
+    ModelCatalog installed = ModelCatalog::shared();
+    installed.insert(custom);
+    ModelCatalog::setShared(installed);
 
     QCOMPARE(ModelCatalog::shared().model(QStringLiteral("gpt-4o")).contextWindow(), 42);
 
-    ModelCatalog::shared() = saved;
+    ModelCatalog::setShared(saved);
     QCOMPARE(ModelCatalog::shared().model(QStringLiteral("gpt-4o")).contextWindow(), 128000);
 }
 

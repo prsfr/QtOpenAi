@@ -131,29 +131,19 @@ CompletionRequest CompletionRequest::fromJson(const QJsonObject &json)
     CompletionRequest request;
     request.d->model = detail::stringOr(json, QStringLiteral("model"));
     request.d->prompt = json.value(QStringLiteral("prompt"));
-    if (json.contains(QStringLiteral("max_tokens")))
-        request.d->maxTokens = json.value(QStringLiteral("max_tokens")).toInt();
-    if (json.contains(QStringLiteral("temperature")))
-        request.d->temperature = json.value(QStringLiteral("temperature")).toDouble();
-    if (json.contains(QStringLiteral("top_p")))
-        request.d->topP = json.value(QStringLiteral("top_p")).toDouble();
-    if (json.contains(QStringLiteral("n")))
-        request.d->n = json.value(QStringLiteral("n")).toInt();
-    if (json.contains(QStringLiteral("echo")))
-        request.d->echo = json.value(QStringLiteral("echo")).toBool();
+    request.d->maxTokens = detail::optionalInt(json, QStringLiteral("max_tokens"));
+    request.d->temperature = detail::optionalDouble(json, QStringLiteral("temperature"));
+    request.d->topP = detail::optionalDouble(json, QStringLiteral("top_p"));
+    request.d->n = detail::optionalInt(json, QStringLiteral("n"));
+    request.d->echo = detail::optionalBool(json, QStringLiteral("echo"));
     if (json.contains(QStringLiteral("stop")))
         request.d->stop = json.value(QStringLiteral("stop"));
-    if (json.contains(QStringLiteral("presence_penalty")))
-        request.d->presencePenalty = json.value(QStringLiteral("presence_penalty")).toDouble();
-    if (json.contains(QStringLiteral("frequency_penalty")))
-        request.d->frequencyPenalty = json.value(QStringLiteral("frequency_penalty")).toDouble();
-    if (json.contains(QStringLiteral("best_of")))
-        request.d->bestOf = json.value(QStringLiteral("best_of")).toInt();
-    if (json.contains(QStringLiteral("seed")))
-        request.d->seed = json.value(QStringLiteral("seed")).toInt();
+    request.d->presencePenalty = detail::optionalDouble(json, QStringLiteral("presence_penalty"));
+    request.d->frequencyPenalty = detail::optionalDouble(json, QStringLiteral("frequency_penalty"));
+    request.d->bestOf = detail::optionalInt(json, QStringLiteral("best_of"));
+    request.d->seed = detail::optionalInt(json, QStringLiteral("seed"));
     request.d->suffix = detail::stringOr(json, QStringLiteral("suffix"));
-    if (json.contains(QStringLiteral("stream")))
-        request.d->stream = json.value(QStringLiteral("stream")).toBool();
+    request.d->stream = detail::optionalBool(json, QStringLiteral("stream"));
     return request;
 }
 

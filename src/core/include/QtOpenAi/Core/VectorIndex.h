@@ -6,6 +6,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QList>
 #include <QtCore/QMetaType>
+#include <QtCore/QObject>
 #include <QtCore/QSharedDataPointer>
 #include <QtCore/QString>
 #include <QtCore/QStringList>
@@ -67,6 +68,12 @@ class VectorIndexData;
 // round-tripped through JSON without ceremony.
 class QTOPENAI_CORE_EXPORT VectorIndex
 {
+    // Q_GADGET only for Q_ENUM below. Metric is written into and read out of the
+    // index's JSON, and registering it is what lets tst_core_enums round-trip
+    // every declared value the way it does for the other thirteen wire-mapped
+    // enums -- so a value added here without a wire spelling fails a test
+    // instead of silently encoding as the fallback.
+    Q_GADGET
 public:
     // How similarity is measured.
     enum class Metric {
@@ -74,6 +81,7 @@ public:
         DotProduct, // direction and magnitude; for already-normalised vectors
         Euclidean   // straight-line distance, ranked as its negation
     };
+    Q_ENUM(Metric)
 
     VectorIndex();
     VectorIndex(const VectorIndex &other);

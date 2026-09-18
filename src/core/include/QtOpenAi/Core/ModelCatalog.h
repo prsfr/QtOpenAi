@@ -47,9 +47,30 @@ public:
     // The bundled table, as a value -- a fresh copy each call.
     static ModelCatalog defaults();
 
-    // The catalog the library consults, initialised from defaults(). Mutable on
-    // purpose: this is where an application installs its own table.
-    static ModelCatalog &shared();
+    // The catalog the library consults, initialised from defaults().
+    //
+    // Returned **by value**, and that is the point: implicit sharing makes the
+    // copy cheap, and the caller gets a snapshot that a later setShared() or
+    // mergeShared() cannot pull out from under it. It used to hand back a
+    // reference, which is how an application installed its own table -- and
+    // reading through that reference while another thread wrote through it is a
+    // race on the shared d-pointer itself, not merely on the container behind
+    // it. The read side is not confined to start-up: TokenCounter::forModel(),
+    // TrimPolicy and MetricsCollector all consult this while a client is
+    // working.
+    //
+    // The same arrangement as TokenCounter's encoding registry next door, which
+    // takes a mutex and hands back an EncodingPtr by value for exactly this
+    // reason.
+    static ModelCatalog shared();
+
+    // Replace the shared catalog. This, not a reference, is how an application
+    // installs its own table.
+    static void setShared(const ModelCatalog &catalog);
+
+    // Add or replace shared entries from a JSON table, atomically with respect
+    // to concurrent readers -- the shared-catalog form of merge() below.
+    static void mergeShared(const QJsonObject &json);
 
     // Never fails; see the class comment for what an unknown id yields.
     ModelInfo model(const QString &id) const;

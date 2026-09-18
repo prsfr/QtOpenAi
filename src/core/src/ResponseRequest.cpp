@@ -159,20 +159,15 @@ ResponseRequest ResponseRequest::fromJson(const QJsonObject &json)
     if (text.contains(QStringLiteral("format")))
         request.d->textFormat
                 = ResponseFormat::fromJson(text.value(QStringLiteral("format")).toObject());
-    if (json.contains(QStringLiteral("max_output_tokens")))
-        request.d->maxOutputTokens = json.value(QStringLiteral("max_output_tokens")).toInt();
-    if (json.contains(QStringLiteral("temperature")))
-        request.d->temperature = json.value(QStringLiteral("temperature")).toDouble();
-    if (json.contains(QStringLiteral("top_p")))
-        request.d->topP = json.value(QStringLiteral("top_p")).toDouble();
-    if (json.contains(QStringLiteral("store")))
-        request.d->store = json.value(QStringLiteral("store")).toBool();
+    request.d->maxOutputTokens = detail::optionalInt(json, QStringLiteral("max_output_tokens"));
+    request.d->temperature = detail::optionalDouble(json, QStringLiteral("temperature"));
+    request.d->topP = detail::optionalDouble(json, QStringLiteral("top_p"));
+    request.d->store = detail::optionalBool(json, QStringLiteral("store"));
     request.d->previousResponseId = detail::stringOr(json, QStringLiteral("previous_response_id"));
     const QJsonObject reasoning = json.value(QStringLiteral("reasoning")).toObject();
     request.d->reasoningEffort = reasoning.value(QStringLiteral("effort")).toString();
     request.d->metadata = json.value(QStringLiteral("metadata")).toObject();
-    if (json.contains(QStringLiteral("stream")))
-        request.d->stream = json.value(QStringLiteral("stream")).toBool();
+    request.d->stream = detail::optionalBool(json, QStringLiteral("stream"));
 
     return request;
 }

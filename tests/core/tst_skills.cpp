@@ -164,7 +164,7 @@ void TestSkills::requestCollectsFiles()
     QCOMPARE(request.files().at(1).first, QStringLiteral("scripts/build.py"));
     QCOMPARE(request.files().at(1).second, QByteArray("print(1)"));
     QCOMPARE(request.makeDefault().value(), true);
-    const QList<CreateSkillRequest::FormField> expected {
+    const FormFields expected {
             {QStringLiteral("default"), QStringLiteral("true")},
     };
     QCOMPARE(request.formFields(), expected);

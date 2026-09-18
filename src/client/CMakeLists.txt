@@ -111,90 +111,56 @@ set(QTOPENAI_CLIENT_PUBLIC_HEADERS
     include/QtOpenAi/Client/Client.h
 )
 
-add_library(QtOpenAiClient
-    ${QTOPENAI_CLIENT_PUBLIC_HEADERS}
-    src/CannedReply_p.h
-    src/HttpSupport_p.h
-    src/RestReply_p.h
-    src/RestReplyBase_p.h
-    src/SseParser_p.h
-    src/Multipart_p.h
-    src/JobPoller_p.h
-    src/ProviderProfile.cpp
-    src/Metrics.cpp
-    src/MetricsCollector.cpp
-    src/Interceptor.cpp
-    src/LoggingInterceptor.cpp
-    src/ResponseCache.cpp
-    src/CachingInterceptor.cpp
-    src/RateLimiter.cpp
-    src/Guardrail.cpp
-    src/ChatMap.cpp
-    src/SemanticIndex.cpp
-    src/ToolRegistry.cpp
-    src/ClientError.cpp
-    src/RetryPolicy.cpp
-    src/RestReply.cpp
-    src/RestReplyBase.cpp
-    src/StreamReplyBase.cpp
-    src/StreamReplyBase_p.h
-    src/PageWalker.cpp
-    src/BinaryReply.cpp
-    src/ChatCompletionAccumulator.cpp
-    src/ChatCompletionStreamReply.cpp
-    src/ConversationItemsReply.cpp
-    src/CompletionStreamReply.cpp
-    src/ResponseStreamReply.cpp
-    src/InputTokensReply.cpp
-    src/SpeechReply.cpp
-    src/VideoContentReply.cpp
-    src/JobPoller.cpp
-    src/VideoPoller.cpp
-    src/ChunkedUploader.cpp
-    src/BatchPoller.cpp
-    src/FineTuningJobPoller.cpp
-    src/EvalRunPoller.cpp
-    src/RunStreamReply.cpp
-    src/RunPoller.cpp
-    src/Client.cpp
-)
-
-add_library(QtOpenAi::Client ALIAS QtOpenAiClient)
-
-target_link_libraries(QtOpenAiClient
-    PUBLIC
+qtopenai_add_module(Client
+    HEADERS
+        ${QTOPENAI_CLIENT_PUBLIC_HEADERS}
+    SOURCES
+        src/CannedReply_p.h
+        src/HttpSupport_p.h
+        src/RestReply_p.h
+        src/RestReplyBase_p.h
+        src/SseParser_p.h
+        src/Multipart_p.h
+        src/JobPoller_p.h
+        src/ProviderProfile.cpp
+        src/Metrics.cpp
+        src/MetricsCollector.cpp
+        src/Interceptor.cpp
+        src/LoggingInterceptor.cpp
+        src/ResponseCache.cpp
+        src/CachingInterceptor.cpp
+        src/RateLimiter.cpp
+        src/Guardrail.cpp
+        src/ChatMap.cpp
+        src/SemanticIndex.cpp
+        src/ToolRegistry.cpp
+        src/ClientError.cpp
+        src/RetryPolicy.cpp
+        src/RestReply.cpp
+        src/RestReplyBase.cpp
+        src/StreamReplyBase.cpp
+        src/StreamReplyBase_p.h
+        src/PageWalker.cpp
+        src/BinaryReply.cpp
+        src/ChatCompletionAccumulator.cpp
+        src/ChatCompletionStreamReply.cpp
+        src/ConversationItemsReply.cpp
+        src/CompletionStreamReply.cpp
+        src/ResponseStreamReply.cpp
+        src/InputTokensReply.cpp
+        src/SpeechReply.cpp
+        src/VideoContentReply.cpp
+        src/JobPoller.cpp
+        src/VideoPoller.cpp
+        src/ChunkedUploader.cpp
+        src/BatchPoller.cpp
+        src/FineTuningJobPoller.cpp
+        src/EvalRunPoller.cpp
+        src/RunStreamReply.cpp
+        src/RunPoller.cpp
+        src/Client.cpp
+    LIBS
         QtOpenAi::Core
         Qt6::Core
         Qt6::Network
 )
-
-target_include_directories(QtOpenAiClient
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${QTOPENAI_PRIVATE_INCLUDE_DIR}
-)
-
-target_compile_definitions(QtOpenAiClient PRIVATE QTOPENAI_CLIENT_LIBRARY)
-if(NOT BUILD_SHARED_LIBS)
-    target_compile_definitions(QtOpenAiClient PUBLIC QTOPENAI_CLIENT_STATIC)
-endif()
-
-set_target_properties(QtOpenAiClient PROPERTIES
-    OUTPUT_NAME QtOpenAiClient
-    EXPORT_NAME Client
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-)
-
-if(QTOPENAI_INSTALL)
-    install(TARGETS QtOpenAiClient
-        EXPORT QtOpenAiTargets
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    # Preserves the QtOpenAi/Client/... include layout.
-    install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-endif()

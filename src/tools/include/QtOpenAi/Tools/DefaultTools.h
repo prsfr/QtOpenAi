@@ -54,8 +54,11 @@ struct QTOPENAI_TOOLS_EXPORT ToolPolicy
     qint64 maxResponseBytes = 256 * 1024;
     int httpTimeoutMs = 10000;
 
-    // Largest file that may be read or written. Mirrors sandbox.maxBytes() and
-    // is applied to it at install time.
+    // Largest file that may be read or written, as a second cap on top of
+    // `sandbox.maxBytes()`. At install time the *smaller* of the two wins: this
+    // can tighten what the sandbox allows but never widen it, so a sandbox that
+    // was handed over already capped keeps its own limit. 0 means "no limit",
+    // which makes it the widest value here rather than the narrowest.
     qint64 maxFileBytes = 1024 * 1024;
 };
 

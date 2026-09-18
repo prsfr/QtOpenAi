@@ -11,8 +11,8 @@
 // those tests out longhand -- seventeen times for a plain string alone -- which
 // is one convention spelled seventeen times rather than named once.
 
-#include <QtCore/QList>
-#include <QtCore/QPair>
+#include <QtOpenAi/Core/FormField.h>
+
 #include <QtCore/QString>
 #include <QtCore/QStringList>
 
@@ -22,9 +22,10 @@ namespace QtOpenAi {
 namespace Core {
 namespace detail {
 
-// The type every multipart request type spells as its own FormField: an ordered
-// name/value pair, ordered because the API reads repeated fields in order.
-using FormFields = QList<QPair<QString, QString>>;
+// The public name, so the append helpers below and the request types they serve
+// agree by construction rather than by coincidence. It used to be spelled out
+// here as well, which made this the eleventh definition of one type.
+using FormFields = Core::FormFields;
 
 // Append a text field only when it has something to say. An empty string would
 // be sent as a present-but-blank field, which is not what an unset one means.

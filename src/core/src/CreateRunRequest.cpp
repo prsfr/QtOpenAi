@@ -2,30 +2,20 @@
 #include "QtOpenAi/Core/CreateRunRequest.h"
 
 #include "JsonHelpers_p.h"
+#include "RunFields_p.h"
 
 #include <QtCore/QSharedData>
 
 namespace QtOpenAi {
 namespace Core {
 
-class CreateRunRequestData : public QSharedData
+// The thirteen shared fields come from the private base; these four are
+// genuinely create-only. See RunFields_p.h.
+class CreateRunRequestData : public detail::RunFieldsData
 {
 public:
-    QString assistantId;
-    QString model;
-    QString instructions;
     QString additionalInstructions;
     QList<ThreadMessageInput> additionalMessages;
-    QJsonArray tools;
-    QJsonObject metadata;
-    std::optional<double> temperature;
-    std::optional<double> topP;
-    std::optional<int> maxPromptTokens;
-    std::optional<int> maxCompletionTokens;
-    QJsonObject truncationStrategy;
-    QJsonValue toolChoice = QJsonValue::Undefined;
-    std::optional<bool> parallelToolCalls;
-    QJsonValue responseFormat = QJsonValue::Undefined;
     CreateThreadRequest thread;
     std::optional<bool> stream;
 };
@@ -149,9 +139,7 @@ void CreateRunRequest::setStream(bool stream) { d->stream = stream; }
 QJsonObject CreateRunRequest::toJson() const
 {
     QJsonObject json;
-    detail::insertIfNotEmpty(json, QStringLiteral("assistant_id"), d->assistantId);
-    detail::insertIfNotEmpty(json, QStringLiteral("model"), d->model);
-    detail::insertIfNotEmpty(json, QStringLiteral("instructions"), d->instructions);
+    detail::insertRunFields(json, *d);
     detail::insertIfNotEmpty(json, QStringLiteral("additional_instructions"),
                              d->additionalInstructions);
     if (!d->additionalMessages.isEmpty()) {
@@ -160,21 +148,6 @@ QJsonObject CreateRunRequest::toJson() const
             messages.append(message.toJson());
         json.insert(QStringLiteral("additional_messages"), messages);
     }
-    if (!d->tools.isEmpty())
-        json.insert(QStringLiteral("tools"), d->tools);
-    if (!d->metadata.isEmpty())
-        json.insert(QStringLiteral("metadata"), d->metadata);
-    detail::insertIfSet(json, QStringLiteral("temperature"), d->temperature);
-    detail::insertIfSet(json, QStringLiteral("top_p"), d->topP);
-    detail::insertIfSet(json, QStringLiteral("max_prompt_tokens"), d->maxPromptTokens);
-    detail::insertIfSet(json, QStringLiteral("max_completion_tokens"), d->maxCompletionTokens);
-    if (!d->truncationStrategy.isEmpty())
-        json.insert(QStringLiteral("truncation_strategy"), d->truncationStrategy);
-    if (!d->toolChoice.isUndefined())
-        json.insert(QStringLiteral("tool_choice"), d->toolChoice);
-    detail::insertIfSet(json, QStringLiteral("parallel_tool_calls"), d->parallelToolCalls);
-    if (!d->responseFormat.isUndefined())
-        json.insert(QStringLiteral("response_format"), d->responseFormat);
     if (!d->thread.isEmpty())
         json.insert(QStringLiteral("thread"), d->thread.toJson());
     detail::insertIfSet(json, QStringLiteral("stream"), d->stream);
@@ -183,18 +156,9 @@ QJsonObject CreateRunRequest::toJson() const
 
 bool CreateRunRequest::operator==(const CreateRunRequest &other) const
 {
-    return d->assistantId == other.d->assistantId && d->model == other.d->model
-           && d->instructions == other.d->instructions
-           && d->additionalInstructions == other.d->additionalInstructions
-           && d->additionalMessages == other.d->additionalMessages && d->tools == other.d->tools
-           && d->metadata == other.d->metadata && d->temperature == other.d->temperature
-           && d->topP == other.d->topP && d->maxPromptTokens == other.d->maxPromptTokens
-           && d->maxCompletionTokens == other.d->maxCompletionTokens
-           && d->truncationStrategy == other.d->truncationStrategy
-           && d->toolChoice == other.d->toolChoice
-           && d->parallelToolCalls == other.d->parallelToolCalls
-           && d->responseFormat == other.d->responseFormat && d->thread == other.d->thread
-           && d->stream == other.d->stream;
+    return d->additionalInstructions == other.d->additionalInstructions
+           && d->additionalMessages == other.d->additionalMessages && d->thread == other.d->thread
+           && d->stream == other.d->stream && detail::runFieldsEqual(*d, *other.d);
 }
 
 } // namespace Core

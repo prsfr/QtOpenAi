@@ -67,6 +67,7 @@ private slots:
     void registerMethodRejectsMissingSlot();
     void unknownToolEmitsSignalAndErrorPayload();
     void toolsAdvertisedInInsertionOrder();
+    void oneToolCanBeFetchedByName();
     void invokeAllReturnsOnePerCall();
     void inferredRegistrationDerivesTheToolDefinition();
     void typedParametersAreFilledFromTheArguments();
@@ -163,6 +164,32 @@ void TestToolRegistry::toolsAdvertisedInInsertionOrder()
     QCOMPARE(names, (QStringList {QStringLiteral("first"), QStringLiteral("second")}));
     QCOMPARE(registry.tools().size(), 2);
     QCOMPARE(registry.tools().first().function().name(), QStringLiteral("first"));
+}
+
+void TestToolRegistry::oneToolCanBeFetchedByName()
+{
+    // contains() and toolNames() answered "is it there" and "what is it
+    // called"; getting the definition back meant building the whole list and
+    // searching it, which is what DefaultTools::install() had to do once per
+    // installed tool.
+    ToolRegistry registry;
+    registry.registerFunction(QStringLiteral("first"), QStringLiteral("the first one"),
+                              QJsonObject {{QStringLiteral("type"), QStringLiteral("object")}},
+                              [](const QJsonObject &) { return QString(); });
+    registry.registerFunction(QStringLiteral("second"), QString(), QJsonObject {},
+                              [](const QJsonObject &) { return QString(); });
+
+    const Tool one = registry.tool(QStringLiteral("first"));
+    QCOMPARE(one.function().name(), QStringLiteral("first"));
+    QCOMPARE(one.function().description(), QStringLiteral("the first one"));
+    // The same definition the list carries, so a caller swapping to this does
+    // not get a differently-described tool.
+    QCOMPARE(one.function().parameters(), registry.tools().first().function().parameters());
+
+    // A name that is not registered is not an error; it answers with an empty
+    // Tool, and contains() is the way to ask the question without one.
+    QVERIFY(!registry.contains(QStringLiteral("absent")));
+    QVERIFY(registry.tool(QStringLiteral("absent")).function().name().isEmpty());
 }
 
 void TestToolRegistry::invokeAllReturnsOnePerCall()

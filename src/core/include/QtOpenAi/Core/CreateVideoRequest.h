@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/FormField.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 
 #include <QtCore/QByteArray>
@@ -24,8 +25,6 @@ class CreateVideoRequestData;
 class QTOPENAI_CORE_EXPORT CreateVideoRequest
 {
 public:
-    using FormField = QPair<QString, QString>;
-
     CreateVideoRequest();
     explicit CreateVideoRequest(QString prompt, QString model = {});
     CreateVideoRequest(const CreateVideoRequest &other);
@@ -62,7 +61,7 @@ public:
     void setExtraBody(const QJsonObject &extra);
 
     // The non-file form fields, in a stable order, for multipart encoding.
-    QList<FormField> formFields() const;
+    FormFields formFields() const;
 
     QJsonObject toJson() const;
     static CreateVideoRequest fromJson(const QJsonObject &json);

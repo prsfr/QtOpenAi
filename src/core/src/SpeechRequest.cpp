@@ -80,8 +80,7 @@ SpeechRequest SpeechRequest::fromJson(const QJsonObject &json)
     request.d->input = detail::stringOr(json, QStringLiteral("input"));
     request.d->voice = detail::stringOr(json, QStringLiteral("voice"));
     request.d->responseFormat = detail::stringOr(json, QStringLiteral("response_format"));
-    if (json.contains(QStringLiteral("speed")))
-        request.d->speed = json.value(QStringLiteral("speed")).toDouble();
+    request.d->speed = detail::optionalDouble(json, QStringLiteral("speed"));
     request.d->instructions = detail::stringOr(json, QStringLiteral("instructions"));
     request.d->streamFormat = detail::stringOr(json, QStringLiteral("stream_format"));
     return request;

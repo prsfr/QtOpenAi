@@ -50,12 +50,19 @@ class MemoryResponseCachePrivate;
 // long-running process that varies its prompts grows without bound; without a
 // time limit a cached answer outlives the question, and "the model said that an
 // hour ago" is rarely the answer a user wants today. The defaults are
-// deliberately modest -- 128 entries, five minutes -- because a cache that
-// silently keeps more than expected is worse than one that misses.
+// deliberately modest -- 64 MiB, five minutes -- because a cache that silently
+// keeps more than expected is worse than one that misses.
+//
+// The size limit is in *bytes*, because bytes are the failure mode it exists to
+// bound. It was a count of entries, which does not bound memory at all: the
+// values here are whole response bodies, and an /embeddings response -- on the
+// default cacheable path -- is a JSON array of float vectors, so 128 of them
+// could be anything from four megabytes to seven gigabytes. A number that
+// authorises an unknown amount of memory is not a ceiling.
 class QTOPENAI_CLIENT_EXPORT MemoryResponseCache : public ResponseCache
 {
 public:
-    explicit MemoryResponseCache(int maxEntries = 128);
+    MemoryResponseCache();
     ~MemoryResponseCache() override;
 
     // Entries older than this are misses and are dropped when found. 0 disables
@@ -63,10 +70,16 @@ public:
     void setTtlSeconds(int seconds);
     int ttlSeconds() const;
 
-    // Hard ceiling on entries; the least recently inserted go first. Lowering it
-    // evicts immediately. Default 128.
-    void setMaxEntries(int entries);
-    int maxEntries() const;
+    // Hard ceiling on the total size of the bodies held; the least recently
+    // inserted go first. Lowering it evicts immediately, and 0 or less stores
+    // nothing at all. Default 64 MiB.
+    //
+    // A single body larger than the whole ceiling is not stored -- there is no
+    // configuration in which caching it could pay -- and that is a miss, not an
+    // error. Accounting is in whole KiB, so a great many tiny entries are
+    // bounded too; the byte figure is what was set, not what it rounded to.
+    void setMaxBytes(qint64 bytes);
+    qint64 maxBytes() const;
 
     std::optional<QByteArray> lookup(const QByteArray &key) override;
     void insert(const QByteArray &key, const QByteArray &body) override;

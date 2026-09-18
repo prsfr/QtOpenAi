@@ -117,8 +117,7 @@ ImageGenerationRequest ImageGenerationRequest::fromJson(const QJsonObject &json)
     ImageGenerationRequest request;
     request.d->prompt = detail::stringOr(json, QStringLiteral("prompt"));
     request.d->model = detail::stringOr(json, QStringLiteral("model"));
-    if (json.contains(QStringLiteral("n")))
-        request.d->n = json.value(QStringLiteral("n")).toInt();
+    request.d->n = detail::optionalInt(json, QStringLiteral("n"));
     request.d->size = detail::stringOr(json, QStringLiteral("size"));
     request.d->quality = detail::stringOr(json, QStringLiteral("quality"));
     request.d->responseFormat = detail::stringOr(json, QStringLiteral("response_format"));

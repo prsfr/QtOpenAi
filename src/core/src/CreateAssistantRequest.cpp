@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Core/CreateAssistantRequest.h"
 
+#include "AssistantFields_p.h"
 #include "JsonHelpers_p.h"
 
 #include <QtCore/QSharedData>
@@ -8,20 +9,11 @@
 namespace QtOpenAi {
 namespace Core {
 
-class CreateAssistantRequestData : public QSharedData
-{
-public:
-    QString model;
-    QString name;
-    QString description;
-    QString instructions;
-    QJsonArray tools;
-    QJsonObject toolResources;
-    QJsonObject metadata;
-    std::optional<double> temperature;
-    std::optional<double> topP;
-    QJsonValue responseFormat = QJsonValue::Undefined;
-};
+// Exactly the fields an assistant is, and nothing else: this type was a strict
+// subset of AssistantData, so it adds no members of its own. See
+// AssistantFields_p.h.
+class CreateAssistantRequestData : public detail::AssistantFieldsData
+{ };
 
 CreateAssistantRequest::CreateAssistantRequest()
     : d(new CreateAssistantRequestData)
@@ -104,30 +96,13 @@ void CreateAssistantRequest::setResponseFormat(const ResponseFormat &responseFor
 QJsonObject CreateAssistantRequest::toJson() const
 {
     QJsonObject json;
-    detail::insertIfNotEmpty(json, QStringLiteral("model"), d->model);
-    detail::insertIfNotEmpty(json, QStringLiteral("name"), d->name);
-    detail::insertIfNotEmpty(json, QStringLiteral("description"), d->description);
-    detail::insertIfNotEmpty(json, QStringLiteral("instructions"), d->instructions);
-    if (!d->tools.isEmpty())
-        json.insert(QStringLiteral("tools"), d->tools);
-    if (!d->toolResources.isEmpty())
-        json.insert(QStringLiteral("tool_resources"), d->toolResources);
-    if (!d->metadata.isEmpty())
-        json.insert(QStringLiteral("metadata"), d->metadata);
-    detail::insertIfSet(json, QStringLiteral("temperature"), d->temperature);
-    detail::insertIfSet(json, QStringLiteral("top_p"), d->topP);
-    if (!d->responseFormat.isUndefined())
-        json.insert(QStringLiteral("response_format"), d->responseFormat);
+    detail::insertAssistantFields(json, *d);
     return json;
 }
 
 bool CreateAssistantRequest::operator==(const CreateAssistantRequest &other) const
 {
-    return d->model == other.d->model && d->name == other.d->name
-           && d->description == other.d->description && d->instructions == other.d->instructions
-           && d->tools == other.d->tools && d->toolResources == other.d->toolResources
-           && d->metadata == other.d->metadata && d->temperature == other.d->temperature
-           && d->topP == other.d->topP && d->responseFormat == other.d->responseFormat;
+    return detail::assistantFieldsEqual(*d, *other.d);
 }
 
 } // namespace Core

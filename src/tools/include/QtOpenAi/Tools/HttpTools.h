@@ -43,6 +43,24 @@ class QTOPENAI_TOOLS_EXPORT HttpTools : public QObject
     Q_OBJECT
     QTOPENAI_DOC("Fetch pages over HTTP from an allowed set of hosts.")
 public:
+    // Why a fetch was refused. The reason this is an enum and not just the
+    // sentence sent to the model: HostNotAllowed is the model reaching for a
+    // host it was never given -- the SSRF case this class exists to stop, and
+    // the one worth alerting on -- while InvalidUrl is a typo. They were
+    // indistinguishable in type, and the only text that told them apart had the
+    // attacker-chosen host interpolated into it.
+    enum class Refusal {
+        None,
+        InvalidUrl,     // not a valid absolute URL
+        NotHttps,       // plain http while requiresHttps() is set
+        HostNotAllowed, // not in allowedHosts() -- deny-by-default did its job
+        TooLarge,       // over maxBytes(), aborted mid-transfer
+        Redirected,     // the server redirected, which is a host nobody approved
+        Failed,         // transport error or timeout; no response arrived
+        HttpError       // the server answered 4xx or 5xx
+    };
+    Q_ENUM(Refusal)
+
     explicit HttpTools(QObject *parent = nullptr);
     ~HttpTools() override;
 
@@ -79,7 +97,12 @@ public:
                            const QString &, url, "The absolute URL to fetch.");
 
 Q_SIGNALS:
-    void refused(const QString &url, const QString &reason);
+    // `reason` is what to branch on; `message` is the sentence the model was
+    // given, for logs and humans. An HTTP error status is reported here too --
+    // a run of 403s against an allowed host is the shape of a model probing an
+    // endpoint it half-remembers, and it used to appear on neither signal.
+    void refused(const QString &url, QtOpenAi::Tools::HttpTools::Refusal reason,
+                 const QString &message);
     void fetched(const QString &url, int httpStatus, qint64 bytes);
 
 private:

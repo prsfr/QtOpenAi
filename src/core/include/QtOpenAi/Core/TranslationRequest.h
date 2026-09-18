@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <QtOpenAi/Core/FormField.h>
 #include <QtOpenAi/Core/GlobalCore.h>
 
 #include <QtCore/QByteArray>
@@ -23,8 +24,6 @@ class TranslationRequestData;
 class QTOPENAI_CORE_EXPORT TranslationRequest
 {
 public:
-    using FormField = QPair<QString, QString>;
-
     TranslationRequest();
     TranslationRequest(QByteArray fileData, QString fileName, QString model);
     TranslationRequest(const TranslationRequest &other);
@@ -54,7 +53,7 @@ public:
     std::optional<double> temperature() const;
     void setTemperature(double temperature);
 
-    QList<FormField> formFields() const;
+    FormFields formFields() const;
 
     bool operator==(const TranslationRequest &other) const;
     bool operator!=(const TranslationRequest &other) const { return !(*this == other); }

@@ -84,6 +84,11 @@ public:
     static constexpr int CurrentSchemaVersion = 1;
 
     Store();
+    // A backend names itself here, and every message it reports through fail()
+    // is prefixed with that name. The two backends used to type the prefix into
+    // each message -- 69 times between them -- which is one convention spelled
+    // out per message rather than named once.
+    explicit Store(QString backendName);
     virtual ~Store();
 
     // Creates the store if it is not there, migrates it if it is older, and
@@ -227,9 +232,19 @@ public:
 
 protected:
     // For backends: record why a call failed and return false, so the failure
-    // path is one line at each call site.
+    // path is one line at each call site. `message` is prefixed with the
+    // backend's name, so it is written without one.
     bool fail(const QString &message);
     void clearError();
+
+    // The prologue every operation begins with: forget the previous error, then
+    // refuse if the store is not open. Returns false having already failed, so a
+    // caller reads `if (!requireOpen()) return false;` -- or `return
+    // std::nullopt`, for the operations that answer with one.
+    //
+    // Written out thirty times across the two backends before this existed,
+    // character-identical apart from the class name in the message.
+    bool requireOpen();
 
 private:
     Q_DISABLE_COPY(Store)

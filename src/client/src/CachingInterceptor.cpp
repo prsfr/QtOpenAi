@@ -17,6 +17,11 @@ namespace {
 const char *const kIdentityHeaders[]
         = {"Authorization", "api-key", "OpenAI-Organization", "OpenAI-Project"};
 
+// Where beforeRequest() leaves the key for afterResponse(), in the scratch space
+// InterceptedRequest carries. Qualified because every interceptor in the chain
+// sees the same hash.
+const QLatin1String kCacheKeySlot("QtOpenAi::CachingInterceptor/key");
+
 } // namespace
 
 class CachingInterceptorPrivate
@@ -95,6 +100,11 @@ std::optional<InterceptedResponse> CachingInterceptor::beforeRequest(Intercepted
         return std::nullopt;
 
     const QByteArray key = cacheKey(request);
+    // Left for afterResponse(), which needs the same key to store under and
+    // would otherwise hash the whole body a second time -- milliseconds of it
+    // on the event-loop thread for a batched /embeddings request, and always
+    // on a miss, which is the case the cache is least able to help with.
+    request.scratch.insert(kCacheKeySlot, key);
     if (const std::optional<QByteArray> body = cache()->lookup(key)) {
         Q_EMIT hit(request.url());
         InterceptedResponse answer;
@@ -120,7 +130,12 @@ void CachingInterceptor::afterResponse(const InterceptedResponse &response)
     if (!d->isCacheable(response.request))
         return;
 
-    cache()->insert(cacheKey(response.request), response.body);
+    // beforeRequest() ran on this exchange and left the key; recompute only if
+    // it did not, which is the case for a caller driving the hooks by hand.
+    const QVariant carried = response.request.scratch.value(kCacheKeySlot);
+    const QByteArray key = carried.isValid() ? carried.toByteArray() : cacheKey(response.request);
+
+    cache()->insert(key, response.body);
     Q_EMIT stored(response.url());
 }
 

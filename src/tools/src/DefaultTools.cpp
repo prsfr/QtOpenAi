@@ -104,13 +104,7 @@ QStringList DefaultTools::install(Client::ToolRegistry *registry, const ToolPoli
             // The tool registerMethod() just derived from the method, so the
             // gated version is described to the model exactly as the ungated
             // one would have been.
-            const Core::Tool tool = [registry, &name]() {
-                for (const Core::Tool &candidate : registry->tools()) {
-                    if (candidate.function().name() == name)
-                        return candidate;
-                }
-                return Core::Tool();
-            }();
+            const Core::Tool tool = registry->tool(name);
             const Core::FunctionDefinition definition = tool.function();
 
             // The same method again on the dispatch registry, so an approved
@@ -154,7 +148,20 @@ QStringList DefaultTools::install(Client::ToolRegistry *registry, const ToolPoli
 
     if (policy.fileRead || policy.fileWrite) {
         FileSandbox sandbox = policy.sandbox;
-        sandbox.setMaxBytes(policy.maxFileBytes);
+        // The same arrangement as fileWrite/isReadOnly() below: the policy may
+        // tighten what the sandbox allows, never widen it. Overwriting instead
+        // meant an application that capped its own sandbox -- which is what
+        // FileSandbox.h's example does -- silently got the policy's larger
+        // default, so of the two limits it can set on a sandbox one was honoured
+        // and the other discarded. Failing in the open direction is the part
+        // that made it worth changing.
+        //
+        // 0 is "no limit" on both sides, so it is the widest value rather than
+        // the narrowest and cannot be compared numerically.
+        if (policy.maxFileBytes > 0
+            && (sandbox.maxBytes() <= 0 || policy.maxFileBytes < sandbox.maxBytes())) {
+            sandbox.setMaxBytes(policy.maxFileBytes);
+        }
         // A sandbox with no roots allows nothing, so a tool built on one could
         // only ever refuse. Not installing it is the honest outcome, and the
         // returned list is how the caller finds out they misconfigured it.

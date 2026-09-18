@@ -25,7 +25,7 @@ private slots:
     void parsesVerboseSegmentDiagnostics();
 };
 
-static QString fieldValue(const QList<TranscriptionRequest::FormField> &fields, const QString &name)
+static QString fieldValue(const FormFields &fields, const QString &name)
 {
     for (const auto &field : fields)
         if (field.first == name)

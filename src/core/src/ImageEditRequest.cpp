@@ -88,7 +88,7 @@ void ImageEditRequest::setOutputFormat(const QString &outputFormat)
 QString ImageEditRequest::user() const { return d->user; }
 void ImageEditRequest::setUser(const QString &user) { d->user = user; }
 
-QList<ImageEditRequest::FormField> ImageEditRequest::formFields() const
+FormFields ImageEditRequest::formFields() const
 {
     detail::FormFields fields;
     fields.append({QStringLiteral("prompt"), d->prompt});

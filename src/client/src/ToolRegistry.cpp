@@ -275,13 +275,27 @@ QStringList ToolRegistry::toolNames() const
     return d->order;
 }
 
+Core::Tool ToolRegistry::tool(const QString &name) const
+{
+    Q_D(const ToolRegistry);
+    const auto it = d->entries.constFind(name);
+    return it == d->entries.constEnd() ? Core::Tool() : it->tool;
+}
+
 QList<Core::Tool> ToolRegistry::tools() const
 {
     Q_D(const ToolRegistry);
     QList<Core::Tool> result;
     result.reserve(d->order.size());
-    for (const QString &name : d->order)
-        result.append(d->entries.value(name).tool);
+    // constFind() rather than value(): an Entry carries the handler, and a
+    // std::function over more than the small-object buffer is a heap
+    // allocation per copy -- paid here for a functor that is then discarded.
+    // invoke() already reads it this way.
+    for (const QString &name : d->order) {
+        const auto it = d->entries.constFind(name);
+        if (it != d->entries.constEnd())
+            result.append(it->tool);
+    }
     return result;
 }
 

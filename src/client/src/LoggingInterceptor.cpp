@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 #include "QtOpenAi/Client/LoggingInterceptor.h"
 
+#include "JsonHelpers_p.h"
+
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QMetaMethod>
 #include <QtCore/QStringList>
 #include <QtCore/QUrlQuery>
 
@@ -54,31 +57,71 @@ QString safeUrl(const QUrl &url)
     return safe.toString(QUrl::FullyEncoded);
 }
 
-// One JSON value with every secret-named field replaced, at any depth. Walks
-// rather than string-matches so it is the *key* that decides: a prompt that
-// happens to mention "value" is still readable, and a field called `value`
-// nested three objects down is still redacted.
-QJsonValue redactFields(const QJsonValue &value, const QStringList &fields)
+// Replace every secret-named field, at any depth, and report whether anything
+// was. Walks rather than string-matches so it is the *key* that decides: a
+// prompt that happens to mention "value" is still readable, and a field called
+// `value` nested three objects down is still redacted.
+//
+// Only what changes is written back, and that is the whole point. Qt 6's JSON
+// containers are CBOR-backed, so QJsonObject::iterator::operator= and
+// QJsonArray::replace() are not cheap slot assignments; assigning every element
+// -- including the scalars a walk leaves alone -- made this quadratic in the
+// container's size. A 1 MiB body cost 244 ms, on the thread that is trying to
+// send a request. Returning a bool rather than a value is what lets an untouched
+// subtree stay untouched, which is the overwhelmingly common case: most bodies
+// carry no secret at all.
+bool redactObject(QJsonObject &object, const QStringList &fields);
+bool redactArray(QJsonArray &array, const QStringList &fields);
+
+bool redactObject(QJsonObject &object, const QStringList &fields)
 {
-    if (value.isObject()) {
-        QJsonObject object = value.toObject();
-        for (auto it = object.begin(); it != object.end(); ++it) {
-            // Compared case-insensitively, as the header list is: a provider
-            // that spells it `Value` is carrying the same secret.
-            if (fields.contains(it.key(), Qt::CaseInsensitive))
-                it.value() = QString(kRedacted);
-            else
-                it.value() = redactFields(it.value(), fields);
+    bool changed = false;
+    for (auto it = object.begin(); it != object.end(); ++it) {
+        // Compared case-insensitively, as the header list is: a provider that
+        // spells it `Value` is carrying the same secret.
+        if (fields.contains(it.key(), Qt::CaseInsensitive)) {
+            it.value() = QString(kRedacted);
+            changed = true;
+            continue;
         }
-        return object;
+        const QJsonValue value = it.value();
+        if (value.isObject()) {
+            QJsonObject nested = value.toObject();
+            if (redactObject(nested, fields)) {
+                it.value() = nested;
+                changed = true;
+            }
+        } else if (value.isArray()) {
+            QJsonArray nested = value.toArray();
+            if (redactArray(nested, fields)) {
+                it.value() = nested;
+                changed = true;
+            }
+        }
     }
-    if (value.isArray()) {
-        QJsonArray array = value.toArray();
-        for (qsizetype i = 0; i < array.size(); ++i)
-            array.replace(i, redactFields(array.at(i), fields));
-        return array;
+    return changed;
+}
+
+bool redactArray(QJsonArray &array, const QStringList &fields)
+{
+    bool changed = false;
+    for (qsizetype i = 0; i < array.size(); ++i) {
+        const QJsonValue element = array.at(i);
+        if (element.isObject()) {
+            QJsonObject nested = element.toObject();
+            if (redactObject(nested, fields)) {
+                array.replace(i, nested);
+                changed = true;
+            }
+        } else if (element.isArray()) {
+            QJsonArray nested = element.toArray();
+            if (redactArray(nested, fields)) {
+                array.replace(i, nested);
+                changed = true;
+            }
+        }
     }
-    return value;
+    return changed;
 }
 
 // The body as it is safe to write down. A body that is not JSON -- a stream, a
@@ -92,12 +135,16 @@ QByteArray safeBody(const QByteArray &body, const QStringList &fields)
     // Parsed before truncation: excerpting first would leave a half-object that
     // no longer parses, and the secret in it unredacted.
     const QJsonDocument document = QJsonDocument::fromJson(body);
-    if (document.isObject())
-        return QJsonDocument(redactFields(document.object(), fields).toObject())
-                .toJson(QJsonDocument::Compact);
-    if (document.isArray())
-        return QJsonDocument(redactFields(document.array(), fields).toArray())
-                .toJson(QJsonDocument::Compact);
+    if (document.isObject()) {
+        QJsonObject object = document.object();
+        redactObject(object, fields);
+        return Core::detail::compactJson(object);
+    }
+    if (document.isArray()) {
+        QJsonArray array = document.array();
+        redactArray(array, fields);
+        return Core::detail::compactJson(array);
+    }
     return body;
 }
 
@@ -225,6 +272,17 @@ std::optional<InterceptedResponse> LoggingInterceptor::beforeRequest(Intercepted
 {
     Q_D(LoggingInterceptor);
 
+    // Nothing reads what follows unless the category is enabled or someone is
+    // connected to logged(), and building it anyway was the steady state: the
+    // category defaults to QtInfoMsg and the header's own workflow is "install
+    // it, switch it on with QT_LOGGING_RULES". So a body was redacted, excerpted
+    // and formatted on the thread trying to send a request, then discarded. The
+    // signal has to be checked too -- connecting to logged() without touching
+    // the category is a legitimate way to use this.
+    if (!lcHttp().isDebugEnabled()
+        && !isSignalConnected(QMetaMethod::fromSignal(&LoggingInterceptor::logged)))
+        return std::nullopt;
+
     QStringList lines;
     lines << QStringLiteral("--> %1 %2")
                      .arg(QString::fromUtf8(request.method), safeUrl(request.url()));
@@ -258,6 +316,17 @@ std::optional<InterceptedResponse> LoggingInterceptor::beforeRequest(Intercepted
 void LoggingInterceptor::afterResponse(const InterceptedResponse &response)
 {
     Q_D(LoggingInterceptor);
+
+    // Nothing reads what follows unless the category is enabled or someone is
+    // connected to logged(), and building it anyway was the steady state: the
+    // category defaults to QtInfoMsg and the header's own workflow is "install
+    // it, switch it on with QT_LOGGING_RULES". So a body was redacted, excerpted
+    // and formatted on the thread trying to send a request, then discarded. The
+    // signal has to be checked too -- connecting to logged() without touching
+    // the category is a legitimate way to use this.
+    if (!lcHttp().isDebugEnabled()
+        && !isSignalConnected(QMetaMethod::fromSignal(&LoggingInterceptor::logged)))
+        return;
 
     QStringList lines;
     // A transport failure has no status to report, so it reports what it has.

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#include <QtOpenAi/Client/ToolRegistry.h>
 #include <QtOpenAi/Core/MetaSchema.h>
 #include <QtOpenAi/Tools/DefaultTools.h>
 #include <QtOpenAi/Tools/FileTools.h>
@@ -37,10 +38,12 @@ private slots:
     void utilitiesNeedNoPolicy();
     void fileAccessNeedsASandboxWithRoots();
     void writingNeedsBothSwitches();
+    void theSizeCapNeverWidensWhatTheSandboxAllows();
     void httpNeedsAnAllowList();
     void theApprovalHandlerGatesSideEffects();
     void readsAreNotGatedUnlessAsked();
     void schemasComeFromTheMethods();
+    void aGatedToolIsDescribedLikeTheUngatedOne();
     void everyAnnotationOnTheseToolsDescribesSomething();
 
 private:
@@ -122,6 +125,44 @@ void TestDefaultTools::fileAccessNeedsASandboxWithRoots()
             call(QStringLiteral("read_file"),
                  {{QStringLiteral("path"), m_jail + QStringLiteral("/notes.txt")}}));
     QCOMPARE(read.content(), QStringLiteral("the notes"));
+}
+
+void TestDefaultTools::theSizeCapNeverWidensWhatTheSandboxAllows()
+{
+    // The other half of "two switches": of the two limits an application can
+    // put on a FileSandbox before handing it over, isReadOnly() was honoured
+    // and maxBytes() was overwritten from a policy field the caller never
+    // touched -- silently, and upwards, so the tighter setting was the one
+    // that got lost.
+    ToolRegistry registry;
+    DefaultTools tools;
+    ToolPolicy policy;
+    policy.fileRead = true;
+    policy.sandbox = FileSandbox({m_jail});
+    policy.sandbox.setMaxBytes(256 * 1024); // as FileSandbox.h's own example does
+
+    QVERIFY(!tools.install(&registry, policy).isEmpty());
+    // policy.maxFileBytes is still its 1 MiB default, which must not widen it.
+    QCOMPARE(tools.fileTools()->sandbox().maxBytes(), qint64(256 * 1024));
+
+    // Tightening from the policy side still works, which is the direction that
+    // was never broken.
+    policy.maxFileBytes = 64 * 1024;
+    QVERIFY(!tools.install(&registry, policy).isEmpty());
+    QCOMPARE(tools.fileTools()->sandbox().maxBytes(), qint64(64 * 1024));
+
+    // 0 means "no limit" on both sides, so it is the widest value rather than
+    // the narrowest: a policy that sets no cap must not remove the sandbox's,
+    // and a sandbox with no cap still takes the policy's.
+    policy.maxFileBytes = 0;
+    policy.sandbox.setMaxBytes(128 * 1024);
+    QVERIFY(!tools.install(&registry, policy).isEmpty());
+    QCOMPARE(tools.fileTools()->sandbox().maxBytes(), qint64(128 * 1024));
+
+    policy.maxFileBytes = 32 * 1024;
+    policy.sandbox.setMaxBytes(0);
+    QVERIFY(!tools.install(&registry, policy).isEmpty());
+    QCOMPARE(tools.fileTools()->sandbox().maxBytes(), qint64(32 * 1024));
 }
 
 void TestDefaultTools::writingNeedsBothSwitches()
@@ -257,6 +298,38 @@ void TestDefaultTools::readsAreNotGatedUnlessAsked()
                     .content()
                     .contains(QStringLiteral("not approved")));
     QCOMPARE(asked, 1);
+}
+
+void TestDefaultTools::aGatedToolIsDescribedLikeTheUngatedOne()
+{
+    // The gated variant re-registers the tool with the definition the ungated
+    // registration derived, so the two must be indistinguishable to the model.
+    // schemasComeFromTheMethods() above only ever sees ungated tools, so this
+    // is the one that covers how install() gets that definition back.
+    ToolRegistry ungated;
+    ToolRegistry gated;
+    ToolPolicy policy;
+    policy.fileRead = true;
+    policy.sandbox = FileSandbox({m_jail});
+
+    DefaultTools plain;
+    plain.install(&ungated, policy);
+
+    DefaultTools approving;
+    approving.setApproveReads(true);
+    approving.setApprovalHandler([](const QString &, const QJsonObject &) { return true; });
+    approving.install(&gated, policy);
+
+    QCOMPARE(gated.toolNames(), ungated.toolNames());
+    QVERIFY(!gated.toolNames().isEmpty());
+    for (const QString &name : ungated.toolNames()) {
+        const FunctionDefinition before = ungated.tool(name).function();
+        const FunctionDefinition after = gated.tool(name).function();
+        QCOMPARE(after.name(), before.name());
+        QVERIFY2(!after.description().isEmpty(), qPrintable(name));
+        QCOMPARE(after.description(), before.description());
+        QCOMPARE(after.parameters(), before.parameters());
+    }
 }
 
 void TestDefaultTools::schemasComeFromTheMethods()

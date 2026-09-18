@@ -74,6 +74,7 @@ private slots:
     void differentCredentialsDoNotShareEntries();
     void streamsAreNotCached();
     void theStoreIsReplaceable();
+    void theKeyIsComputedOnceAndCarriedToTheStore();
     void theMemoryStoreEvictsOnSize();
     void theMemoryStoreExpiresOnTime();
     void keysDistinguishRequestsThatDifferAnywhere();
@@ -275,12 +276,65 @@ void TestResponseCache::theStoreIsReplaceable()
     QCOMPARE(cache.cache()->count(), 0);
 }
 
+void TestResponseCache::theKeyIsComputedOnceAndCarriedToTheStore()
+{
+    // The key is a SHA-256 of the whole body, and both hooks need it. Hashing
+    // it again in afterResponse() was milliseconds on the event-loop thread for
+    // a batched /embeddings body, on every miss.
+    CachingInterceptor cache;
+    CountingCache store;
+    cache.setCache(&store);
+
+    InterceptedRequest request;
+    request.method = "POST";
+    request.request.setUrl(QUrl(QStringLiteral("https://api.example.com/v1/embeddings")));
+    request.body = QByteArray("{\"input\":\"some text\"}");
+
+    const QByteArray expected = CachingInterceptor::cacheKey(request);
+    QVERIFY(!expected.isEmpty());
+
+    // A miss, which is where the second hash used to be paid.
+    QVERIFY(!cache.beforeRequest(request).has_value());
+    QCOMPARE(store.lookups, 1);
+    QCOMPARE(
+            request.scratch.value(QStringLiteral("QtOpenAi::CachingInterceptor/key")).toByteArray(),
+            expected);
+
+    InterceptedResponse response;
+    response.request = request; // as ClientPrivate carries it: the same object
+    response.body = QByteArray("{\"data\":[]}");
+    response.httpStatus = 200;
+    cache.afterResponse(response);
+
+    // Stored under the key beforeRequest() looked up, which is what makes the
+    // next identical request a hit.
+    QCOMPARE(store.inserts, 1);
+    QVERIFY(store.entries.contains(expected));
+
+    // And it still works for a caller driving the hooks by hand, where nothing
+    // filled the scratch in: the key is recomputed rather than lost.
+    store.clear();
+    InterceptedResponse bare;
+    bare.request = request;
+    bare.request.scratch.clear();
+    bare.body = response.body;
+    bare.httpStatus = 200;
+    cache.afterResponse(bare);
+    QVERIFY(store.entries.contains(expected));
+}
+
 void TestResponseCache::theMemoryStoreEvictsOnSize()
 {
     // Without a ceiling, a long-running process that varies its prompts grows
-    // until it is killed.
-    MemoryResponseCache store(2);
-    QCOMPARE(store.maxEntries(), 2);
+    // until it is killed. The ceiling is in bytes, because bytes are what runs
+    // out: a count of entries says nothing about a store whose values are whole
+    // response bodies.
+    MemoryResponseCache store;
+    QCOMPARE(store.maxBytes(), qint64(64 * 1024 * 1024));
+
+    // Accounting is in whole KiB, so three 1-byte bodies cost 1 KiB each.
+    store.setMaxBytes(2 * 1024);
+    QCOMPARE(store.maxBytes(), qint64(2 * 1024));
 
     store.insert("a", "1");
     store.insert("b", "2");
@@ -296,8 +350,27 @@ void TestResponseCache::theMemoryStoreEvictsOnSize()
     store.clear();
     QCOMPARE(store.count(), 0);
 
+    // The size of the body is what counts, not the number of them: one body
+    // over the ceiling evicts as many as it takes.
+    store.setMaxBytes(8 * 1024);
+    store.insert("small-1", QByteArray(1024, 'x'));
+    store.insert("small-2", QByteArray(1024, 'x'));
+    QCOMPARE(store.count(), 2);
+    store.insert("big", QByteArray(8 * 1024, 'x'));
+    QCOMPARE(store.count(), 1);
+    QVERIFY(store.lookup("big").has_value());
+
+    // A body larger than the whole ceiling is a miss rather than a reason to
+    // evict everything, and it does not leave an older entry under its key.
+    store.clear();
+    store.insert("huge", QByteArray(4 * 1024, 'x'));
+    QVERIFY(store.lookup("huge").has_value());
+    store.insert("huge", QByteArray(32 * 1024, 'x'));
+    QCOMPARE(store.count(), 0);
+    QVERIFY(!store.lookup("huge").has_value());
+
     // A store with no room stores nothing rather than misreporting a hit.
-    store.setMaxEntries(0);
+    store.setMaxBytes(0);
     store.insert("d", "4");
     QCOMPARE(store.count(), 0);
 }
