@@ -244,6 +244,13 @@ qtopenai_add_test(tst_client_streaming_extra
     SOURCES client/tst_streaming_extra.cpp
     LIBS QtOpenAi::Client)
 
+# The SSE framing helper is a private header, so this one test reaches into the
+# module's src/ directory. It is header-only and pulls in nothing but QtCore.
+qtopenai_add_test(tst_client_sseparser
+    SOURCES client/tst_sseparser.cpp
+    LIBS Qt6::Core)
+target_include_directories(tst_client_sseparser PRIVATE "${QtOpenAi_SOURCE_DIR}/src/client/src")
+
 qtopenai_add_test(tst_client_transcriptions
     SOURCES client/tst_transcriptions.cpp
     LIBS QtOpenAi::Client)

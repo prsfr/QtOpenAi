@@ -135,9 +135,10 @@ void RealtimeConnectionPrivate::flush()
         enqueue(event);
 }
 
-// Nothing queued for a channel that is not going to open, or has been told to
-// close, is worth keeping: flush() only runs on `connected`, so a backlog left
-// behind would be replayed into whatever session opened next.
+// Nothing queued for a channel that is not going to open, has been told to
+// close, or has closed under it is worth keeping: flush() only runs on
+// `connected`, so a backlog left behind would be replayed into whatever session
+// opened next.
 void RealtimeConnectionPrivate::discardPending() { pending.clear(); }
 
 RealtimeConnection::RealtimeConnection(QObject *parent)
@@ -149,7 +150,15 @@ RealtimeConnection::RealtimeConnection(QObject *parent)
         d->flush();
         Q_EMIT connected();
     });
-    connect(&d->socket, &QWebSocket::disconnected, this, &RealtimeConnection::disconnected);
+    connect(&d->socket, &QWebSocket::disconnected, this, [this, d] {
+        // Not only the failure paths below: the Realtime API ends a session on
+        // its own -- the maximum session duration, an expired client secret --
+        // and that arrives as an ordinary close. Anything queued was addressed
+        // to the session that just ended, so discard before the signal, which
+        // is where a caller reconnects and starts queueing for the next one.
+        d->discardPending();
+        Q_EMIT disconnected();
+    });
     connect(&d->socket, &QWebSocket::textMessageReceived, this, [d](const QString &message) {
         d->dispatch(
                 Core::RealtimeEvent::fromJson(QJsonDocument::fromJson(message.toUtf8()).object()));

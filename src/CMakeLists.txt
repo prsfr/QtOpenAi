@@ -3,7 +3,10 @@
 # include directory rather than a target, so nothing about it can leak into the
 # package config. See src/common/ for why they are not under one module.
 # Every module below is declared with the same shape; see cmake/QtOpenAiModule.cmake.
-include("${CMAKE_SOURCE_DIR}/cmake/QtOpenAiModule.cmake")
+# QtOpenAi_SOURCE_DIR rather than CMAKE_SOURCE_DIR: the latter is the *consuming*
+# project's root when QtOpenAi is pulled in with add_subdirectory(), which is a
+# documented way to use it, and the include would look for the file there.
+include("${QtOpenAi_SOURCE_DIR}/cmake/QtOpenAiModule.cmake")
 
 set(QTOPENAI_PRIVATE_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/common")
 set(QTOPENAI_PRIVATE_HEADERS
