@@ -55,6 +55,14 @@ public:
             tail.replace("\r\n", "\n");
             m_buffer.truncate(normaliseFrom);
             m_buffer += tail;
+            // Dropping a CR pulls everything after it one byte left, so the LF
+            // that followed it can land next to an LF the previous feed had
+            // already passed over -- a separator beginning one byte before
+            // m_scanned. "data: x\r\n\r" then "\ndata: y\r\n\r\n" is exactly
+            // that, and searching from m_scanned would frame the two events as
+            // one. Nothing earlier can be affected: the bytes before it are
+            // untouched and were searched.
+            m_scanned = qMax(qMin(m_scanned, normaliseFrom) - 1, qsizetype(0));
         }
 
         // SSE events are separated by a blank line.
