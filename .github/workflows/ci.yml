@@ -64,13 +64,8 @@ jobs:
             qt_version: "6.11.1"
           - os: macos-latest
             qt_version: "6.11.1"
-          # 6.10.3 because download.qt.io serves no retrievable checksum for the
-          # Qt 6.11 Windows series (qt6_6110 and qt6_6111 Updates.xml), so
-          # aqtinstall cannot install any 6.11 patch there ("Failed to locate
-          # XML data"). That is an upstream packaging gap, tracked in #33; the
-          # library supports Qt 6.4+, so the compiler coverage holds either way.
           - os: windows-latest
-            qt_version: "6.10.3"
+            qt_version: "6.11.1"
 
     steps:
       - name: Checkout

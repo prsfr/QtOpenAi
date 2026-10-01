@@ -3156,9 +3156,8 @@ WebSocket server, so no API key, internet access or audio device is required.
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds and tests on
 **Linux, macOS and Windows** on every pull request and every push to `main`. The
 library has no platform-specific code, but the MSVC and Apple clang jobs are the
-ones that catch template, `constexpr` and export-macro breakage. Windows builds
-against Qt 6.10.3 rather than 6.11 until upstream publishes the 6.11 Windows
-checksums ([#33](https://github.com/prsfr/QtOpenAi/issues/33)).
+ones that catch template, `constexpr` and export-macro breakage. All three build
+against the same Qt release, 6.11.1.
 
 ### Formatting
 
