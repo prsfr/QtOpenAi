@@ -3154,18 +3154,11 @@ tests spin up a local stub HTTP server, and the Realtime ones a local stub
 WebSocket server, so no API key, internet access or audio device is required.
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds and tests on
-**Linux only until 1.0**. The library has no platform-specific code, so the
-macOS and Windows jobs were re-proving the same result at roughly twice the
-wall-clock of the Linux one. Both are still one switch away, without editing the
-workflow:
-
-| To build and test all three platforms | |
-|---|---|
-| for every run | set the repository variable `CI_ALL_PLATFORMS` to `true` |
-| for a single run | *Actions → CI → Run workflow*, tick **all_platforms** |
-
-Restoring all platforms unconditionally is tracked in
-[#92](https://github.com/prsfr/QtOpenAi/issues/92) for the 1.0 release.
+**Linux, macOS and Windows** on every pull request and every push to `main`. The
+library has no platform-specific code, but the MSVC and Apple clang jobs are the
+ones that catch template, `constexpr` and export-macro breakage. Windows builds
+against Qt 6.10.3 rather than 6.11 until upstream publishes the 6.11 Windows
+checksums ([#33](https://github.com/prsfr/QtOpenAi/issues/33)).
 
 ### Formatting
 
