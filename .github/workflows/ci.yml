@@ -71,6 +71,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # TEMPORARY (#33): find out where download.qt.io keeps the Qt 6.11 Windows
+      # repository, since aqtinstall's expected path does not resolve. Removed
+      # again before this PR is merged.
+      - name: Probe Qt repository layout
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: bash
+        run: |
+          base=https://download.qt.io/online/qtsdkrepository
+          for os in windows_x86 windows_x64 windows_arm64 all_os; do
+            for f in qt6_6111/qt6_6111/Updates.xml qt6_6111/qt6_6111/Updates.xml.sha256 \
+                     qt6_6111/Updates.xml qt6_6103/qt6_6103/Updates.xml; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' -L "$base/$os/desktop/$f")
+              echo "$code $os/desktop/$f"
+            done
+          done
+          for d in windows_x86/desktop/ windows_x86/desktop/qt6_6111/ windows_x64/desktop/ windows_x64/desktop/qt6_6111/; do
+            echo "== listing $d"
+            curl -sL "$base/$d" | grep -oE 'href="[^"?/][^"]*"' | grep -E 'qt6_61|Updates' | head -40 || true
+          done
+          pip install -q aqtinstall==3.3.0
+          python -m aqt list-qt windows desktop | tail -3
+          python -m aqt list-qt windows desktop --arch 6.11.1 || true
+          python -m aqt list-qt windows desktop --arch 6.10.3 || true
+
       - name: Install Qt ${{ matrix.qt_version }}
         uses: jurplel/install-qt-action@v4
         with:
