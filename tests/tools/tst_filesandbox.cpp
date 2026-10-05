@@ -6,6 +6,9 @@
 #include <QtCore/QTemporaryDir>
 #include <QtTest/QtTest>
 
+#include <filesystem>
+#include <system_error>
+
 using namespace QtOpenAi::Tools;
 
 namespace {
@@ -17,7 +20,38 @@ void write(const QString &path, const QByteArray &content)
     file.write(content);
 }
 
+// A real symbolic link, on every platform. QFile::link() is not one on Windows:
+// it writes a .lnk shell shortcut, which the filesystem -- and so the sandbox --
+// sees as an ordinary file inside the jail. The escape these tests describe
+// would then never be attempted, and every check that expects a refusal would
+// see the shortcut's own path resolve instead. NTFS symlinks need the
+// create-symbolic-link privilege (an elevated process, or Developer Mode);
+// without it the case cannot be built, which is a skip, not a pass.
+bool symlink(const QString &target, const QString &linkName)
+{
+    const std::filesystem::path from = QFileInfo(target).absoluteFilePath().toStdWString();
+    const std::filesystem::path to = QFileInfo(linkName).absoluteFilePath().toStdWString();
+    std::error_code error;
+    if (QFileInfo(target).isDir())
+        std::filesystem::create_directory_symlink(from, to, error);
+    else
+        std::filesystem::create_symlink(from, to, error);
+    if (error)
+        qWarning("cannot create symlink %s -> %s: %s", qPrintable(linkName), qPrintable(target),
+                 error.message().c_str());
+    return !error;
+}
+
 } // namespace
+
+// Skips rather than fails where the platform will not create a symlink, so it
+// has to be a macro: QSKIP returns from the test function.
+#define QVERIFY_SYMLINK(target, linkName)                                                          \
+    do {                                                                                           \
+        if (!symlink(target, linkName))                                                            \
+            QSKIP("symbolic links cannot be created here (Windows needs Developer Mode or "        \
+                  "elevation)");                                                                   \
+    } while (false)
 
 // Coverage for the filesystem sandbox (#53). These are the tests that matter:
 // a model that can name a file can name any file, and it is steered by whatever
@@ -126,9 +160,9 @@ void TestFileSandbox::aSymlinkOutOfTheJailIsRefused()
 {
     // The attack a spelling check misses entirely: the path looks like it is
     // inside, and it is not.
-    QVERIFY(QFile::link(m_outside + QStringLiteral("/secret.txt"),
-                        m_jail + QStringLiteral("/looks-fine.txt")));
-    QVERIFY(QFile::link(m_outside, m_jail + QStringLiteral("/looks-like-a-dir")));
+    QVERIFY_SYMLINK(m_outside + QStringLiteral("/secret.txt"),
+                    m_jail + QStringLiteral("/looks-fine.txt"));
+    QVERIFY_SYMLINK(m_outside, m_jail + QStringLiteral("/looks-like-a-dir"));
 
     FileSandbox sandbox({m_jail});
     FileSandbox::Rejection reason = FileSandbox::Rejection::None;
@@ -299,28 +333,29 @@ void TestFileSandbox::aRefusalSaysWhichKindItIs()
     QCOMPARE(refused.count(), 3);
     QCOMPARE(reasonOf(2), FileSandbox::Rejection::OutsideRoots);
 
-    // The other one, and the reason containment is by canonical path.
-    QVERIFY(QFile::link(m_outside, m_jail + QStringLiteral("/escape")));
-    tools.read_file(m_jail + QStringLiteral("/escape/secret.txt"));
-    QCOMPARE(refused.count(), 4);
-    QCOMPARE(reasonOf(3), FileSandbox::Rejection::OutsideRoots);
-
     // Not the same event as either: a cap, on a path that was always allowed.
     FileSandbox tiny({m_jail});
     tiny.setMaxBytes(4);
     tools.setSandbox(tiny);
     tools.read_file(m_jail + QStringLiteral("/allowed.txt"));
-    QCOMPARE(refused.count(), 5);
-    QCOMPARE(reasonOf(4), FileSandbox::Rejection::TooLarge);
+    QCOMPARE(refused.count(), 4);
+    QCOMPARE(reasonOf(3), FileSandbox::Rejection::TooLarge);
 
     // A write against a read-only sandbox is its own reason too.
     tools.setSandbox(FileSandbox({m_jail}));
     tools.write_file(m_jail + QStringLiteral("/new.txt"), QStringLiteral("x"));
-    QCOMPARE(refused.count(), 6);
-    QCOMPARE(reasonOf(5), FileSandbox::Rejection::ReadOnly);
+    QCOMPARE(refused.count(), 5);
+    QCOMPARE(reasonOf(4), FileSandbox::Rejection::ReadOnly);
 
     // The sentence is still carried, for logs and for the model.
     QVERIFY(!refused.last().at(3).toString().isEmpty());
+
+    // The other escape, and the reason containment is by canonical path. Last,
+    // because it is the one case that may have to be skipped.
+    QVERIFY_SYMLINK(m_outside, m_jail + QStringLiteral("/escape"));
+    tools.read_file(m_jail + QStringLiteral("/escape/secret.txt"));
+    QCOMPARE(refused.count(), 6);
+    QCOMPARE(reasonOf(5), FileSandbox::Rejection::OutsideRoots);
 }
 
 QTEST_MAIN(TestFileSandbox)
