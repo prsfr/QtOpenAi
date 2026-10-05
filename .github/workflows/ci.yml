@@ -71,37 +71,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # TEMPORARY (#33): find out where download.qt.io keeps the Qt 6.11 Windows
-      # repository, since aqtinstall's expected path does not resolve. Removed
-      # again before this PR is merged.
-      - name: Probe Qt repository layout
-        if: runner.os == 'Windows'
-        continue-on-error: true
-        shell: bash
-        run: |
-          base=https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64
-          for f in Updates.xml Updates.xml.sha256; do
-            echo "$(curl -s -o /dev/null -w '%{http_code}' -L "$base/$f") $f"
-          done
-          curl -sL "$base/Updates.xml" | grep -oE '<Name>[^<]+</Name>' | grep -iE 'websockets|qtbase|win64_msvc2022_64</' | head -20
-          pip install -q aqtinstall==3.3.0
-          cat > probe_aqt.py <<'PY'
-          import sys
-          from aqt import archives
-          from aqt.metadata import Version
-          orig = archives.QtArchives._arch_ext
-          def arch_ext(self):
-              if self.os_name == "windows" and self.version >= Version("6.11.0"):
-                  return "_" + self.arch.replace("win64_", "", 1)
-              return orig(self)
-          archives.QtArchives._arch_ext = arch_ext
-          from aqt.installer import Cli
-          sys.exit(Cli().run(sys.argv[1:]))
-          PY
-          python probe_aqt.py install-qt windows desktop 6.11.1 win64_msvc2022_64 --outputdir "$RUNNER_TEMP/probe-qt" --modules qtwebsockets
-          ls "$RUNNER_TEMP/probe-qt/6.11.1/msvc2022_64/lib/cmake" | head -50
-
       - name: Install Qt ${{ matrix.qt_version }}
+        if: runner.os != 'Windows'
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ matrix.qt_version }}
@@ -109,6 +80,24 @@ jobs:
           # default install set. Without it that module is skipped silently.
           modules: qtwebsockets
           cache: true
+
+      # From 6.11 download.qt.io splits the Windows repository by compiler, and
+      # aqtinstall 3.3.0 -- which install-qt-action runs -- still looks in the
+      # old place ("Failed to locate XML data", #33). scripts/ci/install-qt.py
+      # is aqtinstall pointed at the new directory, checksums and all. Go back
+      # to the step above once an aqtinstall release knows the layout.
+      - name: Install Qt ${{ matrix.qt_version }} (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          python -m pip install --quiet "aqtinstall==3.3.0"
+          python scripts/ci/install-qt.py install-qt windows desktop "${{ matrix.qt_version }}" \
+            win64_msvc2022_64 --outputdir "$RUNNER_TEMP/Qt" --modules qtwebsockets
+          root=$(cygpath -m "$RUNNER_TEMP/Qt/${{ matrix.qt_version }}/msvc2022_64")
+          test -f "$root/lib/cmake/Qt6WebSockets/Qt6WebSocketsConfig.cmake"
+          echo "QT_ROOT_DIR=$root" >> "$GITHUB_ENV"
+          echo "CMAKE_PREFIX_PATH=$root" >> "$GITHUB_ENV"
+          echo "$root/bin" >> "$GITHUB_PATH"
 
       - name: Configure
         run: >
