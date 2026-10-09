@@ -65,6 +65,12 @@ private slots:
     void clientGoneBeforeFirstAttempt_data();
     void clientGoneBeforeFirstAttempt();
     void noReplyAccumulatesUnderTheManager();
+
+    // Harden 2: the ownership model of Amendment 1 under attack.
+    void managerDeletedFromReplySignal_data();
+    void managerDeletedFromReplySignal();
+    void managerReplacedWhileInFlight();
+    void cannedReplyOutlivesClient();
 };
 
 namespace {
@@ -912,6 +918,184 @@ void TestRedirect::noReplyAccumulatesUnderTheManager()
         drainEvents();
     }
     QVERIFY2(replies().isEmpty(), qPrintable(QString::number(replies().size())));
+}
+
+// --- Harden 2 (after Amendment 1) ---------------------------------------------
+
+namespace {
+
+QByteArray streamBody()
+{
+    const QByteArray chunk = R"({"id":"c1","object":"chat.completion.chunk","created":1,)"
+                             R"("model":"gpt-4o","choices":[{"index":0,"delta":)"
+                             R"({"content":"hi"},"finish_reason":null}]})";
+    return "data: " + chunk + "\n\ndata: " + chunk + "\n\ndata: " + chunk + "\n\ndata: [DONE]\n\n";
+}
+
+} // namespace
+
+// The manager now owns the QNetworkReply, so deleting the manager -- with the
+// Client, or an injected one -- from a slot on one of the reply's signals
+// deletes the QNetworkReply that is emitting the signal underneath it. Every
+// public signal a REST or stream reply emits while Qt is still on the stack.
+void TestRedirect::managerDeletedFromReplySignal_data()
+{
+    QTest::addColumn<QString>("path");
+    QTest::addColumn<QString>("signal");
+    QTest::addColumn<int>("status");
+    QTest::addColumn<bool>("injected");
+    const struct
+    {
+        const char *path;
+        const char *signal;
+        int status;
+    } rows[] = {
+            {"rest", "responseReceived", 500},
+            {"rest", "responseReceived", 200},
+            {"rest", "failed", 500},
+            {"rest", "finished", 200},
+            {"rest", "done", 200},
+            {"stream", "failed", 500},
+            {"stream", "finished", 200},
+    };
+    for (const auto &row : rows) {
+        for (const bool injected : {false, true}) {
+            QTest::addRow("%s/%s/%d/%s", row.path, row.signal, row.status,
+                          injected ? "delete-injected-manager" : "delete-client")
+                    << QString::fromLatin1(row.path) << QString::fromLatin1(row.signal)
+                    << row.status << injected;
+        }
+    }
+}
+
+void TestRedirect::managerDeletedFromReplySignal()
+{
+    QFETCH(QString, path);
+    QFETCH(QString, signal);
+    QFETCH(int, status);
+    QFETCH(bool, injected);
+
+    const QByteArray body = status >= 400      ? QByteArray(R"({"error":{"message":"boom"}})")
+                            : path == "stream" ? streamBody()
+                                               : chatBody();
+    StubServer origin(
+            {{body, status,
+              path == "stream" && status < 400 ? "text/event-stream" : "application/json"}});
+    auto client = std::make_unique<Client>(origin.baseUrl(), key);
+    client->setRetryPolicy(RetryPolicy::none());
+    auto manager = std::make_unique<QNetworkAccessManager>();
+    if (injected)
+        client->setNetworkAccessManager(manager.get());
+    int deletions = 0;
+    const auto kill = [&] {
+        if (deletions++)
+            return;
+        QNetworkAccessManager *owner = injected ? manager.get() : client->networkAccessManager();
+        const QPointer<QNetworkReply> wire
+                = owner->findChildren<QNetworkReply *>(QString(), Qt::FindDirectChildrenOnly)
+                          .value(0);
+        QVERIFY(wire);
+        if (injected)
+            manager.reset();
+        else
+            client.reset();
+    };
+
+    std::unique_ptr<QObject> owner;
+    std::unique_ptr<QSignalSpy> done;
+    std::function<bool()> finished;
+    if (path == "stream") {
+        auto *reply = client->createChatCompletionStream(chatRequest());
+        reply->setAutoDelete(false);
+        owner.reset(reply);
+        done = std::make_unique<QSignalSpy>(reply, &ChatCompletionStreamReply::done);
+        finished = [reply] { return reply->isFinished(); };
+        if (signal == "failed")
+            connect(reply, &ChatCompletionStreamReply::failed, reply, kill);
+        else
+            connect(reply, &ChatCompletionStreamReply::finished, reply, kill);
+    } else {
+        auto *reply = client->createChatCompletion(chatRequest());
+        reply->setAutoDelete(false);
+        owner.reset(reply);
+        done = std::make_unique<QSignalSpy>(reply, &ChatCompletionReply::done);
+        finished = [reply] { return reply->isFinished(); };
+        if (signal == "responseReceived")
+            connect(reply, &ChatCompletionReply::responseReceived, reply, kill);
+        else if (signal == "failed")
+            connect(reply, &ChatCompletionReply::failed, reply, kill);
+        else if (signal == "finished")
+            connect(reply, &ChatCompletionReply::finished, reply, kill);
+        else
+            connect(reply, &ChatCompletionReply::done, reply, kill);
+    }
+
+    QVERIFY(QTest::qWaitFor([&] { return deletions > 0; }, 5000));
+    QVERIFY(QTest::qWaitFor(finished, 5000));
+    drainEvents();
+    QCOMPARE(done->count(), 1);
+    QCOMPARE(origin.requestCount(), 1);
+}
+
+// setNetworkAccessManager() while a request is in flight: the request stays on
+// the manager that issued it (its factory captured that one), so deleting the
+// old manager fails it as "client no longer available" even though the Client
+// is alive -- and the Client goes on working on the new manager.
+void TestRedirect::managerReplacedWhileInFlight()
+{
+    QTcpServer silent;
+    QVERIFY(silent.listen(QHostAddress::LocalHost));
+    StubServer live(chatBody());
+    Client client(QUrl(QStringLiteral("http://127.0.0.1:%1/v1").arg(silent.serverPort())), key);
+    client.setRetryPolicy(RetryPolicy::none());
+    auto first = std::make_unique<QNetworkAccessManager>();
+    QNetworkAccessManager second;
+    client.setNetworkAccessManager(first.get());
+    auto *reply = client.createChatCompletion(chatRequest());
+    reply->setAutoDelete(false);
+    const std::unique_ptr<ChatCompletionReply> owner(reply);
+    QVERIFY(QTest::qWaitFor([&silent] { return silent.hasPendingConnections(); }, 5000));
+
+    client.setNetworkAccessManager(&second);
+    first.reset();
+    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    QCOMPARE(reply->error().kind(), ClientError::Kind::Network);
+    QCOMPARE(reply->error().message(), QStringLiteral("client no longer available"));
+
+    client.setBaseUrl(live.baseUrl());
+    const auto next = awaited(client.createChatCompletion(chatRequest()));
+    QVERIFY(next);
+    QVERIFY(next->isSuccess());
+}
+
+// An interceptor's canned reply has no manager: the engine owns it. A Client
+// deleted in the same turn as the call leaves the answer to be delivered (the
+// factory depends on nothing that died) without running afterResponse, whose
+// connection had the Client as context.
+void TestRedirect::cannedReplyOutlivesClient()
+{
+    class Answering : public Interceptor
+    {
+    public:
+        int after = 0;
+        std::optional<InterceptedResponse> beforeRequest(InterceptedRequest &) override
+        {
+            InterceptedResponse response;
+            response.body = chatBody();
+            return response;
+        }
+        void afterResponse(const InterceptedResponse &) override { ++after; }
+    } interceptor;
+
+    auto client = std::make_unique<Client>(QUrl(QStringLiteral("http://127.0.0.1:9/v1")), key);
+    client->addInterceptor(&interceptor);
+    auto *reply = client->createChatCompletion(chatRequest());
+    reply->setAutoDelete(false);
+    const std::unique_ptr<ChatCompletionReply> owner(reply);
+    client.reset();
+    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+    QVERIFY(reply->isSuccess());
+    QCOMPARE(interceptor.after, 0);
 }
 
 QTEST_MAIN(TestRedirect)

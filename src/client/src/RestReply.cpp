@@ -140,16 +140,20 @@ void RestReply::start()
             return;
         }
 
+        // Everything is read off the reply before the first emission: a slot
+        // on settled() may delete the Client, and with it the manager that
+        // owns -- and frees -- the reply.
         m_settled = true;
+        const QString transportMessage = reply->errorString();
+        const QNetworkReply::NetworkError transportError = reply->error();
         if (networkError) {
             Q_EMIT settled(body, status);
-            Q_EMIT failed(ClientError(ClientError::Kind::Network, reply->errorString(), status));
+            Q_EMIT failed(ClientError(ClientError::Kind::Network, transportMessage, status));
             return;
         }
         if (httpError) {
             Q_EMIT settled(body, status);
-            Q_EMIT failed(
-                    detail::errorFromBody(body, reply->errorString(), status, reply->error()));
+            Q_EMIT failed(detail::errorFromBody(body, transportMessage, status, transportError));
             return;
         }
 
