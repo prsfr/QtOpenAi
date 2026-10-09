@@ -381,6 +381,12 @@ QNetworkRequest apiRequest(const ClientPrivate *d, const QString &path, const ch
         networkRequest.setRawHeader(it.key(), it.value());
     if (d->requestTimeoutMs > 0)
         networkRequest.setTransferTimeout(d->requestTimeoutMs);
+    // The request carries the key, and Qt's default policy would follow a 3xx
+    // to any host and copy every header there (#203). Within the same scheme,
+    // host and port a redirect is harmless; anything else fails the reply with
+    // InsecureRedirectError, which the replies report as Kind::Redirect.
+    networkRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                                QNetworkRequest::SameOriginRedirectPolicy);
     return networkRequest;
 }
 

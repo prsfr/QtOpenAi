@@ -203,6 +203,11 @@ public:
     QUrl baseUrl() const;
     void setBaseUrl(const QUrl &baseUrl);
 
+    // Every request that carries the key follows redirects only within its own
+    // origin (scheme, host and port). A redirect anywhere else is refused, per
+    // request and whatever policy the network access manager has: the reply
+    // fails with ClientError::Kind::Redirect and is not re-sent, so the key
+    // never reaches a host that was not configured here.
     QString apiKey() const;
     void setApiKey(const QString &apiKey);
 

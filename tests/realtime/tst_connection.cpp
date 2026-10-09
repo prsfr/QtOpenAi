@@ -6,6 +6,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Realtime;
 
+#include "support/StubServer.h"
 #include "support/StubWebSocketServer.h"
 
 // Loopback coverage for the Realtime WebSocket channel (#25), against a stub
@@ -24,6 +25,7 @@ private slots:
     void reportsDisconnection();
     void audioIsNotQueuedForAChannelThatIsNotOpen();
     void closingDiscardsWhatWasQueued();
+    void handshakeRedirectIsNotFollowed();
 };
 
 namespace {
@@ -294,6 +296,32 @@ void TestRealtimeConnection::reportsDisconnection()
     server.closeClient();
     QVERIFY(await(disconnected));
     QVERIFY(!connection.isOpen());
+}
+
+// The handshake carries the key too. QWebSocket does not follow a redirect on
+// it -- no code here makes sure of that, Qt does -- so this pins the behaviour:
+// a Qt that starts following handshake redirects fails here instead of sending
+// the key to another origin unnoticed (#203).
+void TestRealtimeConnection::handshakeRedirectIsNotFollowed()
+{
+    StubServer target(QByteArray {});
+    const QByteArray location
+            = "ws://localhost:" + QByteArray::number(target.baseUrl().port()) + "/v1/x";
+    StubServer origin({{QByteArray(), 302, "application/json", {{"Location", location}}}});
+
+    RealtimeConnection connection;
+    connection.setUrl(
+            QUrl(QStringLiteral("ws://127.0.0.1:%1/v1/realtime").arg(origin.baseUrl().port())));
+    connection.setApiKey(QStringLiteral("ek_redirect_secret"));
+
+    QSignalSpy connected(&connection, &RealtimeConnection::connected);
+    QSignalSpy socketError(&connection, &RealtimeConnection::socketError);
+    connection.open();
+    QVERIFY(await(socketError));
+
+    QCOMPARE(connected.count(), 0);
+    QCOMPARE(origin.requestCount(), 1);
+    QCOMPARE(target.requestCount(), 0);
 }
 
 QTEST_MAIN(TestRealtimeConnection)

@@ -29,6 +29,7 @@ public:
         Http,           // non-2xx response with a parsable error body
         Parse,          // response body was not valid/expected JSON
         InvalidRequest, // request rejected locally before sending
+        Redirect,       // redirect to another origin refused; the request was not re-sent
     };
     Q_ENUM(Kind)
 

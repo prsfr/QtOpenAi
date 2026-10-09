@@ -40,7 +40,7 @@ StreamReplyBase::StreamReplyBase(StreamReplyBasePrivate &dd, QNetworkReply *repl
             // of it rather than half an event.
             d->success = false;
             d->error = detail::errorFromBody(d->parser.buffered() + reply->readAll(),
-                                             reply->errorString(), status);
+                                             reply->errorString(), status, reply->error());
             Q_EMIT failed(d->error);
         } else {
             // isSuccess() is observably true while the subclass emits its

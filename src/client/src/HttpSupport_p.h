@@ -124,9 +124,16 @@ inline RateLimit parseRateLimit(QNetworkReply *reply)
 // `transportMessage` is QNetworkReply::errorString(); `status` the HTTP status,
 // 0 when no response arrived. A status below 400 with an error here means the
 // transport failed rather than the API, which is the Network/Http distinction.
+//
+// A redirect to another origin, refused by the request's redirect policy, is
+// neither: it is reported as Kind::Redirect before the body is consulted, so a
+// JSON body on the 3xx cannot turn it into an HTTP error.
 inline ClientError errorFromBody(const QByteArray &body, const QString &transportMessage,
-                                 int status)
+                                 int status, QNetworkReply::NetworkError transportError)
 {
+    if (transportError == QNetworkReply::InsecureRedirectError)
+        return ClientError(ClientError::Kind::Redirect, transportMessage, status);
+
     ClientError error(status >= 400 ? ClientError::Kind::Http : ClientError::Kind::Network,
                       transportMessage, status);
 

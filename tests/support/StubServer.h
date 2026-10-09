@@ -59,6 +59,15 @@ public:
         : StubServer(QList<Response> {{std::move(body), status, "application/json"}}, parent)
     { }
 
+    // Replace the queue. For a response that must name the server's own port --
+    // a redirect back to this server under another host name -- which is only
+    // known once the constructor has started listening.
+    void setResponses(QList<Response> responses)
+    {
+        m_responses = std::move(responses);
+        m_index = 0;
+    }
+
     QUrl baseUrl() const
     {
         return QUrl(QStringLiteral("http://127.0.0.1:%1/v1").arg(m_server.serverPort()));

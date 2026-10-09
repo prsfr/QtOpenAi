@@ -73,7 +73,11 @@ void RestReply::start()
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         m_rateLimit = detail::parseRateLimit(reply);
 
-        const bool networkError = reply->error() != QNetworkReply::NoError && status < 400;
+        // A refused cross-origin redirect is an answer rather than a transport
+        // hiccup -- sending it again would be refused again -- so it is neither
+        // retried nor reported as a network error.
+        const bool networkError = reply->error() != QNetworkReply::NoError && status < 400
+                                  && reply->error() != QNetworkReply::InsecureRedirectError;
         const bool httpError = status >= 400 || reply->error() != QNetworkReply::NoError;
 
         // Decide whether this failure is retryable and we still have budget.
@@ -97,7 +101,8 @@ void RestReply::start()
         }
         if (httpError) {
             Q_EMIT settled(body, status);
-            Q_EMIT failed(detail::errorFromBody(body, reply->errorString(), status));
+            Q_EMIT failed(
+                    detail::errorFromBody(body, reply->errorString(), status, reply->error()));
             return;
         }
 
