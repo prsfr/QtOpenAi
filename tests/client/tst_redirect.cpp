@@ -684,18 +684,16 @@ void TestRedirect::abortOrDeleteWhileRedirectInFlight()
 void TestRedirect::keyNeverLoggedDuringRefusedRedirect_data()
 {
     QTest::addColumn<QString>("who");
-    QTest::addColumn<bool>("otherHost");
     for (const char *who : {"bearer", "azure", "organization", "bearer-stream", "azure-stream"})
-        QTest::newRow(who) << QString::fromLatin1(who) << false;
+        QTest::newRow(who) << QString::fromLatin1(who);
 }
 
 void TestRedirect::keyNeverLoggedDuringRefusedRedirect()
 {
     QFETCH(QString, who);
-    QFETCH(bool, otherHost);
 
     const QString secret = QStringLiteral("sk-hardening-%1").arg(who);
-    const Servers servers = makeServers(otherHost);
+    const Servers servers = makeServers(false);
     std::optional<ClientError> error;
     QByteArray observedBody;
     {
