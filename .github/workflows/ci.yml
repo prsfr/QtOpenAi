@@ -42,12 +42,12 @@ jobs:
       - name: Install clang-format
         run: sudo apt-get update && sudo apt-get install -y clang-format
 
-      # The same script a contributor runs before pushing -- see the comment in
-      # it for why the file list is not just `git ls-files`. Keeping the command
-      # in one place is the point: when it lived here, the local version of it
-      # was free to drift, and did.
+      # The same script a contributor runs before pushing (AGENTS.md, #171).
+      # Keeping the command in one place is the point: when it lived here, the
+      # local version of it was free to drift, and did (#115). --strict makes a
+      # missing clang-format a failure instead of a skip.
       - name: Check formatting
-        run: scripts/check-format.sh
+        run: scripts/check.sh --strict format
 
   build-and-test:
     name: ${{ matrix.os }} / Qt ${{ matrix.qt_version }}
@@ -123,30 +123,12 @@ jobs:
         working-directory: build
         run: ctest --build-config Release --output-on-failure
 
-      # The configure step already refuses a GUI module named in any target's
-      # link libraries. This is the other half: what the linker actually
-      # recorded, so a GUI dependency arriving *transitively* -- through a
-      # dependency of a dependency, where no CMakeLists mentions it -- is caught
-      # too. A headless library that turns out to need a display stack at
-      # runtime is discovered on the deployment, not in review.
+      # The linker's view of the headless promise: no QtOpenAi library may
+      # record a GUI library as NEEDED. The rationale lives in the check itself,
+      # scripts/checks/40-headless.sh.
       - name: No GUI dependency
         if: runner.os == 'Linux'
-        run: |
-          set -euo pipefail
-          found=0
-          for lib in build/lib/libQtOpenAi*.so.*; do
-            offenders=$(objdump -p "$lib" | awk '/NEEDED/ {print $2}' \
-              | grep -E 'libQt6(Gui|Widgets|Quick|Qml|OpenGL|Charts|Svg|PrintSupport)' || true)
-            if [ -n "$offenders" ]; then
-              echo "::error::$(basename "$lib") needs $(echo $offenders | tr '\n' ' ')"
-              found=1
-            fi
-          done
-          if [ "$found" -ne 0 ]; then
-            echo "QtOpenAi is a headless library; no module may depend on a GUI stack."
-            exit 1
-          fi
-          echo "No QtOpenAi module depends on a GUI stack."
+        run: scripts/check.sh --strict --build-dir build headless
 
   install-consumer:
     name: find_package smoke test (${{ matrix.link }})

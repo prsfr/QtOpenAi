@@ -74,7 +74,7 @@ that erodes one convenient line at a time:
 | Check | Where | What would otherwise slip through |
 |---|---|---|
 | Configure-time link-library guard | `CMakeLists.txt` | a GUI module named in any QtOpenAi target |
-| `objdump -p` over the built libraries | CI | a GUI dependency arriving *transitively*, where no `CMakeLists` mentions it |
+| `objdump -p` over the built libraries | `scripts/check.sh headless`, run by CI | a GUI dependency arriving *transitively*, where no `CMakeLists` mentions it |
 | `gui_consumer` — a real `QApplication` linking the installed package | CI | the library becoming unusable *from* a GUI application |
 
 The last one is the converse of the first two, and it is there because "does not
@@ -3159,22 +3159,20 @@ library has no platform-specific code, but the MSVC and Apple clang jobs are the
 ones that catch template, `constexpr` and export-macro breakage. All three build
 against the same Qt release, 6.11.1.
 
-### Formatting
+### Before pushing
 
-`.clang-format` is the whole style guide. CI fails on any deviation, so run the
-check before pushing — it is the same script the workflow runs, against the same
-files:
+Every check a change has to pass — formatting, build, tests, the headless
+check, and the deterministic quality gates as they are added — runs from one
+script, the same one CI calls:
 
 ```sh
-scripts/check-format.sh          # report violations, non-zero on any
-scripts/check-format.sh --fix    # rewrite the files in place
+scripts/check.sh                  # everything, in order
+scripts/check.sh --list           # what exists
+scripts/check-format.sh --fix     # apply .clang-format
 ```
 
-Run the script rather than `clang-format` by hand. It enumerates
-`git ls-files --cached --others --exclude-standard`, which includes files you
-have added but not yet committed; plain `git ls-files` lists tracked files only,
-so a branch that *adds* sources would check everything except the code it is
-adding and pass.
+How a change is specified, reviewed and hardened before it becomes a pull
+request is in [`AGENTS.md`](AGENTS.md).
 
 ## License
 

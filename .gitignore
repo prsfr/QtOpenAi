@@ -32,3 +32,6 @@ Thumbs.db
 .env
 *.local
 __pycache__/
+
+# Agent pipeline working files (AGENTS.md)
+/.work/
