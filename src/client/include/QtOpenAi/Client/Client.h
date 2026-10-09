@@ -208,8 +208,8 @@ public:
     // network access manager has. A redirect to another HTTP(S) origin is
     // refused: the reply fails with ClientError::Kind::Redirect and is not
     // re-sent, so the key never reaches a host that was not configured here. A
-    // Location with a non-HTTP scheme is not followed either, and fails as
-    // Kind::Network.
+    // Location with a non-HTTP scheme is not followed either; it is a network
+    // error (Kind::Network), retried to this origin like one.
     QString apiKey() const;
     void setApiKey(const QString &apiKey);
 

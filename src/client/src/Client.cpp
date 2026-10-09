@@ -607,8 +607,9 @@ QByteArray clientSecretBody(const Core::RealtimeSessionConfig &session, qint64 e
 // One per HTTP verb; the multipart POST variant lives in multipartPostFactory().
 //
 // The manager is held weakly: a deferred first attempt or a retry can run after
-// the Client -- and with it the manager -- is gone. A factory then returns
-// nullptr, which RestReply reports as the client being gone.
+// the manager is gone -- with the Client, or an injected one on its own. A
+// factory then returns nullptr, which RestReply reports as the client being
+// gone.
 std::function<QNetworkReply *()> getFactory(QNetworkAccessManager *manager, QNetworkRequest request)
 {
     return [manager = QPointer<QNetworkAccessManager>(manager),

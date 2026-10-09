@@ -74,8 +74,9 @@ Q_SIGNALS:
 
 private:
     void start();
-    // Settle as failed because the network access manager -- and so the
-    // Client -- is gone. Never called from inside the manager's destructor.
+    // Settle as failed because the network access manager is gone -- with the
+    // Client, or an injected one on its own. Always queued, never called from
+    // inside the destructor that took the manager away.
     void failClientGone();
 
     std::function<QNetworkReply *()> m_factory;

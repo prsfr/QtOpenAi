@@ -87,7 +87,10 @@ void RestReply::start()
         return;
     m_networkReply = m_factory();
     if (!m_networkReply) {
-        failClientGone();
+        // Queued like the manager-destroyed path: a rate limiter releases its
+        // waiting requests from its destructor, which can be the Client's.
+        m_managerGone = true;
+        QTimer::singleShot(0, this, &RestReply::failClientGone);
         return;
     }
     if (!m_networkReply->parent())

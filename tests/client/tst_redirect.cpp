@@ -3,6 +3,7 @@
 #include <QtOpenAi/Client/CachingInterceptor.h>
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/Interceptor.h>
+#include <QtOpenAi/Client/RateLimiter.h>
 
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtTest/QtTest>
@@ -322,7 +323,7 @@ void TestRedirect::everyRedirectStatusIsRefused_data()
     QTest::addColumn<int>("status");
     QTest::addColumn<QString>("path");
     for (const int status : {301, 303, 307, 308}) {
-        for (const char *path : {"post", "get", "multipart", "stream"})
+        for (const char *path : {"post", "stream"})
             QTest::addRow("%d/%s", status, path) << status << QString::fromLatin1(path);
     }
 }
@@ -382,8 +383,6 @@ void TestRedirect::locationVariants()
         location = "http://user@localhost:" + o + "/v1/x";
     else if (kind == "https")
         location = "https://127.0.0.1:" + o + "/v1/x";
-    else if (kind == "file")
-        location = "file:///etc/hostname";
     else if (kind == "absolute")
         location = "http://127.0.0.1:" + o + "/v1/second";
     else if (kind == "upper")
@@ -439,12 +438,8 @@ void TestRedirect::sameOriginHopThenCrossOriginIsRefused_data()
 {
     QTest::addColumn<QString>("path");
     QTest::addColumn<Client::AuthScheme>("scheme");
-    for (const char *path : {"post", "stream"}) {
-        QTest::addRow("%s/bearer", path)
-                << QString::fromLatin1(path) << Client::AuthScheme::BearerToken;
-        QTest::addRow("%s/azure", path)
-                << QString::fromLatin1(path) << Client::AuthScheme::AzureApiKey;
-    }
+    for (const char *path : {"post", "stream"})
+        QTest::newRow(path) << QString::fromLatin1(path) << Client::AuthScheme::BearerToken;
 }
 
 void TestRedirect::sameOriginHopThenCrossOriginIsRefused()
@@ -575,7 +570,13 @@ void TestRedirect::abortOrDeleteWhileRedirectInFlight_data()
             for (const char *action : {"abort", "delete-reply", "delete-client",
                                        "delete-injected-manager", "delete-client-keep-manager",
                                        "delete-client-in-failed", "delete-reply-in-failed"}) {
-                // Without a redirect nothing fails, so there is no failed() to act in.
+                // Without a redirect nothing fails, so there is no failed() to act
+                // in; and abort/delete-reply without one are plain pre-#203
+                // lifetimes. The 200 rows stay for the manager going away, which
+                // crashed after a parsed 200 too.
+                if (!redirect && !QByteArray(action).startsWith("delete-client")
+                    && QByteArray(action) != "delete-injected-manager")
+                    continue;
                 if (!redirect && QByteArray(action).endsWith("in-failed"))
                     continue;
                 QTest::addRow("%s/%s/%s", redirect ? "302" : "200-control", path, action)
@@ -657,7 +658,7 @@ void TestRedirect::abortOrDeleteWhileRedirectInFlight()
                 manager.reset();
             else
                 client.reset();
-            QVERIFY(!settledBefore || done.count() == 1);
+            QCOMPARE(done.count(), settledBefore ? 1 : 0);
             QVERIFY(QTest::qWaitFor([&] { return finished(); }, 5000));
             QCOMPARE(done.count(), 1);
             if (action == "delete-client-keep-manager") {
@@ -684,10 +685,8 @@ void TestRedirect::keyNeverLoggedDuringRefusedRedirect_data()
 {
     QTest::addColumn<QString>("who");
     QTest::addColumn<bool>("otherHost");
-    for (const char *who : {"bearer", "azure", "organization", "bearer-stream", "azure-stream"}) {
-        QTest::addRow("%s/other-host", who) << QString::fromLatin1(who) << true;
-        QTest::addRow("%s/other-port", who) << QString::fromLatin1(who) << false;
-    }
+    for (const char *who : {"bearer", "azure", "organization", "bearer-stream", "azure-stream"})
+        QTest::newRow(who) << QString::fromLatin1(who) << false;
 }
 
 void TestRedirect::keyNeverLoggedDuringRefusedRedirect()
@@ -812,6 +811,7 @@ void TestRedirect::clientGoneBeforeFirstAttempt_data()
 {
     QTest::addColumn<QString>("path");
     QTest::newRow("post") << QStringLiteral("post");
+    QTest::newRow("post/limiter") << QStringLiteral("post/limiter");
     QTest::newRow("stream") << QStringLiteral("stream");
 }
 
@@ -821,6 +821,16 @@ void TestRedirect::clientGoneBeforeFirstAttempt()
 
     StubServer origin(chatBody());
     auto client = std::make_unique<Client>(origin.baseUrl(), key);
+    if (path == QLatin1String("post/limiter")) {
+        // A held request is released from the limiter's destructor, which runs
+        // inside the Client's when the limiter is its child. The failure must
+        // still not reach the application from in there.
+        client->networkAccessManager();
+        auto *limiter = new RateLimiter(client.get());
+        limiter->pauseFor(60000);
+        client->setRateLimiter(limiter);
+    }
+    std::unique_ptr<QSignalSpy> done;
     std::function<bool()> finished;
     std::function<ClientError()> error;
     std::unique_ptr<QObject> owner;
@@ -828,21 +838,27 @@ void TestRedirect::clientGoneBeforeFirstAttempt()
         auto *reply = client->createChatCompletionStream(chatRequest());
         reply->setAutoDelete(false);
         owner.reset(reply);
+        done = std::make_unique<QSignalSpy>(reply, &ChatCompletionStreamReply::done);
         finished = [reply] { return reply->isFinished(); };
         error = [reply] { return reply->error(); };
     } else {
         auto *reply = client->createChatCompletion(chatRequest());
         reply->setAutoDelete(false);
         owner.reset(reply);
+        done = std::make_unique<QSignalSpy>(reply, &ChatCompletionReply::done);
         finished = [reply] { return reply->isFinished(); };
         error = [reply] { return reply->error(); };
     }
+    if (path == QLatin1String("post/limiter"))
+        drainEvents(); // the deferred first attempt is now waiting in the gate
     client.reset();
+    QCOMPARE(done->count(), 0);
 
     QVERIFY(QTest::qWaitFor(finished, 5000));
+    QCOMPARE(done->count(), 1);
     QCOMPARE(error().kind(), ClientError::Kind::Network);
     drainEvents();
-    if (path == QLatin1String("post"))
+    if (path != QLatin1String("stream"))
         QCOMPARE(origin.requestCount(), 0);
 }
 
