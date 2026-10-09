@@ -291,9 +291,9 @@ public:
     // The client does not take ownership.
     //
     // Destroying the manager -- the one the client created, with the client; or
-    // an injected one, on its own -- ends every request still in flight on it: the reply fails with
-    // ClientError::Kind::Network, "client no longer available", on a later
-    // event-loop turn. From a slot on a stream's incremental signals (delta,
+    // an injected one, on its own -- ends every request still in flight on it:
+    // the reply fails with ClientError::Kind::Network, "client no longer
+    // available", on a later event-loop turn. From a slot on a stream's incremental signals (delta,
     // events) use deleteLater(), as Qt asks for QNetworkReply itself: the
     // network stack is still on the call stack there. A request waiting in a
     // RateLimiter that outlives the client settles when the limiter releases
