@@ -290,8 +290,8 @@ public:
     // Inject a custom QNetworkAccessManager (e.g. for proxies or test doubles).
     // The client does not take ownership.
     //
-    // Destroying the manager -- with the client, or an injected one on its own
-    // -- ends every request still in flight on it: the reply fails with
+    // Destroying the manager -- the one the client created, with the client; or
+    // an injected one, on its own -- ends every request still in flight on it: the reply fails with
     // ClientError::Kind::Network, "client no longer available", on a later
     // event-loop turn. From a slot on a stream's incremental signals (delta,
     // events) use deleteLater(), as Qt asks for QNetworkReply itself: the
