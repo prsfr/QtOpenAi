@@ -11,6 +11,8 @@
 
 #include "SseParser_p.h"
 
+#include <QtCore/QPointer>
+
 class QNetworkReply;
 
 namespace QtOpenAi {
@@ -21,7 +23,8 @@ class StreamReplyBasePrivate
 public:
     virtual ~StreamReplyBasePrivate() = default;
 
-    QNetworkReply *networkReply = nullptr;
+    // Owned by its QNetworkAccessManager (see the constructor), hence weak.
+    QPointer<QNetworkReply> networkReply;
     detail::SseParser parser;
     ClientError error;
     RateLimit rateLimit;

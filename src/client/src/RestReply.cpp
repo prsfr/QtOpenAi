@@ -7,6 +7,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QPointer>
 #include <QtCore/QTimer>
+#include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 
 namespace QtOpenAi {
@@ -36,7 +37,26 @@ RestReply::RestReply(std::function<QNetworkReply *()> requestFactory, RetryPolic
     });
 }
 
-RestReply::~RestReply() = default;
+RestReply::~RestReply()
+{
+    // The reply belongs to the manager, so it is not freed with this engine by
+    // parentage; free it here, without letting it call back into a half-gone
+    // engine. Deleting an unfinished reply aborts it, as it always did.
+    if (m_networkReply) {
+        m_networkReply->disconnect(this);
+        delete m_networkReply;
+    }
+}
+
+void RestReply::failClientGone()
+{
+    if (m_settled)
+        return;
+    m_settled = true;
+    Q_EMIT settled(QByteArray(), 0);
+    Q_EMIT failed(
+            ClientError(ClientError::Kind::Network, QStringLiteral("client no longer available")));
+}
 
 RateLimit RestReply::rateLimit() const { return m_rateLimit; }
 int RestReply::retryCount() const { return m_retryCount; }
@@ -61,8 +81,31 @@ void RestReply::abort()
 
 void RestReply::start()
 {
+    // A retry timer or a rate-limiter gate can fire after the outcome is known
+    // -- the manager died meanwhile -- and must not issue anything then.
+    if (m_settled || m_managerGone)
+        return;
     m_networkReply = m_factory();
-    m_networkReply->setParent(this);
+    if (!m_networkReply) {
+        failClientGone();
+        return;
+    }
+    if (!m_networkReply->parent())
+        m_networkReply->setParent(this);
+
+    // The manager deletes its replies when it is destroyed, so the reply is
+    // never left behind holding pointers into a freed manager (#203). That
+    // ends the request without a finished(), so the failure is delivered from
+    // here, queued: the manager's destruction is often the Client's, and an
+    // application slot must not run inside it.
+    QNetworkAccessManager *manager = m_networkReply->manager();
+    if (manager && !m_watchingManager) {
+        m_watchingManager = true;
+        connect(manager, &QObject::destroyed, this, [this]() {
+            m_managerGone = true;
+            QTimer::singleShot(0, this, &RestReply::failClientGone);
+        });
+    }
 
     connect(m_networkReply, &QNetworkReply::finished, this, [this]() {
         QNetworkReply *reply = m_networkReply;
@@ -94,6 +137,7 @@ void RestReply::start()
             return;
         }
 
+        m_settled = true;
         if (networkError) {
             Q_EMIT settled(body, status);
             Q_EMIT failed(ClientError(ClientError::Kind::Network, reply->errorString(), status));

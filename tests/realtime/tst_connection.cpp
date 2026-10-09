@@ -26,6 +26,7 @@ private slots:
     void audioIsNotQueuedForAChannelThatIsNotOpen();
     void closingDiscardsWhatWasQueued();
     void handshakeRedirectIsNotFollowed();
+    void handshakeRedirectLeaksNoKey();
 };
 
 namespace {
@@ -321,6 +322,48 @@ void TestRealtimeConnection::handshakeRedirectIsNotFollowed()
 
     QCOMPARE(connected.count(), 0);
     QCOMPARE(origin.requestCount(), 1);
+    QCOMPARE(target.requestCount(), 0);
+}
+
+namespace {
+QStringList capturedLines;
+void captureMessage(QtMsgType, const QMessageLogContext &, const QString &message)
+{
+    capturedLines << message;
+}
+} // namespace
+
+// Stage 6 (#203): the refused handshake reports nothing that carries the key --
+// not in socketError's text, not on the console with every category enabled.
+void TestRealtimeConnection::handshakeRedirectLeaksNoKey()
+{
+    const QString secret = QStringLiteral("ek_hardening_secret");
+    StubServer target(QByteArray {});
+    const QByteArray location
+            = "ws://127.0.0.1:" + QByteArray::number(target.baseUrl().port()) + "/v1/x";
+    StubServer origin({{QByteArray(), 302, "application/json", {{"Location", location}}}});
+
+    capturedLines.clear();
+    QLoggingCategory::setFilterRules(QStringLiteral("*.debug=true"));
+    const QtMessageHandler previous = qInstallMessageHandler(&captureMessage);
+    QString reported;
+    {
+        RealtimeConnection connection;
+        connection.setUrl(
+                QUrl(QStringLiteral("ws://127.0.0.1:%1/v1/realtime").arg(origin.baseUrl().port())));
+        connection.setApiKey(secret);
+        QSignalSpy socketError(&connection, &RealtimeConnection::socketError);
+        connection.open();
+        if (await(socketError))
+            reported = socketError.at(0).at(0).toString();
+    }
+    qInstallMessageHandler(previous);
+    QLoggingCategory::setFilterRules(QString());
+
+    QVERIFY(!reported.isEmpty());
+    QVERIFY2(!reported.contains(secret), qPrintable(reported));
+    const QString log = capturedLines.join(QLatin1Char('\n'));
+    QVERIFY2(!log.contains(secret), qPrintable(log));
     QCOMPARE(target.requestCount(), 0);
 }
 

@@ -4,6 +4,8 @@
 #include "HttpSupport_p.h"
 #include "StreamReplyBase_p.h"
 
+#include <QtCore/QTimer>
+#include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 
 namespace QtOpenAi {
@@ -15,7 +17,29 @@ StreamReplyBase::StreamReplyBase(StreamReplyBasePrivate &dd, QNetworkReply *repl
 {
     Q_D(StreamReplyBase);
     d->networkReply = reply;
-    reply->setParent(this);
+    // The reply stays with its manager, which deletes it on destruction, so it
+    // never outlives the manager it points into (#203). That ends the stream
+    // without a finished(); the failure is reported queued, outside the
+    // manager's -- usually the Client's -- destructor.
+    if (!reply->parent())
+        reply->setParent(this);
+    if (QNetworkAccessManager *manager = reply->manager()) {
+        connect(manager, &QObject::destroyed, this, [this]() {
+            QTimer::singleShot(0, this, [this]() {
+                Q_D(StreamReplyBase);
+                if (d->finished)
+                    return;
+                d->finished = true;
+                d->success = false;
+                d->error = ClientError(ClientError::Kind::Network,
+                                       QStringLiteral("client no longer available"));
+                Q_EMIT failed(d->error);
+                Q_EMIT done();
+                if (d->autoDelete)
+                    deleteLater();
+            });
+        });
+    }
 
     connect(reply, &QNetworkReply::readyRead, this, [this]() {
         Q_D(StreamReplyBase);
@@ -59,7 +83,16 @@ StreamReplyBase::StreamReplyBase(StreamReplyBasePrivate &dd, QNetworkReply *repl
     });
 }
 
-StreamReplyBase::~StreamReplyBase() = default;
+StreamReplyBase::~StreamReplyBase()
+{
+    // The manager owns the reply; free it with the stream, as before, without
+    // letting it call back into a half-destroyed one.
+    Q_D(StreamReplyBase);
+    if (d->networkReply) {
+        d->networkReply->disconnect(this);
+        delete d->networkReply;
+    }
+}
 
 bool StreamReplyBase::isFinished() const
 {
