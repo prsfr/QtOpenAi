@@ -666,6 +666,8 @@ void TestRedirect::abortOrDeleteWhileRedirectInFlight()
                          redirect ? ClientError::Kind::Redirect : ClientError::Kind::NoError);
             } else if (!settledBefore) {
                 QCOMPARE(error().kind(), ClientError::Kind::Network);
+                QCOMPARE(error().message(), QStringLiteral("client no longer available"));
+                QCOMPARE(error().httpStatus(), 0);
             }
         }
     }
@@ -800,6 +802,8 @@ void TestRedirect::managerGoneDuringRetryBackoff()
 
     QCOMPARE(done.count(), 1);
     QCOMPARE(reply->error().kind(), ClientError::Kind::Network);
+    QCOMPARE(reply->error().message(), QStringLiteral("client no longer available"));
+    QCOMPARE(reply->error().httpStatus(), 0);
     QCOMPARE(origin.requestCount(), 1);
 }
 
@@ -855,6 +859,8 @@ void TestRedirect::clientGoneBeforeFirstAttempt()
     QVERIFY(QTest::qWaitFor(finished, 5000));
     QCOMPARE(done->count(), 1);
     QCOMPARE(error().kind(), ClientError::Kind::Network);
+    QCOMPARE(error().message(), QStringLiteral("client no longer available"));
+    QCOMPARE(error().httpStatus(), 0);
     drainEvents();
     if (path != QLatin1String("stream"))
         QCOMPARE(origin.requestCount(), 0);
@@ -892,6 +898,17 @@ void TestRedirect::noReplyAccumulatesUnderTheManager()
             const auto reply = awaited(client.createChatCompletionStream(chatRequest()));
             QVERIFY(reply);
         }
+        drainEvents();
+    }
+    {
+        // In flight: a server that accepts the connection and never answers.
+        QTcpServer silent;
+        QVERIFY(silent.listen(QHostAddress::LocalHost));
+        Client client(QUrl(QStringLiteral("http://127.0.0.1:%1/v1").arg(silent.serverPort())), key);
+        client.setNetworkAccessManager(&manager);
+        auto *reply = client.createChatCompletion(chatRequest());
+        QVERIFY(QTest::qWaitFor([&silent] { return silent.hasPendingConnections(); }, 5000));
+        delete reply;
         drainEvents();
     }
     QVERIFY2(replies().isEmpty(), qPrintable(QString::number(replies().size())));
