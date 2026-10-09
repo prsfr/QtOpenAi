@@ -123,11 +123,12 @@ Servers makeServers(bool otherHost)
 }
 
 // Issue one call on `client` along the named request path and wait for it to
-// settle; returns its error, or nothing if it never settled.
-std::optional<ClientError> issue(Client &client, const QString &path)
+// settle; returns its error, or nothing if it never settled within the hang
+// guard.
+std::optional<ClientError> issue(Client &client, const QString &path, int timeoutMs = 5000)
 {
-    const auto settle = [](auto *raw) -> std::optional<ClientError> {
-        const auto reply = awaited(raw);
+    const auto settle = [timeoutMs](auto *raw) -> std::optional<ClientError> {
+        const auto reply = awaited(raw, timeoutMs);
         if (!reply)
             return std::nullopt;
         return reply->isSuccess() ? ClientError() : reply->error();
@@ -474,7 +475,10 @@ void TestRedirect::sameOriginLoopStaysNetwork()
     Client client(origin.baseUrl(), key);
     client.setRetryPolicy(RetryPolicy::none());
 
-    const std::optional<ClientError> error = issue(client, QStringLiteral("post"));
+    // Qt walks its whole redirect budget first -- some fifty fresh connections,
+    // ~2 s on Linux and more than the usual 5 s guard on the macOS runners --
+    // so the hang guard is wider here. It bounds a hang, it times nothing.
+    const std::optional<ClientError> error = issue(client, QStringLiteral("post"), 30000);
     QVERIFY2(error, "the request never settled");
     QCOMPARE(error->kind(), ClientError::Kind::Network);
     QVERIFY(origin.requestCount() > 1);
