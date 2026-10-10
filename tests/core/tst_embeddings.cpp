@@ -20,6 +20,8 @@ private slots:
     void base64AndFloatResponsesAreEqual();
     void malformedBase64GivesEmptyVector_data();
     void malformedBase64GivesEmptyVector();
+    void nonFiniteBase64GivesEmptyVector_data();
+    void nonFiniteBase64GivesEmptyVector();
 };
 
 void TestEmbeddings::requestRoundTrip()
@@ -127,6 +129,26 @@ void TestEmbeddings::malformedBase64GivesEmptyVector_data()
 }
 
 void TestEmbeddings::malformedBase64GivesEmptyVector()
+{
+    QFETCH(QByteArray, embedding);
+    const QJsonObject json {{QStringLiteral("embedding"), QString::fromLatin1(embedding)}};
+    QVERIFY(Embedding::fromJson(json).vector().isEmpty());
+}
+
+// A float array can never carry NaN or infinity (the JSON parser rejects
+// them), but float32 bits can. Such a vector is garbage to every metric and
+// toJson() writes it as nulls, so it is no vector at all, like a broken string.
+void TestEmbeddings::nonFiniteBase64GivesEmptyVector_data()
+{
+    QTest::addColumn<QByteArray>("embedding");
+    QTest::newRow("quiet NaN") << QByteArray("AADAfw==");
+    QTest::newRow("signalling NaN") << QByteArray("AQCAfw==");
+    QTest::newRow("+infinity") << QByteArray("AACAfw==");
+    QTest::newRow("-infinity") << QByteArray("AACA/w==");
+    QTest::newRow("NaN after a valid value") << QByteArray("AAAAPwAAwH8=");
+}
+
+void TestEmbeddings::nonFiniteBase64GivesEmptyVector()
 {
     QFETCH(QByteArray, embedding);
     const QJsonObject json {{QStringLiteral("embedding"), QString::fromLatin1(embedding)}};

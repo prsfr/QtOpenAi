@@ -6,6 +6,7 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QSharedData>
 #include <QtCore/QtEndian>
+#include <QtCore/QtNumeric>
 
 namespace QtOpenAi {
 namespace Core {
@@ -53,8 +54,9 @@ Embedding Embedding::fromJson(const QJsonObject &json)
     QList<double> &vector = embedding.d->vector;
 
     // encoding_format "base64": little-endian float32, base64-encoded (#198).
-    // Strict decoding, and only whole floats: a broken string is no vector at
-    // all rather than a partial or garbage one.
+    // Strict decoding, whole floats only, and finite values only -- JSON
+    // numbers cannot carry NaN or infinity, and a similarity search cannot
+    // rank them. A broken string is no vector at all, never a partial one.
     if (value.isString()) {
         const auto decoded = QByteArray::fromBase64Encoding(
                 value.toString().toLatin1(),
@@ -63,8 +65,14 @@ Embedding Embedding::fromJson(const QJsonObject &json)
             return embedding;
         const char *bytes = decoded.decoded.constData();
         vector.reserve(decoded.decoded.size() / 4);
-        for (qsizetype offset = 0; offset < decoded.decoded.size(); offset += 4)
-            vector.append(qFromLittleEndian<float>(bytes + offset));
+        for (qsizetype offset = 0; offset < decoded.decoded.size(); offset += 4) {
+            const float element = qFromLittleEndian<float>(bytes + offset);
+            if (!qIsFinite(element)) {
+                vector.clear();
+                return embedding;
+            }
+            vector.append(element);
+        }
         return embedding;
     }
 
