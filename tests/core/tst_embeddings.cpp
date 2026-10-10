@@ -120,7 +120,9 @@ void TestEmbeddings::base64AndFloatResponsesAreEqual()
 void TestEmbeddings::malformedBase64GivesEmptyVector_data()
 {
     QTest::addColumn<QByteArray>("embedding");
-    QTest::newRow("outside the alphabet") << QByteArray("!!!!");
+    // One bad character inside otherwise valid data: a lenient decoder would
+    // skip it and return {0.5}.
+    QTest::newRow("outside the alphabet") << QByteArray("AAAA!Pw==");
     QTest::newRow("not a whole float") << QByteArray("AAAAPwAAgD4AAAA=");
 }
 
