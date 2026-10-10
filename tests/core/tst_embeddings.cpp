@@ -16,6 +16,12 @@ private slots:
     void requestOmitsUnsetOptionals();
     void responseRoundTrip();
     void parsesResponse();
+    void parsesBase64Embedding();
+    void base64AndFloatResponsesAreEqual();
+    void malformedBase64GivesEmptyVector_data();
+    void malformedBase64GivesEmptyVector();
+    void nonFiniteBase64GivesEmptyVector_data();
+    void nonFiniteBase64GivesEmptyVector();
 };
 
 void TestEmbeddings::requestRoundTrip()
@@ -77,6 +83,76 @@ void TestEmbeddings::parsesResponse()
     QCOMPARE(response.data().size(), 1);
     QCOMPARE(response.firstVector(), (QList<double> {0.5, 0.25, -0.125}));
     QCOMPARE(response.usage().promptTokens(), 2);
+}
+
+// encoding_format "base64" returns each embedding as little-endian float32,
+// base64-encoded, instead of an array; it decodes to the same doubles. These
+// four values are exact in float32, so the two forms compare equal.
+void TestEmbeddings::parsesBase64Embedding()
+{
+    const Embedding embedding = Embedding::fromJson(
+            QJsonDocument::fromJson(R"({"index":0,"embedding":"AAAAPwAAgD4AAAC+AACAPw=="})")
+                    .object());
+    QCOMPARE(embedding.index(), 0);
+    QCOMPARE(embedding.vector(), (QList<double> {0.5, 0.25, -0.125, 1.0}));
+
+    // The length is the decoded byte count over four, whatever `dimensions` was.
+    const Embedding single
+            = Embedding::fromJson(QJsonDocument::fromJson(R"({"embedding":"AAAAPw=="})").object());
+    QCOMPARE(single.vector(), (QList<double> {0.5}));
+}
+
+void TestEmbeddings::base64AndFloatResponsesAreEqual()
+{
+    const QByteArray floats = R"({"object":"list","data":[{"object":"embedding","index":0,
+        "embedding":[0.5,0.25,-0.125,1.0]}],"model":"text-embedding-3-small",
+        "usage":{"prompt_tokens":2,"total_tokens":2}})";
+    const QByteArray base64 = R"({"object":"list","data":[{"object":"embedding","index":0,
+        "embedding":"AAAAPwAAgD4AAAC+AACAPw=="}],"model":"text-embedding-3-small",
+        "usage":{"prompt_tokens":2,"total_tokens":2}})";
+    const EmbeddingResponse fromFloats
+            = EmbeddingResponse::fromJson(QJsonDocument::fromJson(floats).object());
+    const EmbeddingResponse fromBase64
+            = EmbeddingResponse::fromJson(QJsonDocument::fromJson(base64).object());
+    QCOMPARE(fromBase64.data().size(), 1);
+    QCOMPARE(fromBase64, fromFloats);
+}
+
+// A broken base64 embedding is no vector at all, never a partial or garbage one.
+void TestEmbeddings::malformedBase64GivesEmptyVector_data()
+{
+    QTest::addColumn<QByteArray>("embedding");
+    // One bad character inside otherwise valid data: a lenient decoder would
+    // skip it and return {0.5}.
+    QTest::newRow("outside the alphabet") << QByteArray("AAAA!Pw==");
+    QTest::newRow("not a whole float") << QByteArray("AAAAPwAAgD4AAAA=");
+}
+
+void TestEmbeddings::malformedBase64GivesEmptyVector()
+{
+    QFETCH(QByteArray, embedding);
+    const QJsonObject json {{QStringLiteral("embedding"), QString::fromLatin1(embedding)}};
+    QVERIFY(Embedding::fromJson(json).vector().isEmpty());
+}
+
+// A float array can never carry NaN or infinity (the JSON parser rejects
+// them), but float32 bits can. Such a vector is garbage to every metric and
+// toJson() writes it as nulls, so it is no vector at all, like a broken string.
+void TestEmbeddings::nonFiniteBase64GivesEmptyVector_data()
+{
+    QTest::addColumn<QByteArray>("embedding");
+    QTest::newRow("quiet NaN") << QByteArray("AADAfw==");
+    QTest::newRow("signalling NaN") << QByteArray("AQCAfw==");
+    QTest::newRow("+infinity") << QByteArray("AACAfw==");
+    QTest::newRow("-infinity") << QByteArray("AACA/w==");
+    QTest::newRow("NaN after a valid value") << QByteArray("AAAAPwAAwH8=");
+}
+
+void TestEmbeddings::nonFiniteBase64GivesEmptyVector()
+{
+    QFETCH(QByteArray, embedding);
+    const QJsonObject json {{QStringLiteral("embedding"), QString::fromLatin1(embedding)}};
+    QVERIFY(Embedding::fromJson(json).vector().isEmpty());
 }
 
 QTEST_APPLESS_MAIN(TestEmbeddings)
