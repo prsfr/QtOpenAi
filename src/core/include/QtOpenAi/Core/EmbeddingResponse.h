@@ -30,7 +30,8 @@ public:
     int index() const;
     void setIndex(int index);
 
-    // The float vector (decoded from the default "float" encoding_format).
+    // The vector, decoded from either encoding_format: "float" (a JSON array)
+    // or "base64" (little-endian float32), into the same doubles.
     QList<double> vector() const;
     void setVector(const QList<double> &vector);
 
