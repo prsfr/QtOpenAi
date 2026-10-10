@@ -562,7 +562,8 @@ void TestInterceptor::anEmptyBodyWritesNoBodyLine()
 
     const QString written = lines.join(QLatin1Char('\n'));
     QVERIFY2(written.contains(QStringLiteral("--> GET")), qPrintable(written));
-    QVERIFY2(written.contains(QStringLiteral("    Authorization: <redacted>")),
+    // Qt 6.10+ writes header names in lower case.
+    QVERIFY2(written.contains(QStringLiteral("    Authorization: <redacted>"), Qt::CaseInsensitive),
              qPrintable(written));
     QVERIFY2(!lines.contains(QStringLiteral("    ")), qPrintable(written));
 }
