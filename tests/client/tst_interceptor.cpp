@@ -3,6 +3,7 @@
 #include <QtOpenAi/Client/Interceptor.h>
 #include <QtOpenAi/Client/LoggingInterceptor.h>
 
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QUrlQuery>
 #include <QtTest/QtTest>
 
@@ -100,6 +101,42 @@ public:
     }
 };
 
+// The lines that reach the "qtopenai.http" category while installed, with its
+// debug output switched on. Logging state is process-wide, so both the rules
+// and the previous handler are put back however the test leaves.
+struct HttpLogCapture
+{
+    static QStringList &lines()
+    {
+        static QStringList l;
+        return l;
+    }
+    static QtMessageHandler &previous()
+    {
+        static QtMessageHandler p = nullptr;
+        return p;
+    }
+    static void handler(QtMsgType type, const QMessageLogContext &context, const QString &message)
+    {
+        if (qstrcmp(context.category, "qtopenai.http") == 0)
+            lines() << message;
+        else if (previous())
+            previous()(type, context, message);
+    }
+
+    HttpLogCapture()
+    {
+        lines().clear();
+        QLoggingCategory::setFilterRules(QStringLiteral("qtopenai.http.debug=true"));
+        previous() = qInstallMessageHandler(&HttpLogCapture::handler);
+    }
+    ~HttpLogCapture()
+    {
+        qInstallMessageHandler(previous());
+        QLoggingCategory::setFilterRules(QString());
+    }
+};
+
 } // namespace
 
 // Coverage for the interceptor chain (#49).
@@ -118,6 +155,11 @@ private slots:
     void theLoggerNeverWritesTheApiKey();
     void theLoggerKeepsBodiesOutOfTheLogUnlessAsked();
     void theLoggerRedactsSecretFieldsAtAnyDepth();
+    void theLoggerRedactsSecretsInTopLevelArrays();
+    void theLoggerRedactsArrayBodiesOnTheWayOut();
+    void theLoggerKeepsOrdinaryQueryParameters();
+    void anEmptyBodyWritesNoBodyLine();
+    void theDebugCategoryGetsTheRedactedLinesToo();
 };
 
 void TestInterceptor::noneIsInstalledByDefault()
@@ -423,6 +465,129 @@ void TestInterceptor::theLoggerRedactsSecretFieldsAtAnyDepth()
     awaited(other.createChatCompletion(sampleRequest()));
     QVERIFY2(lines.join(QLatin1Char('\n')).contains(QStringLiteral("not json at all")),
              qPrintable(lines.join(QLatin1Char('\n'))));
+}
+
+void TestInterceptor::theLoggerRedactsSecretsInTopLevelArrays()
+{
+    // A list endpoint can answer with a bare array, and an array can hold
+    // arrays; the walk has to start there too, not only at an object. Three
+    // levels deep, so a level that drops its "changed" loses the secret.
+    LoggingInterceptor logger;
+    QStringList lines;
+    connect(&logger, &LoggingInterceptor::logged, &logger,
+            [&lines](const QString &line) { lines.append(line); });
+    logger.setLogBodies(true);
+    logger.setMaxBodyLength(0);
+
+    StubServer server(QList<StubServer::Response> {
+            {R"([{"id":"k1","api_key":"sk-ARR-1"},{"id":"k2","value":"sk-ARR-2"}])"},
+            {R"([[[{"value":"sk-NESTED"}]],[{"id":"plain"}]])"}});
+    Client client;
+    client.setBaseUrl(server.baseUrl());
+    client.addInterceptor(&logger);
+    awaited(client.createChatCompletion(sampleRequest()));
+    awaited(client.createChatCompletion(sampleRequest()));
+
+    const QString written = lines.join(QLatin1Char('\n'));
+    QVERIFY2(!written.contains(QStringLiteral("sk-ARR-")), qPrintable(written));
+    QVERIFY2(!written.contains(QStringLiteral("sk-NESTED")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("<redacted>")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("k1")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("k2")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("plain")), qPrintable(written));
+}
+
+void TestInterceptor::theLoggerRedactsArrayBodiesOnTheWayOut()
+{
+    // The request half has its own call into the redaction; a client secret
+    // being sent is as live as one being received.
+    LoggingInterceptor logger;
+    QStringList lines;
+    connect(&logger, &LoggingInterceptor::logged, &logger,
+            [&lines](const QString &line) { lines.append(line); });
+    logger.setLogBodies(true);
+    logger.setMaxBodyLength(0);
+
+    InterceptedRequest request;
+    request.method = "POST";
+    request.request.setUrl(QUrl(QStringLiteral("http://127.0.0.1/v1/batch")));
+    request.body = R"([{"client_secret":"cs-OUTGOING"}])";
+    logger.beforeRequest(request);
+
+    const QString written = lines.join(QLatin1Char('\n'));
+    QVERIFY2(!written.contains(QStringLiteral("cs-OUTGOING")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("<redacted>")), qPrintable(written));
+}
+
+void TestInterceptor::theLoggerKeepsOrdinaryQueryParameters()
+{
+    // Pagination and search parameters are what one reads a URL log for; only
+    // the secret one may change, and the rest must come through as sent.
+    LoggingInterceptor logger;
+    QStringList lines;
+    connect(&logger, &LoggingInterceptor::logged, &logger,
+            [&lines](const QString &line) { lines.append(line); });
+
+    InterceptedRequest request;
+    request.method = "GET";
+    request.request.setUrl(QUrl(
+            QStringLiteral("http://127.0.0.1/v1/files?limit=10&after=x&q=a%2Bb&key=sk-QUERY")));
+    logger.beforeRequest(request);
+
+    QVERIFY(!lines.isEmpty());
+    const QString url = lines.first();
+    QVERIFY2(url.startsWith(QStringLiteral("-->")), qPrintable(url));
+    QVERIFY2(!url.contains(QStringLiteral("sk-QUERY")), qPrintable(url));
+    QVERIFY2(url.contains(QStringLiteral("?limit=10&after=x&q=a%2Bb&key=%3Credacted%3E")),
+             qPrintable(url));
+}
+
+void TestInterceptor::anEmptyBodyWritesNoBodyLine()
+{
+    // A GET has no body, and logging one anyway would print a blank line
+    // under every request.
+    LoggingInterceptor logger;
+    QStringList lines;
+    connect(&logger, &LoggingInterceptor::logged, &logger,
+            [&lines](const QString &line) { lines.append(line); });
+    logger.setLogBodies(true);
+
+    StubServer server(R"({"object":"list","data":[]})");
+    Client client;
+    client.setBaseUrl(server.baseUrl());
+    client.setApiKey(QStringLiteral("sk-get"));
+    client.addInterceptor(&logger);
+    QVERIFY(awaited(client.listModels()));
+
+    const QString written = lines.join(QLatin1Char('\n'));
+    QVERIFY2(written.contains(QStringLiteral("--> GET")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("    Authorization: <redacted>")),
+             qPrintable(written));
+    QVERIFY2(!lines.contains(QStringLiteral("    ")), qPrintable(written));
+}
+
+void TestInterceptor::theDebugCategoryGetsTheRedactedLinesToo()
+{
+    // The documented way to switch the log on is the category, with nothing
+    // connected to logged(); what it writes has to be just as redacted.
+    HttpLogCapture capture;
+    LoggingInterceptor logger;
+    logger.setLogBodies(true);
+    logger.setMaxBodyLength(0);
+
+    StubServer server(R"([{"id":"k1","value":"sk-CATEGORY-BODY"}])");
+    Client client;
+    client.setBaseUrl(server.baseUrl());
+    client.setApiKey(QStringLiteral("sk-CATEGORY-KEY"));
+    client.addInterceptor(&logger);
+    awaited(client.createChatCompletion(sampleRequest()));
+
+    const QString written = HttpLogCapture::lines().join(QLatin1Char('\n'));
+    QVERIFY2(written.contains(QStringLiteral("--> POST")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("<-- 200 POST")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("<redacted>")), qPrintable(written));
+    QVERIFY2(!written.contains(QStringLiteral("sk-CATEGORY-KEY")), qPrintable(written));
+    QVERIFY2(!written.contains(QStringLiteral("sk-CATEGORY-BODY")), qPrintable(written));
 }
 
 QTEST_MAIN(TestInterceptor)

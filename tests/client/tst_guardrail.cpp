@@ -69,6 +69,9 @@ private slots:
     void screenReportsAVerdictOnItsOwn();
     void aFailedScreeningFailsRatherThanPasses();
     void judgeIsThePolicyWithoutARequest();
+    void aWarnedOutputIsAnnouncedBeforeTheAnswer();
+    void theChosenModerationModelIsSent();
+    void aClientGoneBeforeSendingFailsTheExchange();
 };
 
 void TestGuardrail::unflaggedContentPassesThrough()
@@ -361,6 +364,98 @@ void TestGuardrail::judgeIsThePolicyWithoutARequest()
     clean.setCategoryScores({{QStringLiteral("hate"), 0.01}});
     QCOMPARE(guardrail.judge(clean).action, GuardrailAction::Allow);
     QVERIFY(!guardrail.judge(clean).isFlagged());
+
+    // The default is what an unnamed category gets, so changing it has to
+    // change the verdict for one.
+    guardrail.setDefaultAction(GuardrailAction::Warn);
+    QCOMPARE(guardrail.defaultAction(), GuardrailAction::Warn);
+    ModerationResult unnamed;
+    unnamed.setFlagged(true);
+    unnamed.setCategories({{QStringLiteral("violence"), true}});
+    unnamed.setCategoryScores({{QStringLiteral("violence"), 0.9}});
+    QCOMPARE(guardrail.judge(unnamed).action, GuardrailAction::Warn);
+}
+
+void TestGuardrail::aWarnedOutputIsAnnouncedBeforeTheAnswer()
+{
+    // A caller annotates what it is about to show; a warning that arrives
+    // after the answer can only correct it. One list, because a spy per signal
+    // cannot see an order.
+    StubServer server(
+            QList<StubServer::Response> {{moderation(false)}, {kCompletion}, {moderation(true)}});
+    Client client;
+    client.setBaseUrl(server.baseUrl());
+
+    Guardrail guardrail(&client);
+    guardrail.setAction(QStringLiteral("violence"), GuardrailAction::Warn);
+
+    auto *reply = guardrail.createChatCompletion(ask());
+    QStringList order;
+    GuardrailAction action = GuardrailAction::Allow;
+    connect(reply, &GuardedChatReply::flagged, reply,
+            [&order, &action](GuardedChatReply::Position position,
+                              const GuardrailVerdict &verdict) {
+                order << (position == GuardedChatReply::Position::Output
+                                  ? QStringLiteral("flagged(Output)")
+                                  : QStringLiteral("flagged(Input)"));
+                action = verdict.action;
+            });
+    connect(reply, &GuardedChatReply::finished, reply,
+            [&order]() { order << QStringLiteral("finished"); });
+    connect(reply, &GuardedChatReply::done, reply, [&order]() { order << QStringLiteral("done"); });
+    QVERIFY(settled(reply));
+
+    QVERIFY(!reply->isBlocked());
+    QCOMPARE(order, QStringList({QStringLiteral("flagged(Output)"), QStringLiteral("finished"),
+                                 QStringLiteral("done")}));
+    QCOMPARE(action, GuardrailAction::Warn);
+}
+
+void TestGuardrail::theChosenModerationModelIsSent()
+{
+    // Unset means the provider's default, so nothing is sent; set means it is
+    // the one sent, or the policy was tuned against a different model.
+    StubServer server(QList<StubServer::Response> {{moderation(false)}});
+    Client client;
+    client.setBaseUrl(server.baseUrl());
+
+    Guardrail guardrail(&client);
+    QSignalSpy unsetDone(guardrail.screen(QStringLiteral("text")), &GuardrailReply::done);
+    QVERIFY(unsetDone.wait(5000));
+
+    guardrail.setModel(QStringLiteral("omni-moderation-latest"));
+    QCOMPARE(guardrail.model(), QStringLiteral("omni-moderation-latest"));
+    QSignalSpy setDone(guardrail.screen(QStringLiteral("text")), &GuardrailReply::done);
+    QVERIFY(setDone.wait(5000));
+
+    QCOMPARE(server.requestCount(), 2);
+    QVERIFY2(!server.requestBodies().at(0).contains("\"model\""), server.requestBodies().at(0));
+    QVERIFY2(server.requestBodies().at(1).contains(R"("model":"omni-moderation-latest")"),
+             server.requestBodies().at(1));
+}
+
+void TestGuardrail::aClientGoneBeforeSendingFailsTheExchange()
+{
+    // With input screening off the send is queued, and the client can go in
+    // between. The exchange has to fail rather than never answer.
+    StubServer server(kCompletion);
+    auto *client = new Client;
+    client->setBaseUrl(server.baseUrl());
+
+    Guardrail guardrail(client);
+    guardrail.setScreenInput(false);
+    auto *reply = guardrail.createChatCompletion(ask());
+    QSignalSpy failed(reply, &GuardedChatReply::failed);
+    QSignalSpy finished(reply, &GuardedChatReply::finished);
+    QSignalSpy done(reply, &GuardedChatReply::done);
+    delete client;
+    QVERIFY(settled(reply));
+
+    QCOMPARE(failed.count(), 1);
+    QCOMPARE(reply->error().kind(), ClientError::Kind::InvalidRequest);
+    QCOMPARE(done.count(), 1);
+    QCOMPARE(finished.count(), 0);
+    QCOMPARE(server.requestCount(), 0);
 }
 
 QTEST_MAIN(TestGuardrail)
