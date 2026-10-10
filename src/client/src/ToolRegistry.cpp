@@ -8,6 +8,7 @@
 #include "JsonHelpers_p.h"
 
 #include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
 #include <QtCore/QMetaMethod>
 #include <QtCore/QMetaObject>
 #include <QtCore/QPointer>
@@ -309,6 +310,17 @@ Core::Message ToolRegistry::invoke(const Core::ToolCall &call)
     if (it == d->entries.constEnd()) {
         Q_EMIT unknownTool(id, name);
         const QString payload = makeErrorPayload(QStringLiteral("unknown tool: %1").arg(name));
+        Q_EMIT toolFailed(id, name, payload);
+        return Core::Message::toolResult(id, payload);
+    }
+
+    // Arguments that do not parse as an object -- most often a call cut off
+    // by max_tokens -- would otherwise read as {} and run the tool as if it
+    // had been called with none. No arguments at all is a parameterless call.
+    const QString raw = call.function().arguments();
+    if (!raw.trimmed().isEmpty() && !QJsonDocument::fromJson(raw.toUtf8()).isObject()) {
+        const QString payload = makeErrorPayload(
+                QStringLiteral("arguments for tool '%1' are not a JSON object").arg(name));
         Q_EMIT toolFailed(id, name, payload);
         return Core::Message::toolResult(id, payload);
     }

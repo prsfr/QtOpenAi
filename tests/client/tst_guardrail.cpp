@@ -72,6 +72,7 @@ private slots:
     void aWarnedOutputIsAnnouncedBeforeTheAnswer();
     void theChosenModerationModelIsSent();
     void aClientGoneBeforeSendingFailsTheExchange();
+    void aModerationAnswerWithNoResultFailsRatherThanPasses();
 };
 
 void TestGuardrail::unflaggedContentPassesThrough()
@@ -456,6 +457,48 @@ void TestGuardrail::aClientGoneBeforeSendingFailsTheExchange()
     QCOMPARE(done.count(), 1);
     QCOMPARE(finished.count(), 0);
     QCOMPARE(server.requestCount(), 0);
+}
+
+void TestGuardrail::aModerationAnswerWithNoResultFailsRatherThanPasses()
+{
+    // A 200 that carries no verdict -- an empty results list, a proxy's `{}`,
+    // results in the wrong shape -- is "I could not check", the same as a 500.
+    // Treating it as clean lets an unscreened exchange through.
+    const QList<QByteArray> empties
+            = {R"({"id":"m","results":[]})", "{}", R"({"results":{"flagged":true}})"};
+    for (const QByteArray &empty : empties) {
+        // Input side: the request must not go out.
+        StubServer input(QList<StubServer::Response> {{empty}, {kCompletion}, {moderation(false)}});
+        Client client;
+        client.setBaseUrl(input.baseUrl());
+        Guardrail guardrail(&client);
+        auto *reply = guardrail.createChatCompletion(ask());
+        QSignalSpy failed(reply, &GuardedChatReply::failed);
+        QSignalSpy finished(reply, &GuardedChatReply::finished);
+        QVERIFY(settled(reply));
+        QVERIFY2(failed.count() == 1, empty.constData());
+        QCOMPARE(finished.count(), 0);
+        QCOMPARE(input.requestCount(), 1);
+
+        // Output side: the answer arrived, and is not handed over.
+        StubServer output(
+                QList<StubServer::Response> {{moderation(false)}, {kCompletion}, {empty}});
+        Client other;
+        other.setBaseUrl(output.baseUrl());
+        Guardrail second(&other);
+        auto *answered = second.createChatCompletion(ask());
+        QSignalSpy answeredFailed(answered, &GuardedChatReply::failed);
+        QVERIFY(settled(answered));
+        QVERIFY2(answeredFailed.count() == 1, empty.constData());
+        QVERIFY(answered->response().choices().isEmpty());
+
+        // And screen() on its own reports a failure, not a clean verdict.
+        auto *check = second.screen(QStringLiteral("text"));
+        QSignalSpy checkFailed(check, &GuardrailReply::failed);
+        QSignalSpy checkDone(check, &GuardrailReply::done);
+        QVERIFY(checkDone.wait(5000));
+        QVERIFY2(checkFailed.count() == 1, empty.constData());
+    }
 }
 
 QTEST_MAIN(TestGuardrail)

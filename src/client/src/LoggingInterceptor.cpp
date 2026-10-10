@@ -38,12 +38,13 @@ bool isSecretParameter(const QString &name)
     return false;
 }
 
-// The URL as it is safe to write down: same URL, secrets in the query replaced.
+// The URL as it is safe to write down: same URL, secrets in the query replaced
+// and any password in the userinfo dropped.
 QString safeUrl(const QUrl &url)
 {
     QUrlQuery query(url);
     if (query.isEmpty())
-        return url.toString(QUrl::FullyEncoded);
+        return url.toString(QUrl::FullyEncoded | QUrl::RemovePassword);
 
     QList<QPair<QString, QString>> items = query.queryItems();
     for (auto &item : items) {
@@ -54,7 +55,7 @@ QString safeUrl(const QUrl &url)
     QUrlQuery redacted;
     redacted.setQueryItems(items);
     safe.setQuery(redacted);
-    return safe.toString(QUrl::FullyEncoded);
+    return safe.toString(QUrl::FullyEncoded | QUrl::RemovePassword);
 }
 
 // Replace every secret-named field, at any depth, and report whether anything

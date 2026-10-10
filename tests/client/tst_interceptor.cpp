@@ -160,6 +160,7 @@ private slots:
     void theLoggerKeepsOrdinaryQueryParameters();
     void anEmptyBodyWritesNoBodyLine();
     void theDebugCategoryGetsTheRedactedLinesToo();
+    void theLoggerNeverWritesAPasswordInTheUrl();
 };
 
 void TestInterceptor::noneIsInstalledByDefault()
@@ -588,6 +589,39 @@ void TestInterceptor::theDebugCategoryGetsTheRedactedLinesToo()
     QVERIFY2(written.contains(QStringLiteral("<redacted>")), qPrintable(written));
     QVERIFY2(!written.contains(QStringLiteral("sk-CATEGORY-KEY")), qPrintable(written));
     QVERIFY2(!written.contains(QStringLiteral("sk-CATEGORY-BODY")), qPrintable(written));
+}
+
+void TestInterceptor::theLoggerNeverWritesAPasswordInTheUrl()
+{
+    // A proxy in front of the API can take Basic credentials in the base URL
+    // (https://user:secret@proxy/v1), and QNetworkAccessManager will use them.
+    // The password is as live as an Authorization header; the URL line must
+    // not carry it, with or without a query to redact.
+    LoggingInterceptor logger;
+    QStringList lines;
+    connect(&logger, &LoggingInterceptor::logged, &logger,
+            [&lines](const QString &line) { lines.append(line); });
+
+    StubServer server(QList<StubServer::Response> {{kCompletion}, {kCompletion}});
+    QUrl base = server.baseUrl();
+    base.setUserName(QStringLiteral("proxyuser"));
+    base.setPassword(QStringLiteral("pw-IN-THE-URL"));
+    Client client;
+    client.setBaseUrl(base);
+    client.addInterceptor(&logger);
+    awaited(client.createChatCompletion(sampleRequest()));
+
+    InterceptedRequest request;
+    request.method = "GET";
+    request.request.setUrl(QUrl(
+            QStringLiteral("http://proxyuser:pw-IN-THE-QUERY-URL@127.0.0.1/v1/files?limit=1")));
+    logger.beforeRequest(request);
+
+    const QString written = lines.join(QLatin1Char('\n'));
+    QVERIFY2(written.contains(QStringLiteral("--> POST")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("<-- ")), qPrintable(written));
+    QVERIFY2(written.contains(QStringLiteral("limit=1")), qPrintable(written));
+    QVERIFY2(!written.contains(QStringLiteral("pw-IN-THE")), qPrintable(written));
 }
 
 QTEST_MAIN(TestInterceptor)
