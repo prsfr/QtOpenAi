@@ -290,7 +290,7 @@ GuardrailReply *Guardrail::screen(const QString &text)
                 if (response.results().isEmpty() || response.firstResult().categories().isEmpty()) {
                     reply->d_func()->error
                             = ClientError(ClientError::Kind::Parse,
-                                          QStringLiteral("moderation answer carried no result"));
+                                          QStringLiteral("moderation answer carried no verdict"));
                     reply->d_func()->finished = true;
                     Q_EMIT reply->failed(reply->d_func()->error);
                     Q_EMIT reply->done();
