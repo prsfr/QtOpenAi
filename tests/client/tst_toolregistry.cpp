@@ -76,6 +76,9 @@ private slots:
     void missingArgumentsAreReported();
     void validationRejectsArgumentsBeforeDispatch();
     void validationIsOffByDefault();
+    void aWrongTypeIsRefusedWithoutRunningTheMethod();
+    void toolsCanBeUnregisteredAndCleared();
+    void argumentsThatAreNotAnObjectAreRefused();
 
 private:
     static ToolCall makeCall(const QString &id, const QString &name, const QString &args)
@@ -283,6 +286,21 @@ void TestToolRegistry::enumArgumentsArriveAsTheirKey()
     QCOMPARE(result.content(), QStringLiteral("50"));
 }
 
+namespace {
+
+// The other structured return types, kept off WeatherProvider so the tests
+// that use it do not depend on them.
+class Structured : public QObject
+{
+    Q_OBJECT
+public:
+    Q_INVOKABLE QJsonArray array() { return QJsonArray {1, QStringLiteral("two")}; }
+    Q_INVOKABLE QVariantMap map() { return QVariantMap {{QStringLiteral("a"), 1}}; }
+    Q_INVOKABLE QVariantList list() { return QVariantList {true, QStringLiteral("x")}; }
+};
+
+} // namespace
+
 void TestToolRegistry::structuredReturnValuesAreSerialised()
 {
     // A method answering with JSON should not have to serialise it by hand.
@@ -297,6 +315,19 @@ void TestToolRegistry::structuredReturnValuesAreSerialised()
     const QJsonObject payload = QJsonDocument::fromJson(result.content().toUtf8()).object();
     QCOMPARE(payload.value(QStringLiteral("location")).toString(), QStringLiteral("Berlin"));
     QCOMPARE(payload.value(QStringLiteral("sky")).toString(), QStringLiteral("clear"));
+
+    // QVariant::toString() of any of these is empty, which a model would read
+    // as "no result".
+    Structured structured;
+    for (const QString &method :
+         {QStringLiteral("array"), QStringLiteral("map"), QStringLiteral("list")})
+        QVERIFY(registry.registerMethod(&structured, method));
+    const auto content = [&registry](const QString &name) {
+        return registry.invoke(makeCall(QStringLiteral("s"), name, QStringLiteral("{}"))).content();
+    };
+    QCOMPARE(content(QStringLiteral("array")), QStringLiteral(R"([1,"two"])"));
+    QCOMPARE(content(QStringLiteral("map")), QStringLiteral(R"({"a":1})"));
+    QCOMPARE(content(QStringLiteral("list")), QStringLiteral(R"([true,"x"])"));
 }
 
 void TestToolRegistry::missingArgumentsAreReported()
@@ -371,6 +402,78 @@ void TestToolRegistry::validationIsOffByDefault()
              QStringLiteral("ran"));
 }
 
+void TestToolRegistry::aWrongTypeIsRefusedWithoutRunningTheMethod()
+{
+    // An argument that does not convert must not reach the method as a default
+    // value; the model is told which one, so it can send it again.
+    ToolRegistry registry;
+    WeatherProvider provider;
+    provider.lastUnit = WeatherProvider::Unit::Fahrenheit;
+    QVERIFY(registry.registerMethod(&provider, QStringLiteral("forecast")));
+    QVERIFY(registry.registerMethod(&provider, QStringLiteral("convert")));
+    QSignalSpy failedSpy(&registry, &ToolRegistry::toolFailed);
+    QSignalSpy invokedSpy(&registry, &ToolRegistry::toolInvoked);
+
+    const auto error = [](const Message &result) {
+        return QJsonDocument::fromJson(result.content().toUtf8())
+                .object()
+                .value(QStringLiteral("error"))
+                .toString();
+    };
+    const Message days
+            = registry.invoke(makeCall(QStringLiteral("c11"), QStringLiteral("forecast"),
+                                       QStringLiteral(R"({"location":"Berlin","days":"abc"})")));
+    QCOMPARE(error(days), QStringLiteral("argument 'days' of method 'forecast' is not a int"));
+    QCOMPARE(provider.lastLocation, QString());
+
+    const Message unit
+            = registry.invoke(makeCall(QStringLiteral("c12"), QStringLiteral("convert"),
+                                       QStringLiteral(R"({"degrees":10,"unit":"Kelvin"})")));
+    QCOMPARE(error(unit),
+             QStringLiteral("argument 'unit' of method 'convert' is not a %1")
+                     .arg(QString::fromUtf8(QMetaType::fromType<WeatherProvider::Unit>().name())));
+    QCOMPARE(provider.lastUnit, WeatherProvider::Unit::Fahrenheit);
+
+    QCOMPARE(failedSpy.count(), 2);
+    QCOMPARE(invokedSpy.count(), 0);
+}
+
+void TestToolRegistry::toolsCanBeUnregisteredAndCleared()
+{
+    // What is advertised and what can be called have to stay one list: a tool
+    // that is gone from one but not the other is offered and then refused.
+    ToolRegistry registry;
+    for (const QString &name :
+         {QStringLiteral("first"), QStringLiteral("second"), QStringLiteral("third")}) {
+        registry.registerFunction(name, QString(), QJsonObject {},
+                                  [](const QJsonObject &) { return QString(); });
+    }
+    QSignalSpy unknownSpy(&registry, &ToolRegistry::unknownTool);
+
+    QVERIFY(registry.unregister(QStringLiteral("first")));
+    QVERIFY(!registry.contains(QStringLiteral("first")));
+    QCOMPARE(registry.toolNames(),
+             QStringList({QStringLiteral("second"), QStringLiteral("third")}));
+    QCOMPARE(registry.tools().size(), 2);
+    QCOMPARE(registry.tools().first().function().name(), QStringLiteral("second"));
+    registry.invoke(makeCall(QStringLiteral("c13"), QStringLiteral("first"), QStringLiteral("{}")));
+    QCOMPARE(unknownSpy.count(), 1);
+
+    // Back again, it is the newest, not restored to where it was.
+    registry.registerFunction(QStringLiteral("first"), QString(), QJsonObject {},
+                              [](const QJsonObject &) { return QString(); });
+    QCOMPARE(registry.toolNames(), QStringList({QStringLiteral("second"), QStringLiteral("third"),
+                                                QStringLiteral("first")}));
+
+    const QStringList before = registry.toolNames();
+    QVERIFY(!registry.unregister(QStringLiteral("ghost")));
+    QCOMPARE(registry.toolNames(), before);
+
+    registry.clear();
+    QVERIFY(registry.toolNames().isEmpty());
+    QVERIFY(registry.tools().isEmpty());
+}
+
 namespace {
 
 // One annotation that describes nothing, to prove the warning fires where the
@@ -404,6 +507,47 @@ void TestToolRegistry::registeringWarnsAboutADescriptionThatNamesNothing()
                                          .value(QStringLiteral("location"))
                                          .toObject();
     QVERIFY(!location.contains(QStringLiteral("description")));
+}
+
+void TestToolRegistry::argumentsThatAreNotAnObjectAreRefused()
+{
+    // A tool call cut off by max_tokens arrives with half its arguments. That
+    // parses to nothing, and argumentsObject() turns nothing into {} -- so a
+    // handler or a whole-object method runs as if it had been called with no
+    // arguments at all. Refuse it and say why, as a type mismatch is refused.
+    WeatherProvider provider;
+    ToolRegistry registry;
+    int handlerRuns = 0;
+    registry.registerFunction(QStringLiteral("lookup"), QStringLiteral("d"), QJsonObject(),
+                              [&handlerRuns](const QJsonObject &) {
+                                  ++handlerRuns;
+                                  return QStringLiteral("ran");
+                              });
+    QVERIFY(registry.registerMethod(&provider, QStringLiteral("getWeather")));
+    QVERIFY(registry.registerMethod(&provider, QStringLiteral("forecast")));
+
+    const QStringList broken = {R"({"location":"Ber)", "[1,2]", "null", "not json",
+                                R"({"location":"B","days":1e400})"};
+    for (const QString &arguments : broken) {
+        QSignalSpy failed(&registry, &ToolRegistry::toolFailed);
+        QSignalSpy invoked(&registry, &ToolRegistry::toolInvoked);
+        provider.lastLocation = QStringLiteral("unset");
+        registry.invoke(makeCall(QStringLiteral("1"), QStringLiteral("lookup"), arguments));
+        registry.invoke(makeCall(QStringLiteral("2"), QStringLiteral("getWeather"), arguments));
+        const Message typed = registry.invoke(
+                makeCall(QStringLiteral("3"), QStringLiteral("forecast"), arguments));
+        QVERIFY2(invoked.isEmpty(), qPrintable(arguments));
+        QCOMPARE(failed.count(), 3);
+        QCOMPARE(handlerRuns, 0);
+        QCOMPARE(provider.lastLocation, QStringLiteral("unset"));
+        // Not "missing argument 'location'": nothing was missing, it was unreadable.
+        QVERIFY2(!typed.content().contains(QStringLiteral("missing")), qPrintable(typed.content()));
+    }
+
+    // No arguments at all is a call to a function without parameters, not an error.
+    QSignalSpy invoked(&registry, &ToolRegistry::toolInvoked);
+    registry.invoke(makeCall(QStringLiteral("4"), QStringLiteral("lookup"), QString()));
+    QCOMPARE(invoked.count(), 1);
 }
 
 QTEST_MAIN(TestToolRegistry)
