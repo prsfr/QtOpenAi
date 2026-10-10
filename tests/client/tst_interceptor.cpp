@@ -160,7 +160,7 @@ private slots:
     void theLoggerKeepsOrdinaryQueryParameters();
     void anEmptyBodyWritesNoBodyLine();
     void theDebugCategoryGetsTheRedactedLinesToo();
-    void theLoggerNeverWritesAPasswordInTheUrl();
+    void theLoggerNeverWritesUserInfoInTheUrl();
 };
 
 void TestInterceptor::noneIsInstalledByDefault()
@@ -591,7 +591,7 @@ void TestInterceptor::theDebugCategoryGetsTheRedactedLinesToo()
     QVERIFY2(!written.contains(QStringLiteral("sk-CATEGORY-BODY")), qPrintable(written));
 }
 
-void TestInterceptor::theLoggerNeverWritesAPasswordInTheUrl()
+void TestInterceptor::theLoggerNeverWritesUserInfoInTheUrl()
 {
     // A proxy in front of the API can take Basic credentials in the base URL
     // (https://user:secret@proxy/v1), and QNetworkAccessManager will use them.
@@ -622,6 +622,8 @@ void TestInterceptor::theLoggerNeverWritesAPasswordInTheUrl()
     QVERIFY2(written.contains(QStringLiteral("<-- ")), qPrintable(written));
     QVERIFY2(written.contains(QStringLiteral("limit=1")), qPrintable(written));
     QVERIFY2(!written.contains(QStringLiteral("pw-IN-THE")), qPrintable(written));
+    // The username goes too: in https://<token>@proxy it is the credential.
+    QVERIFY2(!written.contains(QStringLiteral("proxyuser")), qPrintable(written));
 }
 
 QTEST_MAIN(TestInterceptor)

@@ -284,9 +284,10 @@ GuardrailReply *Guardrail::screen(const QString &text)
     ModerationReply *moderation = d->client->createModeration(request);
     connect(moderation, &ModerationReply::finished, reply,
             [this, reply](const Core::ModerationResponse &response) {
-                // An answer without a result says nothing about the text, and
-                // a guardrail that cannot tell must not let it through.
-                if (response.results().isEmpty()) {
+                // An answer without a verdict -- no result, or one with no
+                // categories -- says nothing about the text, and a guardrail
+                // that cannot tell must not let it through.
+                if (response.results().isEmpty() || response.firstResult().categories().isEmpty()) {
                     reply->d_func()->error
                             = ClientError(ClientError::Kind::Parse,
                                           QStringLiteral("moderation answer carried no result"));

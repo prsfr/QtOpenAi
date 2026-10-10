@@ -462,10 +462,12 @@ void TestGuardrail::aClientGoneBeforeSendingFailsTheExchange()
 void TestGuardrail::aModerationAnswerWithNoResultFailsRatherThanPasses()
 {
     // A 200 that carries no verdict -- an empty results list, a proxy's `{}`,
-    // results in the wrong shape -- is "I could not check", the same as a 500.
-    // Treating it as clean lets an unscreened exchange through.
-    const QList<QByteArray> empties
-            = {R"({"id":"m","results":[]})", "{}", R"({"results":{"flagged":true}})"};
+    // results in the wrong shape, a result that is empty or not an object --
+    // is "I could not check", the same as a 500. Treating it as clean lets an
+    // unscreened exchange through.
+    const QList<QByteArray> empties = {R"({"id":"m","results":[]})",      "{}",
+                                       R"({"results":{"flagged":true}})", R"({"results":[{}]})",
+                                       R"({"results":[null]})",           R"({"results":[1]})"};
     for (const QByteArray &empty : empties) {
         // Input side: the request must not go out.
         StubServer input(QList<StubServer::Response> {{empty}, {kCompletion}, {moderation(false)}});
