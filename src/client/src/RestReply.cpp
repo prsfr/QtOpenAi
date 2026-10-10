@@ -7,6 +7,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QPointer>
 #include <QtCore/QTimer>
+#include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 
 namespace QtOpenAi {
@@ -36,7 +37,26 @@ RestReply::RestReply(std::function<QNetworkReply *()> requestFactory, RetryPolic
     });
 }
 
-RestReply::~RestReply() = default;
+RestReply::~RestReply()
+{
+    // The reply belongs to the manager, so it is not freed with this engine by
+    // parentage; free it here, without letting it call back into a half-gone
+    // engine. Deleting an unfinished reply aborts it, as it always did.
+    if (m_networkReply) {
+        m_networkReply->disconnect(this);
+        delete m_networkReply;
+    }
+}
+
+void RestReply::failClientGone()
+{
+    if (m_settled)
+        return;
+    m_settled = true;
+    Q_EMIT settled(QByteArray(), 0);
+    Q_EMIT failed(
+            ClientError(ClientError::Kind::Network, QStringLiteral("client no longer available")));
+}
 
 RateLimit RestReply::rateLimit() const { return m_rateLimit; }
 int RestReply::retryCount() const { return m_retryCount; }
@@ -61,8 +81,34 @@ void RestReply::abort()
 
 void RestReply::start()
 {
+    // A retry timer or a rate-limiter gate can fire after the outcome is known
+    // -- the manager died meanwhile -- and must not issue anything then.
+    if (m_settled || m_managerGone)
+        return;
     m_networkReply = m_factory();
-    m_networkReply->setParent(this);
+    if (!m_networkReply) {
+        // Queued like the manager-destroyed path: a rate limiter releases its
+        // waiting requests from its destructor, which can be the Client's.
+        m_managerGone = true;
+        QTimer::singleShot(0, this, &RestReply::failClientGone);
+        return;
+    }
+    if (!m_networkReply->parent())
+        m_networkReply->setParent(this);
+
+    // The manager deletes its replies when it is destroyed, so the reply is
+    // never left behind holding pointers into a freed manager (#203). That
+    // ends the request without a finished(), so the failure is delivered from
+    // here, queued: the manager's destruction is often the Client's, and an
+    // application slot must not run inside it.
+    QNetworkAccessManager *manager = m_networkReply->manager();
+    if (manager && !m_watchingManager) {
+        m_watchingManager = true;
+        connect(manager, &QObject::destroyed, this, [this]() {
+            m_managerGone = true;
+            QTimer::singleShot(0, this, &RestReply::failClientGone);
+        });
+    }
 
     connect(m_networkReply, &QNetworkReply::finished, this, [this]() {
         QNetworkReply *reply = m_networkReply;
@@ -73,7 +119,11 @@ void RestReply::start()
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         m_rateLimit = detail::parseRateLimit(reply);
 
-        const bool networkError = reply->error() != QNetworkReply::NoError && status < 400;
+        // A refused cross-origin redirect is an answer rather than a transport
+        // hiccup -- sending it again would be refused again -- so it is neither
+        // retried nor reported as a network error.
+        const bool networkError = reply->error() != QNetworkReply::NoError && status < 400
+                                  && reply->error() != QNetworkReply::InsecureRedirectError;
         const bool httpError = status >= 400 || reply->error() != QNetworkReply::NoError;
 
         // Decide whether this failure is retryable and we still have budget.
@@ -90,14 +140,20 @@ void RestReply::start()
             return;
         }
 
+        // Everything is read off the reply before the first emission: a slot
+        // on settled() may delete the Client, and with it the manager that
+        // owns -- and frees -- the reply.
+        m_settled = true;
+        const QString transportMessage = reply->errorString();
+        const QNetworkReply::NetworkError transportError = reply->error();
         if (networkError) {
             Q_EMIT settled(body, status);
-            Q_EMIT failed(ClientError(ClientError::Kind::Network, reply->errorString(), status));
+            Q_EMIT failed(ClientError(ClientError::Kind::Network, transportMessage, status));
             return;
         }
         if (httpError) {
             Q_EMIT settled(body, status);
-            Q_EMIT failed(detail::errorFromBody(body, reply->errorString(), status));
+            Q_EMIT failed(detail::errorFromBody(body, transportMessage, status, transportError));
             return;
         }
 

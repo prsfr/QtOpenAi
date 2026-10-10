@@ -6,6 +6,7 @@
 using namespace QtOpenAi::Core;
 using namespace QtOpenAi::Realtime;
 
+#include "support/StubServer.h"
 #include "support/StubWebSocketServer.h"
 
 // Loopback coverage for the Realtime WebSocket channel (#25), against a stub
@@ -24,6 +25,7 @@ private slots:
     void reportsDisconnection();
     void audioIsNotQueuedForAChannelThatIsNotOpen();
     void closingDiscardsWhatWasQueued();
+    void handshakeRedirectIsNotFollowed();
 };
 
 namespace {
@@ -294,6 +296,56 @@ void TestRealtimeConnection::reportsDisconnection()
     server.closeClient();
     QVERIFY(await(disconnected));
     QVERIFY(!connection.isOpen());
+}
+
+namespace {
+QStringList capturedLines;
+void captureMessage(QtMsgType, const QMessageLogContext &, const QString &message)
+{
+    capturedLines << message;
+}
+} // namespace
+
+// The handshake carries the key too. QWebSocket does not follow a redirect on
+// it -- no code here makes sure of that, Qt does -- so this pins the behaviour:
+// a Qt that starts following handshake redirects fails here instead of sending
+// the key to another origin unnoticed (#203). Nor does the refusal report the
+// key, in socketError's text or on the console with every category enabled.
+void TestRealtimeConnection::handshakeRedirectIsNotFollowed()
+{
+    const QString secret = QStringLiteral("ek_redirect_secret");
+    StubServer target(QByteArray {});
+    const QByteArray location
+            = "ws://localhost:" + QByteArray::number(target.baseUrl().port()) + "/v1/x";
+    StubServer origin({{QByteArray(), 302, "application/json", {{"Location", location}}}});
+
+    capturedLines.clear();
+    QLoggingCategory::setFilterRules(QStringLiteral("*.debug=true"));
+    const QtMessageHandler previous = qInstallMessageHandler(&captureMessage);
+    QString reported;
+    int connectedCount = -1;
+    {
+        RealtimeConnection connection;
+        connection.setUrl(
+                QUrl(QStringLiteral("ws://127.0.0.1:%1/v1/realtime").arg(origin.baseUrl().port())));
+        connection.setApiKey(secret);
+        QSignalSpy connected(&connection, &RealtimeConnection::connected);
+        QSignalSpy socketError(&connection, &RealtimeConnection::socketError);
+        connection.open();
+        if (await(socketError))
+            reported = socketError.at(0).at(0).toString();
+        connectedCount = connected.count();
+    }
+    qInstallMessageHandler(previous);
+    QLoggingCategory::setFilterRules(QString());
+
+    QVERIFY(!reported.isEmpty());
+    QCOMPARE(connectedCount, 0);
+    QCOMPARE(origin.requestCount(), 1);
+    QCOMPARE(target.requestCount(), 0);
+    QVERIFY2(!reported.contains(secret), qPrintable(reported));
+    const QString log = capturedLines.join(QLatin1Char('\n'));
+    QVERIFY2(!log.contains(secret), qPrintable(log));
 }
 
 QTEST_MAIN(TestRealtimeConnection)

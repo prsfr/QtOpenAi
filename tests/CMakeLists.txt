@@ -216,6 +216,10 @@ qtopenai_add_test(tst_client_resilience
     SOURCES client/tst_resilience.cpp
     LIBS QtOpenAi::Client)
 
+qtopenai_add_test(tst_client_redirect
+    SOURCES client/tst_redirect.cpp
+    LIBS QtOpenAi::Client QtOpenAi::Admin)
+
 qtopenai_add_test(tst_client_responses
     SOURCES client/tst_responses.cpp
     LIBS QtOpenAi::Client)

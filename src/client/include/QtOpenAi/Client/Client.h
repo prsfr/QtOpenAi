@@ -203,6 +203,13 @@ public:
     QUrl baseUrl() const;
     void setBaseUrl(const QUrl &baseUrl);
 
+    // Every request that carries the key follows redirects only within its own
+    // origin (scheme, host and port), per request and whatever policy the
+    // network access manager has. A redirect to another HTTP(S) origin is
+    // refused: the reply fails with ClientError::Kind::Redirect and is not
+    // re-sent, so the key never reaches a host that was not configured here. A
+    // Location with a non-HTTP scheme is not followed either; it is a network
+    // error (Kind::Network), retried to this origin like one.
     QString apiKey() const;
     void setApiKey(const QString &apiKey);
 
@@ -282,6 +289,15 @@ public:
 
     // Inject a custom QNetworkAccessManager (e.g. for proxies or test doubles).
     // The client does not take ownership.
+    //
+    // Destroying the manager -- the one the client created, with the client; or
+    // an injected one, on its own -- ends every request still in flight on it:
+    // the reply fails with ClientError::Kind::Network, "client no longer
+    // available", on a later event-loop turn. From a slot on a stream's incremental signals (delta,
+    // events) use deleteLater(), as Qt asks for QNetworkReply itself: the
+    // network stack is still on the call stack there. A request waiting in a
+    // RateLimiter that outlives the client settles when the limiter releases
+    // it.
     void setNetworkAccessManager(QNetworkAccessManager *manager);
     QNetworkAccessManager *networkAccessManager() const;
 

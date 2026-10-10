@@ -381,6 +381,12 @@ QNetworkRequest apiRequest(const ClientPrivate *d, const QString &path, const ch
         networkRequest.setRawHeader(it.key(), it.value());
     if (d->requestTimeoutMs > 0)
         networkRequest.setTransferTimeout(d->requestTimeoutMs);
+    // The request carries the key, and Qt's default policy would follow a 3xx
+    // to any host and copy every header there (#203). Within the same scheme,
+    // host and port a redirect is harmless; anything else fails the reply with
+    // InsecureRedirectError, which the replies report as Kind::Redirect.
+    networkRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                                QNetworkRequest::SameOriginRedirectPolicy);
     return networkRequest;
 }
 
@@ -432,7 +438,10 @@ std::function<QNetworkReply *()> multipartPostFactory(const ClientPrivate *d,
                                                       QList<detail::FormFilePart> files)
 {
     applyIdempotencyKey(d, request);
-    return [manager, request, fields = std::move(fields), files = std::move(files)]() mutable {
+    return [manager = QPointer<QNetworkAccessManager>(manager), request, fields = std::move(fields),
+            files = std::move(files)]() mutable -> QNetworkReply * {
+        if (!manager)
+            return nullptr;
         QHttpMultiPart *multiPart = detail::buildMultipart(fields, files);
         QNetworkRequest req = request;
         req.setHeader(QNetworkRequest::ContentTypeHeader,
@@ -596,23 +605,35 @@ QByteArray clientSecretBody(const Core::RealtimeSessionConfig &session, qint64 e
 
 // Request factories capturing everything a retry needs to re-issue the call.
 // One per HTTP verb; the multipart POST variant lives in multipartPostFactory().
+//
+// The manager is held weakly: a deferred first attempt or a retry can run after
+// the manager is gone -- with the Client, or an injected one on its own. A
+// factory then returns nullptr, which RestReply reports as the client being
+// gone.
 std::function<QNetworkReply *()> getFactory(QNetworkAccessManager *manager, QNetworkRequest request)
 {
-    return [manager, request = std::move(request)]() { return manager->get(request); };
+    return [manager = QPointer<QNetworkAccessManager>(manager),
+            request = std::move(request)]() -> QNetworkReply * {
+        return manager ? manager->get(request) : nullptr;
+    };
 }
 
 std::function<QNetworkReply *()> deleteFactory(QNetworkAccessManager *manager,
                                                QNetworkRequest request)
 {
-    return [manager, request = std::move(request)]() { return manager->deleteResource(request); };
+    return [manager = QPointer<QNetworkAccessManager>(manager),
+            request = std::move(request)]() -> QNetworkReply * {
+        return manager ? manager->deleteResource(request) : nullptr;
+    };
 }
 
 std::function<QNetworkReply *()> postFactory(const ClientPrivate *d, QNetworkAccessManager *manager,
                                              QNetworkRequest request, QByteArray body = {})
 {
     applyIdempotencyKey(d, request);
-    return [manager, request = std::move(request), body = std::move(body)]() {
-        return manager->post(request, body);
+    return [manager = QPointer<QNetworkAccessManager>(manager), request = std::move(request),
+            body = std::move(body)]() -> QNetworkReply * {
+        return manager ? manager->post(request, body) : nullptr;
     };
 }
 

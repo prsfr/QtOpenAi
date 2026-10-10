@@ -13,6 +13,8 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QObject>
 
+#include <QtCore/QPointer>
+
 #include <functional>
 
 class QNetworkReply;
@@ -72,10 +74,20 @@ Q_SIGNALS:
 
 private:
     void start();
+    // Settle as failed because the network access manager is gone -- with the
+    // Client, or an injected one on its own. Always queued, never called from
+    // inside the destructor that took the manager away.
+    void failClientGone();
 
     std::function<QNetworkReply *()> m_factory;
     RetryPolicy m_policy;
-    QNetworkReply *m_networkReply = nullptr;
+    // Owned by its QNetworkAccessManager, which deletes it on destruction --
+    // hence the QPointer. A reply without a manager (an interceptor's canned
+    // reply) is owned here instead.
+    QPointer<QNetworkReply> m_networkReply;
+    bool m_watchingManager = false;
+    bool m_managerGone = false;
+    bool m_settled = false;
     RateLimit m_rateLimit;
     QByteArray m_contentType;
     QList<QPair<QByteArray, QByteArray>> m_responseHeaders;
