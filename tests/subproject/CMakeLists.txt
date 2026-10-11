@@ -43,7 +43,7 @@ foreach(_name IN LISTS _before)
                                " -> ${_type}='$CACHE{${_name}}'")
     endif()
 endforeach()
-if(NOT CMAKE_BUILD_TYPE STREQUAL _build_type_before)
+if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "${_build_type_before}")
     string(APPEND _changed "\n  CMAKE_BUILD_TYPE (variable): '${_build_type_before}'"
                            " -> '${CMAKE_BUILD_TYPE}'")
 endif()

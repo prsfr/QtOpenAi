@@ -37,7 +37,9 @@ consume() {
     local dir="$QTOPENAI_BUILD_DIR-subproject/$1"
     shift
     mkdir -p "$dir"
-    rm -f "$dir/CMakeCache.txt"
+    # FetchContent's sub-build has a cache of its own, which would otherwise
+    # pin the generator of the first run.
+    rm -rf "$dir/CMakeCache.txt" "$dir/_deps/qtopenai-subbuild"
     cmake -S "$QTOPENAI_ROOT/tests/subproject" -B "$dir" "${generator[@]}" "$@"
     cmake --build "$dir" --parallel "$jobs"
     QT_QPA_PLATFORM=offscreen "$dir/consumer"
