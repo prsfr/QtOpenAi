@@ -3157,7 +3157,8 @@ FetchContent_MakeAvailable(qtopenai)
 ```
 
 Either way, QtOpenAi leaves your `CMAKE_BUILD_TYPE` alone, builds static or
-shared libraries as your `BUILD_SHARED_LIBS` says, and turns its tests,
+shared libraries as your `BUILD_SHARED_LIBS` says on the first configure (the
+choice is then cached as `QTOPENAI_BUILD_SHARED`), and turns its tests,
 examples and install rules off.
 
 ## Testing
