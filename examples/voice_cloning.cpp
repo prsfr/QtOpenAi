@@ -16,43 +16,21 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
-#include <QtCore/QFile>
-#include <QtCore/QFileInfo>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
-
-namespace {
-
-bool readFile(const QString &path, QByteArray &bytes, QString &name, QTextStream &out)
-{
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) {
-        out << "Cannot read " << path << "\n";
-        return false;
-    }
-    bytes = file.readAll();
-    name = QFileInfo(file).fileName();
-    return true;
-}
-
-} // namespace
 
 int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
     if (argc < 3) {
         out << "Usage: voice_cloning <consent.wav> <sample.wav> [name]\n";
         return 1;
@@ -60,19 +38,16 @@ int main(int argc, char **argv)
 
     QByteArray consentBytes, sampleBytes;
     QString consentName, sampleName;
-    if (!readFile(QString::fromLocal8Bit(argv[1]), consentBytes, consentName, out)
-        || !readFile(QString::fromLocal8Bit(argv[2]), sampleBytes, sampleName, out)) {
+    if (!readFileArg(QString::fromLocal8Bit(argv[1]), consentBytes, consentName, out)
+        || !readFileArg(QString::fromLocal8Bit(argv[2]), sampleBytes, sampleName, out)) {
         return 1;
     }
     const QString speaker
             = argc > 3 ? QString::fromLocal8Bit(argv[3]) : QStringLiteral("Example Speaker");
 
-    auto *client = new Client::Client(QUrl(baseUrl), apiKey, &app);
+    auto *client = new Client::Client(env->baseUrl, env->key, &app);
 
-    auto reportError = [&out, &app](const Client::ClientError &error) {
-        out << "Error: " << error.message() << "\n";
-        app.exit(1);
-    };
+    auto reportError = failAndExit(out, app);
 
     // 1. The consent recording authorises cloning; a voice cannot be built
     // without one.

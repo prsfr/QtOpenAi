@@ -10,10 +10,11 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -23,19 +24,14 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QString input = argc > 1 ? QString::fromLocal8Bit(argv[1])
                                    : QStringLiteral("John Doe is 30 and lives in Berlin.");
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
 
     // A schema for {name, age, city}. Strict mode requires all properties listed
     // in `required` and additionalProperties disabled.
@@ -55,18 +51,14 @@ int main(int argc, char **argv)
             {QStringLiteral("additionalProperties"), false},
     };
 
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env->model(QStringLiteral("gpt-4o-mini"));
     Core::ChatCompletionRequest request(
             model, {Core::Message::user(QStringLiteral("Extract the person from: ") + input)});
     request.setResponseFormat(Core::ResponseFormat::jsonSchema(QStringLiteral("person"), schema));
 
     Client::ChatCompletionReply *reply = client.createChatCompletion(request);
 
-    QObject::connect(reply, &Client::ChatCompletionReply::failed,
-                     [&out, &app](const Client::ClientError &error) {
-                         out << "Error: " << error.message() << "\n";
-                         app.exit(1);
-                     });
+    QObject::connect(reply, &Client::ChatCompletionReply::failed, failAndExit(out, app));
 
     QObject::connect(reply, &Client::ChatCompletionReply::finished,
                      [&out, &app](const Core::ChatCompletionResponse &response) {

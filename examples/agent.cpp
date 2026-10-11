@@ -24,9 +24,10 @@
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/ToolRegistry.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QJsonObject>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -55,14 +56,9 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QStringList arguments = app.arguments();
     const bool confirmEachCall = arguments.contains(QStringLiteral("--ask"));
@@ -72,7 +68,7 @@ int main(int argc, char **argv)
             question = arguments.at(i);
     }
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
 
     WeatherService service;
     Client::ToolRegistry registry;
@@ -82,7 +78,7 @@ int main(int argc, char **argv)
     registry.setValidateArguments(true);
 
     Chat::Agent agent(&client, &registry);
-    agent.setModel(env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini")));
+    agent.setModel(env->model(QStringLiteral("gpt-4o-mini")));
     agent.setSystemPrompt(QStringLiteral("You are a concise assistant."));
     agent.setStreaming(true);
 

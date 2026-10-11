@@ -25,10 +25,11 @@
 #include <QtOpenAi/Client/ToolRegistry.h>
 #include <QtOpenAi/Core/MetaSchema.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -82,20 +83,16 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example, or pass --schema.\n";
+    const std::optional<ExampleEnv> env
+            = exampleEnv(out, KeyKind::Api, QStringLiteral("pass --schema"));
+    if (!env)
         return 1;
-    }
 
     const QString question
             = argc > 1 ? QString::fromLocal8Bit(argv[1])
                        : QStringLiteral("What is the weather in Berlin over the next 3 days?");
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
 
     QObject::connect(&registry, &Client::ToolRegistry::toolInvoked,
                      [&out](const QString &, const QString &name, const QString &result) {
@@ -111,7 +108,7 @@ int main(int argc, char **argv)
                          out.flush();
                      });
 
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env->model(QStringLiteral("gpt-4o-mini"));
     Core::ChatCompletionRequest request(model, {Core::Message::user(question)});
     request.setTools(registry.tools());
 
@@ -119,11 +116,7 @@ int main(int argc, char **argv)
     send = [&](Core::ChatCompletionRequest req) {
         Client::ChatCompletionReply *reply = client.createChatCompletion(req);
 
-        QObject::connect(reply, &Client::ChatCompletionReply::failed,
-                         [&out, &app](const Client::ClientError &error) {
-                             out << "Error: " << error.message() << "\n";
-                             app.exit(1);
-                         });
+        QObject::connect(reply, &Client::ChatCompletionReply::failed, failAndExit(out, app));
 
         QObject::connect(reply, &Client::ChatCompletionReply::finished,
                          [&, req](const Core::ChatCompletionResponse &response) mutable {

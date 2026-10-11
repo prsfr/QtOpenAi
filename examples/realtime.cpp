@@ -25,9 +25,10 @@
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Realtime/RealtimeConnection.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QFile>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 #include <QtCore/QTimer>
 
@@ -172,15 +173,11 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-realtime"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
+
+    const QString model = env->model(QStringLiteral("gpt-realtime"));
 
     bool wantAudio = false;
     QString prompt = QStringLiteral("Explain a WebSocket in one sentence.");
@@ -192,7 +189,7 @@ int main(int argc, char **argv)
             prompt = argument;
     }
 
-    Client::Client client(QUrl(baseUrl), apiKey, &app);
+    Client::Client client(env->baseUrl, env->key, &app);
     Realtime::RealtimeConnection connection(&app);
     RealtimeDemo demo(&client, &connection, model, prompt, wantAudio);
     demo.start();

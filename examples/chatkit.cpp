@@ -21,6 +21,8 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDateTime>
 #include <QtCore/QProcessEnvironment>
@@ -159,15 +161,11 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    const QString workflowId = env.value(QStringLiteral("CHATKIT_WORKFLOW_ID"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const QString workflowId
+            = QProcessEnvironment::systemEnvironment().value(QStringLiteral("CHATKIT_WORKFLOW_ID"));
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
     if (workflowId.isEmpty()) {
         out << "Set CHATKIT_WORKFLOW_ID to the workflow the session should run.\n";
         return 1;
@@ -176,7 +174,7 @@ int main(int argc, char **argv)
     const QString user
             = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QStringLiteral("qtopenai-example-user");
 
-    Client::Client client(QUrl(baseUrl), apiKey, &app);
+    Client::Client client(env->baseUrl, env->key, &app);
     ChatKitDemo demo(&client, workflowId, user);
     demo.start();
 

@@ -23,10 +23,11 @@
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/SemanticIndex.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QFile>
 #include <QtCore/QJsonDocument>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -80,20 +81,15 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QString question = argc > 1 ? QString::fromLocal8Bit(argv[1])
                                       : QStringLiteral("What is the refund window?");
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env->model(QStringLiteral("gpt-4o-mini"));
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
     Client::SemanticIndex index(&client);
 
     // Answer from the retrieved passages and nothing else: the point of
@@ -125,21 +121,13 @@ int main(int argc, char **argv)
                              out << response.choices().value(0).message().content() << "\n";
                              app.quit();
                          });
-        QObject::connect(reply, &Client::ChatCompletionReply::failed,
-                         [&out, &app](const Client::ClientError &error) {
-                             out << "Error: " << error.message() << "\n";
-                             app.quit();
-                         });
+        QObject::connect(reply, &Client::ChatCompletionReply::failed, failAndExit(out, app));
     };
 
     const auto search = [&]() {
         auto *hits = index.query(question, 3);
         QObject::connect(hits, &Client::SemanticQueryReply::finished, answer);
-        QObject::connect(hits, &Client::SemanticQueryReply::failed,
-                         [&out, &app](const Client::ClientError &error) {
-                             out << "Error: " << error.message() << "\n";
-                             app.quit();
-                         });
+        QObject::connect(hits, &Client::SemanticQueryReply::failed, failAndExit(out, app));
     };
 
     const Core::VectorIndex saved = loadIndex();
@@ -162,11 +150,7 @@ int main(int argc, char **argv)
         saveIndex(index.index());
         search();
     });
-    QObject::connect(indexed, &Client::SemanticIndexReply::failed,
-                     [&out, &app](const Client::ClientError &error) {
-                         out << "Error: " << error.message() << "\n";
-                         app.quit();
-                     });
+    QObject::connect(indexed, &Client::SemanticIndexReply::failed, failAndExit(out, app));
 
     return app.exec();
 }

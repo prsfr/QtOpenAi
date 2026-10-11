@@ -33,9 +33,10 @@
 #include <QtOpenAi/Tools/DefaultTools.h>
 #include <QtOpenAi/Tools/FileTools.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QJsonDocument>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 #include <iostream>
@@ -47,14 +48,9 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
     if (argc < 2) {
         out << "Usage: sandboxed_tools <directory> [question]\n";
         return 1;
@@ -64,9 +60,9 @@ int main(int argc, char **argv)
     const QString question = argc > 2 ? QString::fromLocal8Bit(argv[2])
                                       : QStringLiteral("What files are here, and what are they "
                                                        "about?");
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env->model(QStringLiteral("gpt-4o-mini"));
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
     Client::ToolRegistry registry;
     // The model's arguments are checked against each tool's own schema before
     // dispatch, so a malformed call is corrected on the next turn rather than
@@ -137,7 +133,7 @@ int main(int argc, char **argv)
     });
     QObject::connect(&agent, &Chat::Agent::failed, [&out, &app](const Client::ClientError &error) {
         out << "\nError: " << error.message() << "\n";
-        app.quit();
+        app.exit(1);
     });
 
     agent.run(question);

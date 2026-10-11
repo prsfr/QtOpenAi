@@ -17,12 +17,13 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QFile>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -46,16 +47,11 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    const QString model
-            = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini-2024-07-18"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
+
+    const QString model = env->model(QStringLiteral("gpt-4o-mini-2024-07-18"));
 
     QByteArray jsonl;
     if (argc > 1) {
@@ -72,12 +68,9 @@ int main(int argc, char **argv)
                               QStringLiteral("A Qt client library for the OpenAI API."));
     }
 
-    auto *client = new Client::Client(QUrl(baseUrl), apiKey, &app);
+    auto *client = new Client::Client(env->baseUrl, env->key, &app);
 
-    auto reportError = [&out, &app](const Client::ClientError &error) {
-        out << "Error: " << error.message() << "\n";
-        app.exit(1);
-    };
+    auto reportError = failAndExit(out, app);
 
     // 1. Training data lives in the Files API, with purpose "fine-tune".
     Core::FileUploadRequest upload(jsonl, QStringLiteral("training.jsonl"),

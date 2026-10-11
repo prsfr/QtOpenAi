@@ -13,10 +13,9 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
-#include <QtCore/QFile>
-#include <QtCore/QFileInfo>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 #include <QtCore/QTimer>
 
@@ -29,26 +28,16 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     // Either index the document named on the command line or a built-in snippet.
     QByteArray document;
     QString fileName;
     if (argc > 1) {
-        QFile file(QString::fromLocal8Bit(argv[1]));
-        if (!file.open(QIODevice::ReadOnly)) {
-            out << "Cannot read " << file.fileName() << "\n";
+        if (!readFileArg(QString::fromLocal8Bit(argv[1]), document, fileName, out))
             return 1;
-        }
-        document = file.readAll();
-        fileName = QFileInfo(file).fileName();
     } else {
         document = QByteArray("QtOpenAi is a Qt 6 client library for OpenAI-compatible APIs.\n"
                               "To reset an API key, create a new one and revoke the old one.\n");
@@ -57,12 +46,9 @@ int main(int argc, char **argv)
     const QString query = argc > 2 ? QString::fromLocal8Bit(argv[2])
                                    : QStringLiteral("How do I reset an API key?");
 
-    auto *client = new Client::Client(QUrl(baseUrl), apiKey, &app);
+    auto *client = new Client::Client(env->baseUrl, env->key, &app);
 
-    auto reportError = [&out, &app](const Client::ClientError &error) {
-        out << "Error: " << error.message() << "\n";
-        app.exit(1);
-    };
+    auto reportError = failAndExit(out, app);
 
     // --- 4. search, once the store is ready ---------------------------------
     auto search = [&out, &app, client, query, reportError](const QString &storeId) {

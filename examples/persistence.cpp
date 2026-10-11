@@ -42,6 +42,8 @@
 #include <QtOpenAi/Sql/SqliteStore.h>
 #endif
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QProcessEnvironment>
 #include <QtCore/QStandardPaths>
@@ -57,14 +59,9 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QStringList arguments = app.arguments();
     const bool useSqlite = arguments.contains(QStringLiteral("--sqlite"));
@@ -73,11 +70,12 @@ int main(int argc, char **argv)
         if (!arguments.at(i).startsWith(QStringLiteral("--")))
             question = arguments.at(i);
     }
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env->model(QStringLiteral("gpt-4o-mini"));
 
-    const QString root = env.value(QStringLiteral("QTOPENAI_STORE"),
-                                   QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
-                                           + QStringLiteral("/qtopenai-persistence-example"));
+    const QString root = QProcessEnvironment::systemEnvironment().value(
+            QStringLiteral("QTOPENAI_STORE"),
+            QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                    + QStringLiteral("/qtopenai-persistence-example"));
 
     // The one line an application changes to swap backends; everything below
     // this point is written against the Store interface.
@@ -121,7 +119,7 @@ int main(int argc, char **argv)
     }
 
     // --- Wire the client ---------------------------------------------------
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
     metrics.attach(&client);
 
     Storage::PersistentResponseCache cache(store.get());
@@ -150,11 +148,7 @@ int main(int argc, char **argv)
             = client.createChatCompletion(transcript.buildRequest(model));
     metrics.observe(reply);
 
-    QObject::connect(reply, &Client::ChatCompletionReply::failed,
-                     [&](const Client::ClientError &error) {
-                         out << "Error: " << error.message() << "\n";
-                         app.quit();
-                     });
+    QObject::connect(reply, &Client::ChatCompletionReply::failed, failAndExit(out, app));
 
     QObject::connect(reply, &Client::ChatCompletionReply::finished,
                      [&](const Core::ChatCompletionResponse &response) {

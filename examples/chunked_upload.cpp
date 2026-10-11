@@ -14,11 +14,12 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtCore/QMimeDatabase>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -28,14 +29,9 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
     if (argc < 2) {
         out << "Usage: chunked_upload <path> [purpose] [chunk-bytes]\n";
         return 1;
@@ -55,7 +51,7 @@ int main(int argc, char **argv)
     const QFileInfo info(source);
     const QString mimeType = QMimeDatabase().mimeTypeForFile(info).name();
 
-    auto *client = new Client::Client(QUrl(baseUrl), apiKey, &app);
+    auto *client = new Client::Client(env->baseUrl, env->key, &app);
 
     Core::CreateUploadRequest request(info.fileName(), purpose, source.size(), mimeType);
     Client::ChunkedUploader *uploader = client->uploadInChunks(request, &source, chunkSize);
@@ -66,11 +62,7 @@ int main(int argc, char **argv)
                          out.flush();
                      });
 
-    QObject::connect(uploader, &Client::ChunkedUploader::failed,
-                     [&out, &app](const Client::ClientError &error) {
-                         out << "Error: " << error.message() << "\n";
-                         app.exit(1);
-                     });
+    QObject::connect(uploader, &Client::ChunkedUploader::failed, failAndExit(out, app));
 
     QObject::connect(uploader, &Client::ChunkedUploader::completed,
                      [&out, &app](const Core::Upload &upload) {

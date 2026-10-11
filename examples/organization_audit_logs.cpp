@@ -32,10 +32,11 @@
 
 #include <QtOpenAi/Admin/Organization.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDateTime>
 #include <QtCore/QJsonDocument>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -68,15 +69,9 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString adminKey = env.value(QStringLiteral("OPENAI_ADMIN_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (adminKey.isEmpty()) {
-        out << "Set OPENAI_ADMIN_KEY to run this example.\n";
-        out << "It must be an admin key; a standard API key cannot read this surface.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out, KeyKind::Admin);
+    if (!env)
         return 1;
-    }
 
     const int hours = app.arguments().value(1).toInt() > 0 ? app.arguments().value(1).toInt() : 24;
     const QString eventType = app.arguments().value(2);
@@ -89,14 +84,10 @@ int main(int argc, char **argv)
         query.eventTypes = {eventType};
     query.limit = 20;
 
-    Admin::Organization organization(QUrl(baseUrl), adminKey);
+    Admin::Organization organization(env->baseUrl, env->key);
 
     Admin::AuditLogListReply *reply = organization.listAuditLogs(query);
-    QObject::connect(reply, &Admin::AuditLogListReply::failed,
-                     [&](const Client::ClientError &error) {
-                         out << "Error: " << error.message() << "\n";
-                         app.quit();
-                     });
+    QObject::connect(reply, &Admin::AuditLogListReply::failed, failAndExit(out, app));
     QObject::connect(
             reply, &Admin::AuditLogListReply::finished, [&](const Core::AuditLogList &page) {
                 out << page.size() << " event(s) in the last " << hours << " hour(s)\n";

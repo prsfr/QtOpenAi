@@ -18,15 +18,17 @@
 // A failed item does not fail the run. One row of a thousand hitting a content
 // filter is not a reason to throw away the other nine hundred and ninety-nine,
 // so the error is recorded against its index and the run carries on -- which is
-// why the results are printed with their index and their outcome.
+// why the results are printed with their index and their outcome. Only the exit
+// status says that something failed, so a script running this can tell.
 
 #include <QtOpenAi/Client/ChatMap.h>
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QFile>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -66,23 +68,18 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QStringList prompts
             = readPrompts(argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString(), out);
     if (prompts.isEmpty())
         return 1;
 
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env->model(QStringLiteral("gpt-4o-mini"));
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
 
     Client::ChatMap map(&client);
     map.setConcurrency(4);
@@ -119,7 +116,7 @@ int main(int argc, char **argv)
         if (run->isAborted())
             out << " -- stopped early after " << run->failureCount() << " failures";
         out << "\n";
-        app.quit();
+        app.exit(run->failureCount() > 0 ? 1 : 0);
     });
 
     return app.exec();

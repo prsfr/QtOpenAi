@@ -23,8 +23,9 @@
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/Guardrail.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -45,20 +46,15 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QString question = argc > 1 ? QString::fromLocal8Bit(argv[1])
                                       : QStringLiteral("Tell me about the French Revolution.");
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env->model(QStringLiteral("gpt-4o-mini"));
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
     Client::Guardrail guardrail(&client);
 
     // A history question will mention violence; that is a reason to note it,
@@ -93,13 +89,9 @@ int main(int argc, char **argv)
                          app.quit();
                      });
 
-    QObject::connect(reply, &Client::GuardedChatReply::failed,
-                     [&out, &app](const Client::ClientError &error) {
-                         // A guardrail that treats "I could not check" as "it
-                         // is fine" is not a guardrail.
-                         out << "Error: " << error.message() << "\n";
-                         app.quit();
-                     });
+    // A guardrail that treats "I could not check" as "it is fine" is not a
+    // guardrail -- and neither is a program that exits 0 when it could not.
+    QObject::connect(reply, &Client::GuardedChatReply::failed, failAndExit(out, app));
 
     return app.exec();
 }

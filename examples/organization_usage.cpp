@@ -29,9 +29,10 @@
 #include <QtOpenAi/Admin/Organization.h>
 #include <QtOpenAi/Client/PageWalker.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDateTime>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -50,19 +51,13 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString adminKey = env.value(QStringLiteral("OPENAI_ADMIN_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (adminKey.isEmpty()) {
-        out << "Set OPENAI_ADMIN_KEY to run this example.\n";
-        out << "It must be an admin key; a standard API key cannot read this surface.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out, KeyKind::Admin);
+    if (!env)
         return 1;
-    }
 
     const bool wantCosts = app.arguments().contains(QStringLiteral("--costs"));
 
-    Admin::Organization organization(QUrl(baseUrl), adminKey);
+    Admin::Organization organization(env->baseUrl, env->key);
 
     Admin::UsageQuery query;
     // start_time is required by the API — a report with no window is refused.
@@ -72,10 +67,7 @@ int main(int argc, char **argv)
     // model (or per line item, which is what the costs report splits by).
     query.groupBy = {wantCosts ? QStringLiteral("line_item") : QStringLiteral("model")};
 
-    const auto onError = [&](const Client::ClientError &error) {
-        out << "Error: " << error.message() << "\n";
-        app.quit();
-    };
+    const auto onError = failAndExit(out, app);
 
     if (wantCosts) {
         Admin::CostsReply *reply = organization.costs(query);

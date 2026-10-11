@@ -20,10 +20,9 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
-#include <QtCore/QFile>
-#include <QtCore/QFileInfo>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -149,25 +148,19 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     // Either upload the zip named on the command line, or a generated directory
     // bundle — the API takes both, and so does CreateSkillRequest.
     Core::CreateSkillRequest bundle;
     if (argc > 1) {
-        QFile file(QString::fromLocal8Bit(argv[1]));
-        if (!file.open(QIODevice::ReadOnly)) {
-            out << "Cannot read " << file.fileName() << "\n";
+        QByteArray bytes;
+        QString name;
+        if (!readFileArg(QString::fromLocal8Bit(argv[1]), bytes, name, out))
             return 1;
-        }
-        bundle.addFile(QFileInfo(file).fileName(), file.readAll());
+        bundle.addFile(name, bytes);
     } else {
         // A directory upload: file names are paths relative to the skill root.
         bundle.addFile(QStringLiteral("SKILL.md"),
@@ -176,7 +169,7 @@ int main(int argc, char **argv)
                        QByteArray("print(\"hello from the skill bundle\")\n"));
     }
 
-    Client::Client client(QUrl(baseUrl), apiKey, &app);
+    Client::Client client(env->baseUrl, env->key, &app);
     SkillDemo demo(&client, std::move(bundle));
     demo.start();
 

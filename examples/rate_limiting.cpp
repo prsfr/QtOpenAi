@@ -22,9 +22,10 @@
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/RateLimiter.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QElapsedTimer>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -34,19 +35,14 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const int count = argc > 1 ? QString::fromLocal8Bit(argv[1]).toInt() : 12;
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env->model(QStringLiteral("gpt-4o-mini"));
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
 
     Client::RateLimiter limiter;
     // Three at a time. Also bounds how many sockets and how much memory a burst
@@ -68,6 +64,7 @@ int main(int argc, char **argv)
     QElapsedTimer elapsed;
     elapsed.start();
     int settled = 0;
+    int failures = 0;
 
     for (int i = 0; i < count; ++i) {
         const Core::ChatCompletionRequest request(
@@ -81,8 +78,9 @@ int main(int argc, char **argv)
                                  << "\n";
                          });
         QObject::connect(reply, &Client::ChatCompletionReply::failed,
-                         [&out, i](const Client::ClientError &error) {
+                         [&out, &failures, i](const Client::ClientError &error) {
                              out << i << ": failed -- " << error.message() << "\n";
+                             ++failures;
                          });
         QObject::connect(reply, &Client::ChatCompletionReply::done, [&]() {
             if (++settled < count)
@@ -90,7 +88,7 @@ int main(int argc, char **argv)
             out << "\n"
                 << count << " requests in " << elapsed.elapsed() << " ms, never more than "
                 << limiter.maxConcurrent() << " at once.\n";
-            app.quit();
+            app.exit(failures > 0 ? 1 : 0);
         });
     }
 

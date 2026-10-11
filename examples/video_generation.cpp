@@ -13,9 +13,10 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QFile>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -25,34 +26,25 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QString prompt = argc > 1 ? QString::fromLocal8Bit(argv[1])
                                     : QStringLiteral("a cat surfing a wave at sunset");
     const QString path = argc > 2 ? QString::fromLocal8Bit(argv[2]) : QStringLiteral("out.mp4");
 
     // Keep the client alive for the whole flow; it parents nothing here.
-    auto *client = new Client::Client(QUrl(baseUrl), apiKey, &app);
+    auto *client = new Client::Client(env->baseUrl, env->key, &app);
 
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("sora-2"));
+    const QString model = env->model(QStringLiteral("sora-2"));
     Core::CreateVideoRequest request(prompt, model);
     request.setSize(QStringLiteral("720x1280"));
     request.setSeconds(QStringLiteral("8"));
 
     Client::VideoReply *job = client->createVideo(request);
 
-    QObject::connect(job, &Client::VideoReply::failed,
-                     [&out, &app](const Client::ClientError &error) {
-                         out << "Error: " << error.message() << "\n";
-                         app.exit(1);
-                     });
+    QObject::connect(job, &Client::VideoReply::failed, failAndExit(out, app));
 
     QObject::connect(job, &Client::VideoReply::finished,
                      [&out, &app, client, path](const Core::VideoJob &queued) {
