@@ -36,11 +36,10 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDateTime>
-#include <QtCore/QFile>
-#include <QtCore/QFileInfo>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -67,14 +66,9 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QStringList args = app.arguments();
     const QString action = args.value(1);
@@ -85,23 +79,19 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    auto *client = new Client::Client(QUrl(baseUrl), apiKey, &app);
+    auto *client = new Client::Client(env->baseUrl, env->key, &app);
 
-    const auto onError = [&](const Client::ClientError &error) {
-        out << "Error: " << error.message() << "\n";
-        app.exit(1);
-    };
+    const auto onError = failAndExit(out, app);
 
     // --- Characters -------------------------------------------------------
     if (action == QLatin1String("character")) {
-        QFile videoFile(third);
-        if (!videoFile.open(QIODevice::ReadOnly)) {
-            out << "Cannot read " << videoFile.fileName() << "\n";
+        QByteArray video;
+        QString videoName;
+        if (!readFileArg(third, video, videoName, out))
             return 1;
-        }
 
-        Client::VideoCharacterReply *created = client->createVideoCharacter(
-                second, QFileInfo(videoFile).fileName(), videoFile.readAll());
+        Client::VideoCharacterReply *created
+                = client->createVideoCharacter(second, videoName, video);
         QObject::connect(created, &Client::VideoCharacterReply::failed, onError);
         QObject::connect(created, &Client::VideoCharacterReply::finished,
                          [&](const Core::VideoCharacter &character) {

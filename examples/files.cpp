@@ -14,10 +14,9 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
-#include <QtCore/QFile>
-#include <QtCore/QFileInfo>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -27,26 +26,16 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     // Either upload the file named on the command line or a small generated one.
     QByteArray payload;
     QString fileName;
     if (argc > 1) {
-        QFile file(QString::fromLocal8Bit(argv[1]));
-        if (!file.open(QIODevice::ReadOnly)) {
-            out << "Cannot read " << file.fileName() << "\n";
+        if (!readFileArg(QString::fromLocal8Bit(argv[1]), payload, fileName, out))
             return 1;
-        }
-        payload = file.readAll();
-        fileName = QFileInfo(file).fileName();
     } else {
         payload = QByteArray("QtOpenAi example upload.\n");
         fileName = QStringLiteral("qtopenai-example.txt");
@@ -56,12 +45,9 @@ int main(int argc, char **argv)
     // input; fine-tuning and batch jobs use their own purposes.
     const QString purpose = QStringLiteral("user_data");
 
-    auto *client = new Client::Client(QUrl(baseUrl), apiKey, &app);
+    auto *client = new Client::Client(env->baseUrl, env->key, &app);
 
-    auto reportError = [&out, &app](const Client::ClientError &error) {
-        out << "Error: " << error.message() << "\n";
-        app.exit(1);
-    };
+    auto reportError = failAndExit(out, app);
 
     Core::FileUploadRequest request(payload, fileName, purpose);
     Client::FileReply *upload = client->uploadFile(request);

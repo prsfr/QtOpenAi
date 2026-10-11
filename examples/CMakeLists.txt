@@ -4,6 +4,7 @@
 function(qtopenai_add_example name source)
     qt_add_executable(${name} ${source})
     target_link_libraries(${name} PRIVATE QtOpenAi::Client)
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/common)
 endfunction()
 
 # --- Infrastructure ---

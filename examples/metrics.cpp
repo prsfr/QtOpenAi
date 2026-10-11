@@ -24,8 +24,9 @@
 #include <QtOpenAi/Client/Client.h>
 #include <QtOpenAi/Client/MetricsCollector.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -35,20 +36,15 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QString question = argc > 1 ? QString::fromLocal8Bit(argv[1])
                                       : QStringLiteral("Explain the Qt meta-object system.");
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env->model(QStringLiteral("gpt-4o-mini"));
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
 
     Client::MetricsCollector metrics;
     metrics.attach(&client);
@@ -82,9 +78,13 @@ int main(int argc, char **argv)
                          out.flush();
                      });
 
+    // done() follows failed(), so the exit status is decided there: the report
+    // is printed either way, and a failed request still fails the run.
+    bool failed = false;
     QObject::connect(reply, &Client::ChatCompletionStreamReply::failed,
-                     [&out](const Client::ClientError &error) {
+                     [&out, &failed](const Client::ClientError &error) {
                          out << "\nError: " << error.message() << "\n";
+                         failed = true;
                      });
 
     QObject::connect(reply, &Client::ChatCompletionStreamReply::done, [&]() {
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
         // was free.
         out << "Cost:     $" << snapshot.cost() << "\n";
 
-        app.quit();
+        app.exit(failed ? 1 : 0);
     });
 
     return app.exec();

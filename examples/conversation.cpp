@@ -21,9 +21,10 @@
 #include <QtOpenAi/Chat/Transcript.h>
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QJsonDocument>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -89,18 +90,15 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    if (apiKey.isEmpty()) {
+    const ExampleEnv env = readExampleEnv();
+    if (env.key.isEmpty()) {
         out << "No OPENAI_API_KEY set -- running the offline walk-through.\n\n";
         return walkThrough(out);
     }
 
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env.model(QStringLiteral("gpt-4o-mini"));
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env.baseUrl, env.key);
 
     Chat::Transcript transcript;
     transcript.setSystemPrompt(QStringLiteral("You are a concise assistant."));

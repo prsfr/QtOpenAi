@@ -29,8 +29,9 @@
 #include <QtOpenAi/Client/LoggingInterceptor.h>
 #include <QtOpenAi/Client/ResponseCache.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 #include <QtCore/QUuid>
 
@@ -56,20 +57,15 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QString question = argc > 1 ? QString::fromLocal8Bit(argv[1])
                                       : QStringLiteral("What is the capital of France?");
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-4o-mini"));
+    const QString model = env->model(QStringLiteral("gpt-4o-mini"));
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
 
     // Outermost, so it sees the request after the others have had their say and
     // the response before they unwind.
@@ -109,11 +105,7 @@ int main(int argc, char **argv)
                              else
                                  QCoreApplication::quit();
                          });
-        QObject::connect(reply, &Client::ChatCompletionReply::failed,
-                         [&out](const Client::ClientError &error) {
-                             out << "Error: " << error.message() << "\n";
-                             QCoreApplication::quit();
-                         });
+        QObject::connect(reply, &Client::ChatCompletionReply::failed, failAndExit(out, app));
     };
     askTwice(askTwice, 2);
 

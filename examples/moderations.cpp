@@ -9,8 +9,9 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -20,33 +21,24 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
     const QString text
             = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QStringLiteral("I want to hug a puppy.");
 
-    Client::Client client(QUrl(baseUrl), apiKey);
+    Client::Client client(env->baseUrl, env->key);
 
     Core::ModerationRequest request(text);
     // Optional: override the moderation model (e.g. for a local endpoint).
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"));
+    const QString model = env->model({});
     if (!model.isEmpty())
         request.setModel(model);
 
     Client::ModerationReply *reply = client.createModeration(request);
 
-    QObject::connect(reply, &Client::ModerationReply::failed,
-                     [&out, &app](const Client::ClientError &error) {
-                         out << "Error: " << error.message() << "\n";
-                         app.exit(1);
-                     });
+    QObject::connect(reply, &Client::ModerationReply::failed, failAndExit(out, app));
 
     QObject::connect(reply, &Client::ModerationReply::finished,
                      [&out, &app](const Core::ModerationResponse &response) {

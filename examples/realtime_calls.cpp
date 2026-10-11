@@ -43,9 +43,9 @@
 
 #include <QtOpenAi/Client/Client.h>
 
+#include "ExampleSupport.h"
+
 #include <QtCore/QCoreApplication>
-#include <QtCore/QFile>
-#include <QtCore/QProcessEnvironment>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -78,12 +78,6 @@ int main(int argc, char **argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString apiKey = env.value(QStringLiteral("OPENAI_API_KEY"));
-    const QString baseUrl = env.value(QStringLiteral("OPENAI_BASE_URL"),
-                                      QStringLiteral("https://api.openai.com/v1"));
-    const QString model = env.value(QStringLiteral("OPENAI_MODEL"), QStringLiteral("gpt-realtime"));
-
     const QStringList args = app.arguments();
     const QString action = args.value(1);
     // For `create` the second argument is a file holding the SDP offer; for
@@ -93,12 +87,13 @@ int main(int argc, char **argv)
         usage(out, args.value(0));
         return 1;
     }
-    if (apiKey.isEmpty()) {
-        out << "Set OPENAI_API_KEY to run this example.\n";
+    const std::optional<ExampleEnv> env = exampleEnv(out);
+    if (!env)
         return 1;
-    }
 
-    auto *client = new Client::Client(QUrl(baseUrl), apiKey, &app);
+    const QString model = env->model(QStringLiteral("gpt-realtime"));
+
+    auto *client = new Client::Client(env->baseUrl, env->key, &app);
 
     // The concierge the caller is bridged into, configured before they hear
     // anything. Audio in both directions is the point of a phone call, so this
@@ -116,13 +111,12 @@ int main(int argc, char **argv)
     // `create` answers with an SDP body and a call id rather than an
     // acknowledgement, so it has its own reply type and its own branch.
     if (action == QLatin1String("create")) {
-        QFile offerFile(callId);
-        if (!offerFile.open(QIODevice::ReadOnly)) {
-            out << "Cannot read " << offerFile.fileName() << "\n"
-                << "Pass a file holding an SDP offer from your peer-connection stack.\n";
+        QByteArray sdpOffer;
+        QString offerName;
+        if (!readFileArg(callId, sdpOffer, offerName, out)) {
+            out << "Pass a file holding an SDP offer from your peer-connection stack.\n";
             return 1;
         }
-        const QByteArray sdpOffer = offerFile.readAll();
 
         // Passing a session means the credential is an API key. With an
         // ephemeral client secret you would call createRealtimeCall(sdpOffer)
@@ -178,14 +172,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    QObject::connect(reply, &Client::RealtimeCallReply::failed,
-                     [&](const Client::ClientError &error) {
-                         // A call id is short-lived: one that has already been
-                         // answered, declined or abandoned is gone, and that is
-                         // the common failure here rather than a bad key.
-                         out << "Error: " << error.message() << "\n";
-                         app.exit(1);
-                     });
+    // A call id is short-lived: one that has already been answered, declined
+    // or abandoned is gone, and that is the common failure here rather than a
+    // bad key.
+    QObject::connect(reply, &Client::RealtimeCallReply::failed, failAndExit(out, app));
     QObject::connect(reply, &Client::RealtimeCallReply::finished, [&] {
         // Nothing to print but the fact that it worked: the API acknowledges
         // these four and returns no object.
@@ -197,7 +187,7 @@ int main(int argc, char **argv)
             //   Realtime::RealtimeConnection connection;
             //   connection.setUrl(QUrl("wss://api.openai.com/v1/realtime"
             //                          "?call_id=" + callId));
-            //   connection.setApiKey(apiKey);   // leave the model unset --
+            //   connection.setApiKey(env->key); // leave the model unset --
             //   connection.open();              // accept already chose it
             //
             // Not done here, so that this example needs nothing beyond
