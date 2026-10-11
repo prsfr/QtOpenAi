@@ -16,18 +16,24 @@ set -euo pipefail
 cd "$QTOPENAI_ROOT/examples"
 failed=0
 
-literals=$(grep -rnE '"OPENAI_(API_KEY|ADMIN_KEY|BASE_URL|MODEL)"' --include='*.cpp' . | LC_ALL=C sort || true)
+# grep exits 1 for "no match"; anything above that (an unreadable file) must
+# fail the check rather than pass it.
+literals=$(grep -rnE '"OPENAI_(API_KEY|ADMIN_KEY|BASE_URL|MODEL)"' --include='*.cpp' \
+    --include='*.h' --exclude=ExampleSupport.h .) || [[ $? -eq 1 ]] || exit 2
 if [[ -n $literals ]]; then
     echo "examples read the environment themselves; use exampleEnv() from common/ExampleSupport.h:"
-    echo "$literals"
+    LC_ALL=C sort <<<"$literals"
     failed=1
 fi
 
-quits=$(grep -rn -A4 'error\.message()' --include='*.cpp' --include='*.h' . |
-    grep -E 'app\.quit\(\)|QCoreApplication::quit\(\)|qApp->quit\(\)' | LC_ALL=C sort || true)
+# The window is lexical: a success handler that quits within four lines of an
+# error handler is flagged too. Move it, rather than widening this.
+context=$(grep -rn -A4 'error\.message()' --include='*.cpp' --include='*.h' .) ||
+    [[ $? -eq 1 ]] || exit 2
+quits=$(grep -E 'app\.quit\(\)|QCoreApplication::quit\(\)|qApp->quit\(\)' <<<"$context" || true)
 if [[ -n $quits ]]; then
     echo "an error handler quits with exit status 0; use failAndExit() or exit(1):"
-    echo "$quits"
+    LC_ALL=C sort <<<"$quits"
     failed=1
 fi
 
