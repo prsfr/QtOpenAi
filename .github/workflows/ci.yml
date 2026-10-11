@@ -22,6 +22,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Every job only reads the repository (checkout, Qt from its own cache).
+permissions:
+  contents: read
+
 # With one event per branch there is nothing left to reconcile, so the group is
 # just the ref. Superseding still applies to a pull request -- a commit nobody
 # is going to look at any more need not finish building -- but never to the
