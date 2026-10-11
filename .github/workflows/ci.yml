@@ -194,3 +194,29 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: LD_LIBRARY_PATH="$PWD/_prefix/lib:$QT_ROOT_DIR/lib" ./build-consumer/gui_consumer
+
+  # The ways of building QtOpenAi that the shared test matrix does not cover
+  # (#210): the whole suite against static libraries, and QtOpenAi included
+  # from source into another project, which must leave that project's build
+  # type alone. Linux only -- both are platform-independent CMake, and the
+  # subproject check skips on Windows, which --strict would turn into a FAIL.
+  build-variants:
+    name: check ${{ matrix.check }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [static, subproject]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.1"
+          modules: qtwebsockets
+          cache: true
+
+      - name: scripts/check.sh ${{ matrix.check }}
+        run: scripts/check.sh --strict --build-dir build ${{ matrix.check }}

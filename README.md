@@ -3132,7 +3132,8 @@ ctest --test-dir build --output-on-failure
 |---------------------------|----------------|--------------------------------------|
 | `QTOPENAI_BUILD_TESTS`    | `ON` top-level | Build the QtTest unit tests.         |
 | `QTOPENAI_BUILD_EXAMPLES` | `ON` top-level | Build the example programs.          |
-| `QTOPENAI_BUILD_SHARED`   | `ON`           | Build shared (vs. static) libraries. |
+| `QTOPENAI_BUILD_SHARED`   | `BUILD_SHARED_LIBS`, else `ON` | Build shared (vs. static) libraries. |
+| `QTOPENAI_INSTALL`        | `ON` top-level | Generate install and export rules.   |
 | `QTOPENAI_BUILD_REALTIME` | Qt WebSockets  | Build `QtOpenAi::Realtime`; on when `Qt6::WebSockets` is found. |
 | `QTOPENAI_BUILD_SQL`      | Qt Sql         | Build `QtOpenAi::Sql`; on when `Qt6::Sql` is found. |
 
@@ -3146,6 +3147,18 @@ target_link_libraries(myapp PRIVATE QtOpenAi::Admin)      # the /organization su
 target_link_libraries(myapp PRIVATE QtOpenAi::Realtime)   # optional; adds WebSockets
 target_link_libraries(myapp PRIVATE QtOpenAi::Sql)        # optional; adds Sql
 ```
+
+Or without a copy in your tree:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(qtopenai GIT_REPOSITORY https://github.com/prsfr/qtopenai.git GIT_TAG main)
+FetchContent_MakeAvailable(qtopenai)
+```
+
+Either way, QtOpenAi leaves your `CMAKE_BUILD_TYPE` alone, builds static or
+shared libraries as your `BUILD_SHARED_LIBS` says, and turns its tests,
+examples and install rules off.
 
 ## Testing
 
@@ -3162,11 +3175,14 @@ against the same Qt release, 6.11.1.
 ### Before pushing
 
 Every check a change has to pass — formatting, build, tests, the headless
-check, and the deterministic quality gates as they are added — runs from one
-script, the same one CI calls:
+check, a build as a subproject, and the deterministic quality gates as they
+are added — runs from one script, the same one CI calls. The suite against
+static libraries is a second full build, so it runs only when named; CI always
+runs it:
 
 ```sh
-scripts/check.sh                  # everything, in order
+scripts/check.sh                  # everything but the static suite, in order
+scripts/check.sh static           # the test suite against static libraries
 scripts/check.sh --list           # what exists
 scripts/check-format.sh --fix     # apply .clang-format
 ```
