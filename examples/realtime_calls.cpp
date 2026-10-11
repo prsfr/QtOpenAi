@@ -46,7 +46,6 @@
 #include "ExampleSupport.h"
 
 #include <QtCore/QCoreApplication>
-#include <QtCore/QFile>
 #include <QtCore/QTextStream>
 
 using namespace QtOpenAi;
@@ -112,13 +111,12 @@ int main(int argc, char **argv)
     // `create` answers with an SDP body and a call id rather than an
     // acknowledgement, so it has its own reply type and its own branch.
     if (action == QLatin1String("create")) {
-        QFile offerFile(callId);
-        if (!offerFile.open(QIODevice::ReadOnly)) {
-            out << "Cannot read " << offerFile.fileName() << "\n"
-                << "Pass a file holding an SDP offer from your peer-connection stack.\n";
+        QByteArray sdpOffer;
+        QString offerName;
+        if (!readFileArg(callId, sdpOffer, offerName, out)) {
+            out << "Pass a file holding an SDP offer from your peer-connection stack.\n";
             return 1;
         }
-        const QByteArray sdpOffer = offerFile.readAll();
 
         // Passing a session means the credential is an API key. With an
         // ephemeral client secret you would call createRealtimeCall(sdpOffer)
@@ -174,14 +172,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    QObject::connect(reply, &Client::RealtimeCallReply::failed,
-                     [&](const Client::ClientError &error) {
-                         // A call id is short-lived: one that has already been
-                         // answered, declined or abandoned is gone, and that is
-                         // the common failure here rather than a bad key.
-                         out << "Error: " << error.message() << "\n";
-                         app.exit(1);
-                     });
+    // A call id is short-lived: one that has already been answered, declined
+    // or abandoned is gone, and that is the common failure here rather than a
+    // bad key.
+    QObject::connect(reply, &Client::RealtimeCallReply::failed, failAndExit(out, app));
     QObject::connect(reply, &Client::RealtimeCallReply::finished, [&] {
         // Nothing to print but the fact that it worked: the API acknowledges
         // these four and returns no object.

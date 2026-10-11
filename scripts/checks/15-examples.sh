@@ -7,7 +7,7 @@
 #   - an example reads OPENAI_API_KEY / OPENAI_ADMIN_KEY / OPENAI_BASE_URL /
 #     OPENAI_MODEL itself instead of through the header;
 #   - an error handler ends with quit(), which exits 0 and tells a script that
-#     a failed request succeeded. Sixteen did, cloned from one that had it.
+#     a failed request succeeded. Seventeen did, most cloned from one another.
 #
 # Plain grep over the sources: no build, the same answer on every machine.
 
@@ -16,7 +16,7 @@ set -euo pipefail
 cd "$QTOPENAI_ROOT/examples"
 failed=0
 
-literals=$(grep -rnE '"OPENAI_(API_KEY|ADMIN_KEY|BASE_URL|MODEL)"' --include='*.cpp' . || true)
+literals=$(grep -rnE '"OPENAI_(API_KEY|ADMIN_KEY|BASE_URL|MODEL)"' --include='*.cpp' . | sort || true)
 if [[ -n $literals ]]; then
     echo "examples read the environment themselves; use exampleEnv() from common/ExampleSupport.h:"
     echo "$literals"
@@ -24,7 +24,7 @@ if [[ -n $literals ]]; then
 fi
 
 quits=$(grep -rn -A4 'error\.message()' --include='*.cpp' --include='*.h' . |
-    grep -E 'app\.quit\(\)|QCoreApplication::quit\(\)|qApp->quit\(\)' || true)
+    grep -E 'app\.quit\(\)|QCoreApplication::quit\(\)|qApp->quit\(\)' | sort || true)
 if [[ -n $quits ]]; then
     echo "an error handler quits with exit status 0; use failAndExit() or exit(1):"
     echo "$quits"
