@@ -4,7 +4,7 @@
 # The one entry point for every check a change has to pass, run the same way
 # by a contributor, by the agent pipeline in AGENTS.md and by CI (#171).
 #
-#   scripts/check.sh                     # every check, in order
+#   scripts/check.sh                     # every default check, in order
 #   scripts/check.sh format test         # just these, still in order
 #   scripts/check.sh --list              # what exists
 #   scripts/check.sh --strict            # a skipped check fails (CI)
@@ -17,6 +17,11 @@
 # fail. Skipping is fine on a developer machine missing clang-format; it is not
 # fine in CI, where a silently skipped check is a check that never ran, so CI
 # passes --strict.
+#
+# A check whose file has the line `# check.sh: explicit-only` is too costly
+# for every run (a second full build): it runs only when named, and CI names
+# it. A run that names no checks lists it as skipped, with the command to run
+# it, and does not count that as a failure even under --strict.
 #
 # CI calls this script rather than spelling a check out in ci.yml. That is the
 # point of having it: the local run and the CI run ask the same question, and
@@ -68,15 +73,26 @@ case $build_dir in
     *) build_dir="$PWD/$build_dir" ;;
 esac
 
-declare -a names files
+declare -a names files explicit
 for file in "$checks_dir"/[0-9][0-9]-*.sh; do
     name=$(basename "$file" .sh)
     names+=("${name#[0-9][0-9]-}")
     files+=("$file")
+    if grep -qxF '# check.sh: explicit-only' "$file"; then
+        explicit+=(1)
+    else
+        explicit+=(0)
+    fi
 done
 
 if [[ $list -eq 1 ]]; then
-    printf '%s\n' "${names[@]}"
+    for i in "${!names[@]}"; do
+        if [[ ${explicit[$i]} -eq 1 ]]; then
+            echo "${names[$i]} (explicit only)"
+        else
+            echo "${names[$i]}"
+        fi
+    done
     exit 0
 fi
 
@@ -104,6 +120,9 @@ for i in "${!names[@]}"; do
             [[ $want == "$name" ]] && wanted=1
         done
         [[ $wanted -eq 1 ]] || continue
+    elif [[ ${explicit[$i]} -eq 1 ]]; then
+        summary+=("SKIP  $name (explicit only; scripts/check.sh $name)")
+        continue
     fi
 
     echo "==> $name"

@@ -13,10 +13,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
-endif()
-
 # Treat this as the top-level project only when configured directly.
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(QTOPENAI_IS_TOPLEVEL ON)
@@ -24,9 +20,21 @@ else()
     set(QTOPENAI_IS_TOPLEVEL OFF)
 endif()
 
+# Only our own build: the cache is shared, so as a subproject this would
+# switch the whole parent to Release (#210).
+if(QTOPENAI_IS_TOPLEVEL AND NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
+endif()
+
 option(QTOPENAI_BUILD_TESTS    "Build QtOpenAi unit tests"   ${QTOPENAI_IS_TOPLEVEL})
 option(QTOPENAI_BUILD_EXAMPLES "Build QtOpenAi examples"     ${QTOPENAI_IS_TOPLEVEL})
-option(QTOPENAI_BUILD_SHARED   "Build QtOpenAi as shared libraries" ON)
+# Follows BUILD_SHARED_LIBS, the CMake convention, when the build sets it.
+if(DEFINED BUILD_SHARED_LIBS)
+    set(_qtopenai_shared_default ${BUILD_SHARED_LIBS})
+else()
+    set(_qtopenai_shared_default ON)
+endif()
+option(QTOPENAI_BUILD_SHARED   "Build QtOpenAi as shared libraries" ${_qtopenai_shared_default})
 option(QTOPENAI_INSTALL        "Generate QtOpenAi install/export rules" ${QTOPENAI_IS_TOPLEVEL})
 
 include(GNUInstallDirs)

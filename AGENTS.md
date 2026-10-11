@@ -18,7 +18,7 @@ Two ideas carry it:
 ## The check script
 
 ```sh
-scripts/check.sh                  # every check, in order
+scripts/check.sh                  # every default check, in order
 scripts/check.sh format test      # a subset
 scripts/check.sh --list           # what exists
 scripts/check.sh --strict         # a skipped check fails -- what CI runs
@@ -34,6 +34,13 @@ the good direction.
 
 Run it before every push. Run the full set, not the check you think is
 relevant.
+
+A check too costly for every run (`static`, a second full build) is marked
+`explicit-only` in its file: it runs only when named (`scripts/check.sh
+static`), and CI always names it. A run that names no checks prints it as
+`SKIP ... (explicit only; ...)`; that line is not a failure and does not block
+a stage, `--strict` or not. Run it by name when a change could behave
+differently in a static build.
 
 ## The pipeline
 
