@@ -58,11 +58,23 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 # --------------------------------------------------------------------------
 # Dependencies
 # --------------------------------------------------------------------------
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Network)
+# The oldest Qt QtOpenAi supports, in one place: every find_package below, the
+# installed package config, the deprecation cut-off and the name of the CI job
+# that builds against it (scripts/check.sh qt-min holds them together, #205).
+# A normal variable, not a cache entry: as a subproject QtOpenAi must not add
+# to the parent's cache what the parent could mistake for its own setting.
+set(QTOPENAI_MIN_QT_VERSION 6.4)
+string(REPLACE "." ";" _qtopenai_min "${QTOPENAI_MIN_QT_VERSION}")
+list(GET _qtopenai_min 0 _qtopenai_min_major)
+list(GET _qtopenai_min 1 _qtopenai_min_minor)
+math(EXPR QTOPENAI_QT_DEPRECATION_CUTOFF
+     "(${_qtopenai_min_major} << 16) | (${_qtopenai_min_minor} << 8)" OUTPUT_FORMAT HEXADECIMAL)
+
+find_package(Qt6 ${QTOPENAI_MIN_QT_VERSION} REQUIRED COMPONENTS Core Network)
 
 # QtOpenAi::Realtime is the only module that needs Qt6::WebSockets, so it is
 # built only when that component is there. Everything else works without it.
-find_package(Qt6 6.4 QUIET COMPONENTS WebSockets)
+find_package(Qt6 ${QTOPENAI_MIN_QT_VERSION} QUIET COMPONENTS WebSockets)
 option(QTOPENAI_BUILD_REALTIME "Build the QtOpenAi::Realtime module (needs Qt6::WebSockets)"
        ${Qt6WebSockets_FOUND})
 if(QTOPENAI_BUILD_REALTIME AND NOT Qt6WebSockets_FOUND)
@@ -74,7 +86,7 @@ endif()
 # QtOpenAi::Storage and the only module that needs Qt6::Sql. Storage itself,
 # and its JSON-files backend, are always built and need nothing beyond
 # Qt6::Core.
-find_package(Qt6 6.4 QUIET COMPONENTS Sql)
+find_package(Qt6 ${QTOPENAI_MIN_QT_VERSION} QUIET COMPONENTS Sql)
 option(QTOPENAI_BUILD_SQL "Build the QtOpenAi::Sql module (needs Qt6::Sql)"
        ${Qt6Sql_FOUND})
 if(QTOPENAI_BUILD_SQL AND NOT Qt6Sql_FOUND)

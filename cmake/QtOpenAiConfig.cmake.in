@@ -9,18 +9,18 @@ include(CMakeFindDependencyMacro)
 # which is the reason it exists. Spelling it out would override that and turn a
 # deliberate find_package(QtOpenAi QUIET) -- a project deciding whether it can
 # enable an optional feature -- into a fatal error about Qt6.
-find_dependency(Qt6 COMPONENTS Core Network)
+find_dependency(Qt6 @QTOPENAI_MIN_QT_VERSION@ COMPONENTS Core Network)
 
 # QtOpenAi::Realtime additionally needs Qt6::WebSockets. It is only in the
 # export set when it was built, so the dependency is asked for only then.
 if(@QTOPENAI_BUILD_REALTIME@)
-    find_dependency(Qt6 COMPONENTS WebSockets)
+    find_dependency(Qt6 @QTOPENAI_MIN_QT_VERSION@ COMPONENTS WebSockets)
 endif()
 
 # QtOpenAi::Sql additionally needs Qt6::Sql, and is in the export set only when
 # it was built -- the same arrangement as Realtime above.
 if(@QTOPENAI_BUILD_SQL@)
-    find_dependency(Qt6 COMPONENTS Sql)
+    find_dependency(Qt6 @QTOPENAI_MIN_QT_VERSION@ COMPONENTS Sql)
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/QtOpenAiTargets.cmake")

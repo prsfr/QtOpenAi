@@ -3119,6 +3119,7 @@ beyond `QtOpenAi::Client`.
 Requirements: CMake ≥ 3.21, a C++17 compiler, and Qt 6 (`Core`, `Network`,
 plus `Test` for the test suite, `WebSockets` for the optional
 `QtOpenAi::Realtime` module and `Sql` for the optional `QtOpenAi::Sql` module).
+Targets Qt 6.4+ (developed against the Qt 6.11 series); CI builds and tests both.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -3171,13 +3172,17 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds and tests on
 **Linux, macOS and Windows** on every pull request and every push to `main`. The
 library has no platform-specific code, but the MSVC and Apple clang jobs are the
 ones that catch template, `constexpr` and export-macro breakage. All three build
-against the same Qt release, 6.11.1.
+against the same Qt release, 6.11.1. A fourth job, on Linux, builds and tests
+against the oldest supported Qt — 6.4, from Ubuntu 24.04 — and every build
+compiles the library with Qt API deprecated up to 6.4 disabled, so neither a
+newer API nor a soon-removed one can slip in unnoticed.
 
 ### Before pushing
 
 Every check a change has to pass — formatting, build, tests, the headless
-check, a build as a subproject, and the deterministic quality gates as they
-are added — runs from one script, the same one CI calls. The suite against
+check, a build as a subproject, the Qt minimum (`qt-min`: declared once, and
+built against when the tree's Qt is the minimum), and the deterministic quality
+gates as they are added — runs from one script, the same one CI calls. The suite against
 static libraries is a second full build, so it runs only when named; CI always
 runs it:
 
