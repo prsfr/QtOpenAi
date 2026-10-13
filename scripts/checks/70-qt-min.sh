@@ -18,9 +18,11 @@ fail() {
 
 # The declaration first, so a broken one fails on any machine, whatever Qt the
 # tree has.
-sets=$(grep -cE '^set\(QTOPENAI_MIN_QT_VERSION [0-9]+\.[0-9]+\)' "$root/CMakeLists.txt" || true)
-[[ $sets -eq 1 ]] || fail "CMakeLists.txt must set QTOPENAI_MIN_QT_VERSION <major>.<minor> exactly once (found $sets)"
-min=$(sed -nE 's/^set\(QTOPENAI_MIN_QT_VERSION ([0-9]+\.[0-9]+)\)/\1/p' "$root/CMakeLists.txt")
+sets=$(grep -cE '^\s*set\(QTOPENAI_MIN_QT_VERSION\s' "$root/CMakeLists.txt" || true)
+[[ $sets -eq 1 ]] || fail "CMakeLists.txt must set QTOPENAI_MIN_QT_VERSION exactly once (found $sets)"
+min=$(sed -nE 's/^set\(QTOPENAI_MIN_QT_VERSION ([0-9]+\.[0-9]+)\)$/\1/p' "$root/CMakeLists.txt")
+[[ -n $min ]] || fail "QTOPENAI_MIN_QT_VERSION must be set to <major>.<minor>, at the start of a line"
+min_re=${min//./\\.}
 
 for file in CMakeLists.txt tests/CMakeLists.txt; do
     if grep -nE '^\s*find_package\(Qt6 [0-9]' "$root/$file"; then
@@ -31,17 +33,23 @@ uses=$(cat "$root/CMakeLists.txt" "$root/tests/CMakeLists.txt" |
     grep -cE '^\s*find_package\(Qt6 \$\{QTOPENAI_MIN_QT_VERSION\} ' || true)
 [[ $uses -eq 4 ]] || fail "expected 4 find_package(Qt6 \${QTOPENAI_MIN_QT_VERSION} ...) calls, found $uses"
 
-job="name: linux / Qt $min (distro)"
-grep -qF "$job" "$root/.github/workflows/ci.yml" || fail "ci.yml has no job '$job'"
+job="    name: linux / Qt $min (distro)"
+grep -qxF "$job" "$root/.github/workflows/ci.yml" || fail "ci.yml has no job named 'linux / Qt $min (distro)'"
 
 cache=$QTOPENAI_BUILD_DIR/CMakeCache.txt
 [[ -f $cache ]] || fail "no configured tree in $QTOPENAI_BUILD_DIR -- run the build check first"
+if grep -q '^QTOPENAI_MIN_QT_VERSION:' "$cache"; then
+    fail "QTOPENAI_MIN_QT_VERSION is a cache entry; as a subproject it would land in the parent's cache"
+fi
 
 config=$QTOPENAI_BUILD_DIR/QtOpenAiConfig.cmake
 [[ -f $config ]] || fail "$config is missing"
-if grep -nE '^\s*find_dependency\(Qt6 COMPONENTS' "$config"; then
-    fail "the package config asks consumers for Qt6 without a version"
-fi
+# Core/Network, WebSockets and Sql: each asks for the minimum, and nothing else
+# asks for Qt6 at all.
+deps=$(grep -cE '^\s*find_dependency\(Qt6' "$config" || true)
+versioned=$(grep -cE "^\\s*find_dependency\\(Qt6 $min_re COMPONENTS " "$config" || true)
+[[ $deps -eq 3 && $versioned -eq 3 ]] ||
+    fail "the package config must ask for Qt6 $min in all 3 find_dependency calls ($versioned of $deps do)"
 
 # From the tree, not from qmake6, which may belong to another Qt.
 dir=$(sed -n 's/^Qt6Core_DIR:[A-Z]*=//p' "$cache")
@@ -53,8 +61,14 @@ for file in "$dir/Qt6CoreConfigVersionImpl.cmake" "$dir/Qt6CoreConfigVersion.cma
 done
 [[ -n $version ]] || fail "cannot read the Qt version of the tree (Qt6Core_DIR='$dir')"
 
-if [[ ${version%.*} != "$min" ]]; then
-    echo "tree is built against Qt $version, not the minimum $min -- skipped"
+IFS=. read -r have_major have_minor _ <<<"$version"
+IFS=. read -r min_major min_minor <<<"$min"
+have=$((have_major * 1000 + have_minor))
+want=$((min_major * 1000 + min_minor))
+if ((have < want)); then
+    fail "tree is built against Qt $version, older than the declared minimum $min"
+elif ((have > want)); then
+    echo "tree is built against Qt $version, newer than the minimum $min -- skipped"
     exit 77
 fi
 echo "tree is built against Qt $version, the declared minimum"

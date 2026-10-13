@@ -49,8 +49,8 @@ function(qtopenai_add_module name)
     target_compile_definitions(${target} PRIVATE QTOPENAI_${upper}_LIBRARY)
     # Qt API already deprecated in the oldest supported Qt does not compile,
     # on any Qt: a newer one would otherwise accept it only to remove it later.
-    # Both spellings, because Qt 6.4 knows only _BEFORE and 6.5+ maps it onto
-    # _UP_TO.
+    # _UP_TO is the name from Qt 6.5 on; _BEFORE stays because 6.4 knows only
+    # that one.
     target_compile_definitions(${target} PRIVATE
         QT_DISABLE_DEPRECATED_BEFORE=${QTOPENAI_QT_DEPRECATION_CUTOFF}
         QT_DISABLE_DEPRECATED_UP_TO=${QTOPENAI_QT_DEPRECATION_CUTOFF})

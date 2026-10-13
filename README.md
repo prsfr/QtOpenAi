@@ -3172,7 +3172,7 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds and tests on
 **Linux, macOS and Windows** on every pull request and every push to `main`. The
 library has no platform-specific code, but the MSVC and Apple clang jobs are the
 ones that catch template, `constexpr` and export-macro breakage. All three build
-against the same Qt release, 6.11.1. A fourth job, on Linux, builds and tests
+against the same Qt release, 6.11.1. Another job, on Linux, builds and tests
 against the oldest supported Qt — 6.4, from Ubuntu 24.04 — and every build
 compiles the library with Qt API deprecated up to 6.4 disabled, so neither a
 newer API nor a soon-removed one can slip in unnoticed.
@@ -3182,9 +3182,9 @@ newer API nor a soon-removed one can slip in unnoticed.
 Every check a change has to pass — formatting, build, tests, the headless
 check, a build as a subproject, the Qt minimum (`qt-min`: declared once, and
 built against when the tree's Qt is the minimum), and the deterministic quality
-gates as they are added — runs from one script, the same one CI calls. The suite against
-static libraries is a second full build, so it runs only when named; CI always
-runs it:
+gates as they are added — runs from one script, the same one CI calls. The
+suite against static libraries is a second full build, so it runs only when
+named; CI always runs it:
 
 ```sh
 scripts/check.sh                  # everything but the static suite, in order
