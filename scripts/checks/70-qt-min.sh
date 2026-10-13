@@ -52,7 +52,7 @@ versioned=$(grep -cE "^\\s*find_dependency\\(Qt6 $min_re COMPONENTS " "$config" 
     fail "the package config must ask for Qt6 $min in all 3 find_dependency calls ($versioned of $deps do)"
 
 # From the tree, not from qmake6, which may belong to another Qt.
-dir=$(sed -n 's/^Qt6Core_DIR:[A-Z]*=//p' "$cache")
+dir=$(sed -n 's/^Qt6Core_DIR:[A-Z]*=//p' "$cache" | tr -d '\r')
 version=
 for file in "$dir/Qt6CoreConfigVersionImpl.cmake" "$dir/Qt6CoreConfigVersion.cmake"; do
     [[ -f $file ]] || continue
@@ -63,8 +63,8 @@ done
 
 IFS=. read -r have_major have_minor _ <<<"$version"
 IFS=. read -r min_major min_minor <<<"$min"
-have=$((have_major * 1000 + have_minor))
-want=$((min_major * 1000 + min_minor))
+have=$((10#$have_major * 1000 + 10#$have_minor))
+want=$((10#$min_major * 1000 + 10#$min_minor))
 if ((have < want)); then
     fail "tree is built against Qt $version, older than the declared minimum $min"
 elif ((have > want)); then
