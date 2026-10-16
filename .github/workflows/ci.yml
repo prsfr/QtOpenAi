@@ -224,3 +224,40 @@ jobs:
 
       - name: scripts/check.sh ${{ matrix.check }}
         run: scripts/check.sh --strict --build-dir build ${{ matrix.check }}
+
+  # The oldest Qt QtOpenAi supports, QTOPENAI_MIN_QT_VERSION, from the distro
+  # (#205). A minimum no job builds against stops being true after a few
+  # changes. The name follows QTOPENAI_MIN_QT_VERSION; qt-min fails if it does
+  # not, and passes only when the tree really is that Qt.
+  #
+  # Pinned to ubuntu-24.04, whose Qt is 6.4.2: ubuntu-latest will move on to a
+  # newer Qt and this job would quietly stop meaning anything. If 24.04 runners
+  # are retired, install it with jurplel/install-qt-action instead
+  # (version: 6.4.*, modules: qtwebsockets).
+  qt-min:
+    name: linux / Qt 6.4 (distro)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt from the distro
+        run: >
+          sudo apt-get update &&
+          sudo apt-get install -y qt6-base-dev qt6-websockets-dev libqt6sql6-sqlite cmake ninja-build
+
+      - name: scripts/check.sh against the minimum
+        run: scripts/check.sh --strict --build-dir build build test headless qt-min subproject
+
+      - name: Install, then build & run the package consumer
+        run: >
+          cmake --install build --prefix "$PWD/_prefix" &&
+          cmake -S tests/package -B build-consumer -G Ninja -DCMAKE_PREFIX_PATH="$PWD/_prefix" &&
+          cmake --build build-consumer &&
+          LD_LIBRARY_PATH="$PWD/_prefix/lib" ./build-consumer/consumer
+
+      - name: Run the GUI consumer
+        if: hashFiles('build-consumer/gui_consumer') != ''
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: LD_LIBRARY_PATH="$PWD/_prefix/lib" ./build-consumer/gui_consumer

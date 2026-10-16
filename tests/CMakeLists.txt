@@ -1,4 +1,4 @@
-find_package(Qt6 6.4 REQUIRED COMPONENTS Test)
+find_package(Qt6 ${QTOPENAI_MIN_QT_VERSION} REQUIRED COMPONENTS Test)
 
 # Helper to declare a QtTest-based unit test with a consistent naming scheme.
 function(qtopenai_add_test name)
