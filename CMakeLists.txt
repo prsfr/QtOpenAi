@@ -48,6 +48,13 @@ if(QTOPENAI_COVERAGE AND (MSVC OR NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         "QTOPENAI_COVERAGE=ON needs GCC or Clang, which take --coverage; "
         "this compiler (${CMAKE_CXX_COMPILER_ID}, MSVC or clang-cl included) does not.")
 endif()
+# A static library built with --coverage needs the gcov runtime in every
+# consumer's link, which PRIVATE link options do not carry.
+if(QTOPENAI_COVERAGE AND NOT QTOPENAI_BUILD_SHARED)
+    message(FATAL_ERROR
+        "QTOPENAI_COVERAGE=ON needs QTOPENAI_BUILD_SHARED=ON: a static library "
+        "built with --coverage leaves __gcov_* undefined in every consumer's link.")
+endif()
 
 include(GNUInstallDirs)
 set(QTOPENAI_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/QtOpenAi"

@@ -184,6 +184,12 @@ def main():
             failures.append("module %s is in the baseline but was not measured" % name)
         for name in sorted(set(modules) & set(base)):
             for kind in ("lines", "branches"):
+                # percent() reads 0/0 as 100 %, so code that vanished from the
+                # measurement would otherwise pass as a rise.
+                if modules[name][kind][1] == 0 and base[name][kind][1] != 0:
+                    failures.append("%s %s total is 0 but %d in the baseline"
+                                    % (name, kind, base[name][kind][1]))
+                    continue
                 delta = percent(modules[name][kind]) - percent(base[name][kind])
                 if delta < -FAIL_DROP:
                     failures.append("%s %s coverage dropped %s pt below the baseline (more than 0.5)"

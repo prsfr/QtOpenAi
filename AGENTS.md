@@ -61,7 +61,16 @@ measure `src/`. It prints lines and branches per module (the directory under
 2. a function in `src/` is never called and not listed in
    `tests/coverage/uncalled-functions.txt`;
 3. a listed function is called now, or no longer exists (a stale entry);
-4. a module is measured but not in the baseline, or the other way round.
+4. a module is measured but not in the baseline, or the other way round;
+5. a module's measured line or branch total is 0 while its baseline total is
+   not.
+
+Rule 2 sees only the functions the compiler emits: an unused inline function
+in a header, or a template nothing instantiates, is invisible to it, so the
+reviewer checks by eye that such code has a test. The check ignores
+`LCOV_EXCL_*`/`GCOVR_EXCL_*` exclusion markers and any `gcovr.cfg`, and runs
+the tests without the caller's Qt logging configuration, so none of them can
+change the measurement.
 
 A module more than 1.0 point above its baseline passes with a WARNING asking
 for the baseline to be raised.

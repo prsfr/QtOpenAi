@@ -10,6 +10,8 @@
 #   - an uncalled function missing from uncalled-functions.txt fails;
 #   - a listed function that is called now, or gone, fails (a stale entry);
 #   - a module measured but not in the baseline, or the other way round, fails;
+#   - a module with no lines or no branches left where the baseline has some
+#     fails;
 #   - a module more than 1.0 pt above its baseline warns, asking for an update.
 #
 # The tree must sit inside the source tree: moc includes headers by relative
@@ -72,8 +74,19 @@ fi
 find "$tree" -name '*.gcda' -delete
 
 bash "$QTOPENAI_ROOT/scripts/checks/20-build.sh"
-export QTOPENAI_CHECK_TEST_REPEAT=1
-bash "$QTOPENAI_ROOT/scripts/checks/30-test.sh"
+# Qt logging rules switch qCDebug categories on and so change which src/
+# branches run: none from the caller's environment or config files. The XDG
+# variables are set rather than unset, which would fall back to ~/.config and
+# /etc/xdg.
+empty_config=$tree/empty-xdg-config
+rm -rf "$empty_config"
+mkdir -p "$empty_config"
+(
+    unset QT_LOGGING_RULES QT_LOGGING_CONF
+    export XDG_CONFIG_HOME="$empty_config" XDG_CONFIG_DIRS="$empty_config"
+    export QTOPENAI_CHECK_TEST_REPEAT=1
+    bash "$QTOPENAI_ROOT/scripts/checks/30-test.sh"
+)
 
 # The toolchain the baseline is pinned to. Every CMake version that ever
 # configured the tree leaves its own CMakeFiles/<version>/, so they must agree.
@@ -107,9 +120,15 @@ mkdir -p "$out"
 # From the root: the relative --filter is matched against paths relative to
 # the working directory. The trailing tree keeps gcovr to this tree's
 # counters, not those of any other coverage tree in the checkout.
+# Nothing in the checkout may change what is measured: an empty --config
+# keeps gcovr from loading a gcovr.cfg at the root (tracked or not), and an
+# exclusion-marker prefix that matches nothing ('[^\s\S]' is an empty class)
+# keeps LCOV_EXCL_*/GCOVR_EXCL_* comments in src/ from hiding code.
 cd "$QTOPENAI_ROOT"
+: >"$out/empty.cfg"
 status=0
-gcovr --root "$QTOPENAI_ROOT" --object-directory "$tree" \
+gcovr --config "$out/empty.cfg" --exclude-pattern-prefix '[^\s\S]' \
+    --root "$QTOPENAI_ROOT" --object-directory "$tree" \
     --filter src/ --exclude '.*_autogen.*' \
     --exclude-unreachable-branches --exclude-throw-branches \
     --json "$out/coverage.json" \
