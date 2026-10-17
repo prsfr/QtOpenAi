@@ -39,8 +39,11 @@ if [[ -f $cache ]]; then
     grep -qxF "CMAKE_CXX_FLAGS:STRING=$flags" "$cache" &&
         grep -qxF "CMAKE_EXE_LINKER_FLAGS:STRING=$link_flags" "$cache" &&
         grep -qxF "CMAKE_SHARED_LINKER_FLAGS:STRING=$link_flags" "$cache" &&
-        grep -qx 'QTOPENAI_BUILD_TESTS:BOOL=ON' "$cache" || {
-        echo "$QTOPENAI_BUILD_DIR is not a sanitizer build with tests; remove it or point --build-dir elsewhere" >&2
+        grep -qx 'QTOPENAI_BUILD_TESTS:BOOL=ON' "$cache" &&
+        grep -qx 'CMAKE_BUILD_TYPE:STRING=Debug' "$cache" &&
+        ! grep -qxE 'QTOPENAI_BUILD_REALTIME:BOOL=(OFF|0|FALSE|NO)' "$cache" &&
+        ! grep -qxE 'QTOPENAI_WARNINGS_AS_ERRORS:BOOL=(ON|1|TRUE|YES)' "$cache" || {
+        echo "$QTOPENAI_BUILD_DIR is not this check's sanitizer build (Debug, tests on, Realtime not off, warnings option off); remove it or point --build-dir elsewhere" >&2
         exit 1
     }
 else
@@ -57,7 +60,11 @@ fi
 
 bash "$QTOPENAI_ROOT/scripts/checks/20-build.sh"
 
+# Set outright, never inherited: a detect_leaks=0 or exitcode=0 already in the
+# environment would let the check pass on the reports it exists to fail on.
 export ASAN_OPTIONS=detect_leaks=1
+export UBSAN_OPTIONS=print_stacktrace=1
+export LSAN_OPTIONS=
 supp=$QTOPENAI_ROOT/scripts/sanitizers/lsan.supp
-[[ -f $supp ]] && export LSAN_OPTIONS="suppressions=$supp"
+[[ -f $supp ]] && LSAN_OPTIONS="suppressions=$supp"
 bash "$QTOPENAI_ROOT/scripts/checks/30-test.sh"

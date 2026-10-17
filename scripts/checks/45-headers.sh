@@ -28,6 +28,14 @@ command -v cmake >/dev/null || {
     echo "cmake not found -- skipped"
     exit 77
 }
+# tests/headers needs IMPORTED_NO_SYSTEM (3.23); the library itself builds
+# with 3.21, so an older cmake is a skip, not a failure.
+cmake_version=$(cmake --version | sed -nE '1s/.* ([0-9]+)\.([0-9]+).*/\1 \2/p')
+read -r cmake_major cmake_minor <<<"$cmake_version"
+if ((cmake_major < 3 || (cmake_major == 3 && cmake_minor < 23))); then
+    echo "cmake $cmake_major.$cmake_minor is older than 3.23 -- skipped"
+    exit 77
+fi
 
 tree=$QTOPENAI_BUILD_DIR
 cache=$tree/CMakeCache.txt
@@ -44,6 +52,10 @@ fi
 
 source "$QTOPENAI_ROOT/scripts/checks/build-type.sh"
 cached() { sed -n "s/^$1:[A-Z]*=//p" "$cache" | tr -d '\r'; }
+if [[ $(cached QTOPENAI_INSTALL) =~ ^(OFF|0|FALSE|NO|N)?$ ]] && grep -q '^QTOPENAI_INSTALL:' "$cache"; then
+    echo "$tree is configured with QTOPENAI_INSTALL=OFF; this check compiles the installed headers" >&2
+    exit 1
+fi
 
 failed=0
 
@@ -84,12 +96,13 @@ jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
 # previous run was given -- the option above all -- can outlive a change to
 # the main tree. The objects are kept.
 rm -f "$dir/build/CMakeCache.txt"
-# Without check.sh's QTOPENAI_ROOT, which find_package(QtOpenAi) would read as
-# the package's <Name>_ROOT hint (CMP0144).
-env -u QTOPENAI_ROOT cmake -S "$QTOPENAI_ROOT/tests/headers" -B "$dir/build" "${generator[@]}" \
+# QtOpenAi_DIR names the prefix just installed, so neither a QtOpenAi_ROOT in
+# the environment nor check.sh's QTOPENAI_ROOT (read as <Name>_ROOT, CMP0144)
+# can point find_package at another install.
+env -u QTOPENAI_ROOT -u QtOpenAi_ROOT cmake -S "$QTOPENAI_ROOT/tests/headers" -B "$dir/build" "${generator[@]}" \
     -DCMAKE_CXX_COMPILER="$(cached CMAKE_CXX_COMPILER)" \
     -DQt6_DIR="$(cached Qt6_DIR)" \
-    -DCMAKE_PREFIX_PATH="$dir/prefix" \
+    -DQtOpenAi_DIR="$dir/prefix/$(cached QTOPENAI_INSTALL_CMAKEDIR)" \
     -DQTOPENAI_WARNINGS_AS_ERRORS="$(cached QTOPENAI_WARNINGS_AS_ERRORS)" >/dev/null
 cmake --build "$dir/build" --parallel "$jobs" "${keep_going[@]}" || failed=1
 
