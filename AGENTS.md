@@ -73,7 +73,9 @@ line). It holds for one compiler, gcovr and Qt -- CI's coverage job, the
 ubuntu-24.04 compiler with the distro gcovr and Qt. Another toolchain still
 measures and prints the table, then reports a SKIP; under `--strict`, as in
 CI, that is a failure. The coverage tree must sit inside the source tree, or
-gcov cannot read what moc generated and the check fails.
+gcov cannot read what moc generated and the check fails. After deleting or
+renaming a source file, remove `<build-dir>-coverage`: Ninja leaves the old
+objects behind and gcov fails on them.
 
 `QTOPENAI_COVERAGE_UPDATE_BASELINE=1 scripts/check.sh coverage` writes the
 measurement into both files and prints whether each module went up, down or

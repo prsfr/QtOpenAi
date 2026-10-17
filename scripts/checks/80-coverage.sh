@@ -118,7 +118,10 @@ gcovr --root "$QTOPENAI_ROOT" --object-directory "$tree" \
     --html-details "$out/coverage.html" \
     "$tree" || status=$?
 if [[ $status -ne 0 ]]; then
-    echo "gcovr failed (exit $status): the coverage tree must sit inside the source tree, or gcov cannot open the headers moc includes ($tree)" >&2
+    echo "gcovr failed (exit $status). Likely causes:" >&2
+    echo "  - the coverage tree is outside the source tree, so gcov cannot open the headers moc includes ($tree)" >&2
+    echo "  - stale objects from a removed or renamed source: remove $tree and rerun" >&2
+    echo "  - gcov does not match the compiler (e.g. a Clang build read by GCC's gcov)" >&2
     exit 1
 fi
 
