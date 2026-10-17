@@ -13,8 +13,8 @@
 # template that instantiate.cpp does not instantiate.
 #
 # The template guard reads `template <...> class|struct [EXPORT] Name {|:`,
-# with the head on one line or wrapped over several, and skips `//` lines and
-# forward declarations. It does not see function templates or member
+# with the head on one line or wrapped over several, and skips `//` comments
+# and forward declarations. A `/* */` comment inside the head hides it. It does not see function templates or member
 # templates -- an explicit class instantiation does not instantiate those, so
 # they are checked only where the library instantiates them, under the
 # library's own flags -- and each template is checked for the arguments in

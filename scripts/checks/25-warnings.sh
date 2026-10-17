@@ -9,7 +9,8 @@
 #
 #   (a) build-and-test's Configure step sets the option ON;
 #   (b) no runner label in ci.yml ends in -latest, which would change the
-#       compiler under the gate with no change here;
+#       compiler under the gate with no change here (on the runs-on/os line
+#       itself: a block list under `os:` is not read);
 #   (c) the option defaults OFF, so no local build is gated;
 #   (d) the macOS job selects its Xcode by path -- Apple Clang moves inside a
 #       macOS label.
