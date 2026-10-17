@@ -32,7 +32,9 @@ configure=$(awk '/^      - name: Configure$/ {in_step = 1; print; next} in_step 
 grep -qxF '          -DQTOPENAI_WARNINGS_AS_ERRORS=ON' <<<"$configure" ||
     fail "(a) build-and-test's Configure step must pass -DQTOPENAI_WARNINGS_AS_ERRORS=ON"
 
-latest=$(grep -nE "^[[:space:]]*(-[[:space:]]+)?(runs-on|os):[[:space:]]*[\"']?[A-Za-z0-9._-]*-latest[\"']?[[:space:]]*(#.*)?$" "$ci" || true)
+# Any -latest on those keys, scalar or flow list ([ubuntu-latest, ...]),
+# outside a trailing comment.
+latest=$(grep -nE '^[[:space:]]*(-[[:space:]]+)?(runs-on|os):[^#]*-latest\b' "$ci" || true)
 [[ -z $latest ]] || fail "(b) ci.yml runs on a moving label; pin it:
 $latest"
 

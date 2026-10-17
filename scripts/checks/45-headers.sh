@@ -51,7 +51,7 @@ templates=()
 for header in "$QTOPENAI_ROOT"/src/*/include/QtOpenAi/*/*.h; do
     while IFS= read -r name; do
         [[ -n $name ]] && templates+=("$name")
-    done < <(grep -v '^[[:space:]]*//' "$header" | tr '\n' ' ' |
+    done < <(grep -v '^[[:space:]]*//' "$header" | sed -E 's|[[:space:]]//.*$||' | tr '\n' ' ' |
         grep -oE 'template[[:space:]]*<[^;{]*>[[:space:]]*(class|struct)[[:space:]]+(QTOPENAI_[A-Z]+_EXPORT[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*[[:space:]]*(final[[:space:]]*)?[:{]' |
         sed -E 's/.*(class|struct)[[:space:]]+(QTOPENAI_[A-Z]+_EXPORT[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*).*/\3/' || true)
 done
