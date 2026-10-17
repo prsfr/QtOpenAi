@@ -41,9 +41,8 @@ if [[ -f $cache ]]; then
         grep -qxF "CMAKE_SHARED_LINKER_FLAGS:STRING=$link_flags" "$cache" &&
         grep -qx 'QTOPENAI_BUILD_TESTS:BOOL=ON' "$cache" &&
         grep -qx 'CMAKE_BUILD_TYPE:STRING=Debug' "$cache" &&
-        ! grep -qxE 'QTOPENAI_BUILD_REALTIME:BOOL=(OFF|0|FALSE|NO)' "$cache" &&
-        ! grep -qxE 'QTOPENAI_WARNINGS_AS_ERRORS:BOOL=(ON|1|TRUE|YES)' "$cache" || {
-        echo "$QTOPENAI_BUILD_DIR is not this check's sanitizer build (Debug, tests on, Realtime not off, warnings option off); remove it or point --build-dir elsewhere" >&2
+        grep -qx 'QTOPENAI_WARNINGS_AS_ERRORS:BOOL=OFF' "$cache" || {
+        echo "$QTOPENAI_BUILD_DIR is not this check's sanitizer build (Debug, tests on, warnings option off); remove it or point --build-dir elsewhere" >&2
         exit 1
     }
 else

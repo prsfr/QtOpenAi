@@ -52,7 +52,9 @@ fi
 
 source "$QTOPENAI_ROOT/scripts/checks/build-type.sh"
 cached() { sed -n "s/^$1:[A-Z]*=//p" "$cache" | tr -d '\r'; }
-if [[ $(cached QTOPENAI_INSTALL) =~ ^(OFF|0|FALSE|NO|N)?$ ]] && grep -q '^QTOPENAI_INSTALL:' "$cache"; then
+install=$(cached QTOPENAI_INSTALL)
+if grep -q '^QTOPENAI_INSTALL:' "$cache" &&
+    [[ ${install^^} =~ ^(OFF|0|FALSE|NO|N|IGNORE)?$|-NOTFOUND$ ]]; then
     echo "$tree is configured with QTOPENAI_INSTALL=OFF; this check compiles the installed headers" >&2
     exit 1
 fi
