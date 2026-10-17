@@ -1,0 +1,99 @@
+{
+  "modules": {
+    "admin": {
+      "branches": [
+        461,
+        547
+      ],
+      "lines": [
+        619,
+        718
+      ]
+    },
+    "chat": {
+      "branches": [
+        309,
+        366
+      ],
+      "lines": [
+        339,
+        419
+      ]
+    },
+    "client": {
+      "branches": [
+        3111,
+        3791
+      ],
+      "lines": [
+        3732,
+        4017
+      ]
+    },
+    "common": {
+      "branches": [
+        106,
+        117
+      ],
+      "lines": [
+        100,
+        102
+      ]
+    },
+    "core": {
+      "branches": [
+        6579,
+        9044
+      ],
+      "lines": [
+        7154,
+        8770
+      ]
+    },
+    "realtime": {
+      "branches": [
+        78,
+        95
+      ],
+      "lines": [
+        116,
+        141
+      ]
+    },
+    "sql": {
+      "branches": [
+        376,
+        680
+      ],
+      "lines": [
+        270,
+        329
+      ]
+    },
+    "storage": {
+      "branches": [
+        520,
+        691
+      ],
+      "lines": [
+        425,
+        485
+      ]
+    },
+    "tools": {
+      "branches": [
+        498,
+        584
+      ],
+      "lines": [
+        482,
+        512
+      ]
+    }
+  },
+  "toolchain": {
+    "compiler": "GNU 13.3.0",
+    "gcovr": "7.0",
+    "qt": "6.4.2"
+  }
+}

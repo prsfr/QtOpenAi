@@ -232,6 +232,7 @@ private slots:
 
     void pruningDropsEverythingOlderThanTheCutoff();
     void aConversationWithoutItsRecordIsStillListed();
+    void conversationsUpdatedAtTheSameTimeAreListedById();
     void pruningDropsEverythingOlderThanTheCutoff_data() { addBackends(); }
 
     void aMetricsSnapshotSurvivesSaveAndLoad();
@@ -617,6 +618,41 @@ void TestStore::aConversationWithoutItsRecordIsStillListed()
     // record was standing in for.
     QVERIFY(store.saveConversation(QStringLiteral("legacy"), transcript, QString()));
     QCOMPARE(store.conversation(QStringLiteral("legacy"))->title, QStringLiteral("Legacy title"));
+}
+
+void TestStore::conversationsUpdatedAtTheSameTimeAreListedById()
+{
+    // Two saves a millisecond apart rarely tie, so the tie-break would run in
+    // some test runs and not others (#173). The records are rewritten to the
+    // same updated_at instead, which makes the tie certain.
+    QTemporaryDir root;
+    JsonFileStore store(root.path());
+    QVERIFY2(store.open(), qPrintable(store.lastError()));
+
+    Transcript transcript;
+    transcript.addUserMessage(QStringLiteral("hello"));
+    QVERIFY(store.saveConversation(QStringLiteral("b"), transcript, QStringLiteral("B")));
+    QVERIFY(store.saveConversation(QStringLiteral("a"), transcript, QStringLiteral("A")));
+
+    const QDir records(root.path() + QStringLiteral("/records"));
+    const QStringList names = records.entryList({QStringLiteral("*.json")}, QDir::Files);
+    QCOMPARE(names.size(), 2);
+    for (const QString &name : names) {
+        QFile file(records.filePath(name));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QJsonObject record = QJsonDocument::fromJson(file.readAll()).object();
+        file.close();
+        QVERIFY(record.contains(QLatin1String("updated_at")));
+        record.insert(QLatin1String("updated_at"), QStringLiteral("2026-01-01T00:00:00.000Z"));
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        file.write(QJsonDocument(record).toJson(QJsonDocument::Compact));
+    }
+
+    const QList<ConversationRecord> listed = store.conversations();
+    QCOMPARE(listed.size(), 2);
+    QCOMPARE(listed.at(0).updatedAt, listed.at(1).updatedAt);
+    QCOMPARE(listed.at(0).id, QStringLiteral("a"));
+    QCOMPARE(listed.at(1).id, QStringLiteral("b"));
 }
 
 void TestStore::pruningDropsEverythingOlderThanTheCutoff()

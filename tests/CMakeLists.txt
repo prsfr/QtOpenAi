@@ -7,6 +7,7 @@ function(qtopenai_add_test name)
     target_link_libraries(${name} PRIVATE Qt6::Test ${ARG_LIBS})
     # Lets tests share helpers via #include "support/....h".
     target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    qtopenai_enable_coverage(${name})
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
 

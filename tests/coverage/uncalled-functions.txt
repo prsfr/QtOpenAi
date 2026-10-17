@@ -1,0 +1,1180 @@
+src/admin/include/QtOpenAi/Admin/Organization.h	QtOpenAi::Admin::Organization::d_func() const
+src/admin/include/QtOpenAi/Admin/Organization.h	QtOpenAi::Admin::qt_getEnumName(QtOpenAi::Admin::Organization::UsageKind)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::adminKey() const
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::assignUserRole(QString const&, QString const&, QtOpenAi::Admin::RoleScope const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::baseUrl() const
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::createRole(QtOpenAi::Core::RoleRequest const&, QtOpenAi::Admin::RoleScope const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::deleteProjectApiKey(QString const&, QString const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::deleteProjectServiceAccount(QString const&, QString const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::deleteProjectUser(QString const&, QString const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::deleteRole(QString const&, QtOpenAi::Admin::RoleScope const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::getGroup(QString const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::getGroupRole(QString const&, QString const&, QtOpenAi::Admin::RoleScope const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::getUser(QString const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::modifyGroup(QString const&, QString const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::modifyProject(QString const&, QString const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::modifyProjectUserRole(QString const&, QString const&, QString const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::modifyRole(QString const&, QtOpenAi::Core::RoleRequest const&, QtOpenAi::Admin::RoleScope const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::removeInterceptor(QtOpenAi::Client::Interceptor*)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::removeProjectGroup(QString const&, QString const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::retryPolicy() const
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::setRateLimiter(QtOpenAi::Client::RateLimiter*)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::setRetryPolicy(QtOpenAi::Client::RetryPolicy const&)
+src/admin/src/Organization.cpp	QtOpenAi::Admin::Organization::unassignGroupRole(QString const&, QString const&, QtOpenAi::Admin::RoleScope const&)
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::client() const
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::isStreaming() const
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::maxIterations() const
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::model() const
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::setStreaming(bool)
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::setTranscript(QtOpenAi::Chat::Transcript const&)
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::setTrimPolicy(QtOpenAi::Chat::TrimPolicy const&)
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::systemPrompt() const
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::timeoutMs() const
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::tools() const
+src/chat/src/Agent.cpp	QtOpenAi::Chat::Agent::trimPolicy() const
+src/chat/src/Agent.cpp	QtOpenAi::Chat::AgentPrivate::step()::{lambda(QtOpenAi::Core::ChatCompletionResponse const&)#1}::operator()(QtOpenAi::Core::ChatCompletionResponse const&) const
+src/chat/src/Transcript.cpp	QtOpenAi::Chat::Transcript::addMessages(QList<QtOpenAi::Core::Message> const&)
+src/chat/src/Transcript.cpp	QtOpenAi::Chat::Transcript::clear()
+src/chat/src/Transcript.cpp	QtOpenAi::Chat::Transcript::isEmpty() const
+src/chat/src/Transcript.cpp	QtOpenAi::Chat::Transcript::operator=(QtOpenAi::Chat::Transcript const&)
+src/chat/src/Transcript.cpp	QtOpenAi::Chat::Transcript::operator=(QtOpenAi::Chat::Transcript&&)
+src/chat/src/Transcript.cpp	QtOpenAi::Chat::Transcript::trimPolicy() const
+src/chat/src/TrimPolicy.cpp	QtOpenAi::Chat::TrimPolicy::TrimPolicy(QtOpenAi::Chat::TrimPolicy const&)
+src/chat/src/TrimPolicy.cpp	QtOpenAi::Chat::TrimPolicy::TrimPolicy(QtOpenAi::Chat::TrimPolicy&&)
+src/chat/src/TrimPolicy.cpp	QtOpenAi::Chat::TrimPolicy::maxMessages() const
+src/chat/src/TrimPolicy.cpp	QtOpenAi::Chat::TrimPolicy::operator=(QtOpenAi::Chat::TrimPolicy&&)
+src/chat/src/TrimPolicy.cpp	QtOpenAi::Chat::TrimPolicy::summariser() const
+src/client/include/QtOpenAi/Client/ChatMap.h	QMetaTypeId<QtOpenAi::Client::ChatMapItem>::qt_metatype_id()
+src/client/include/QtOpenAi/Client/Client.h	QtOpenAi::Client::qt_getEnumName(QtOpenAi::Client::Client::AuthScheme)
+src/client/include/QtOpenAi/Client/Guardrail.h	QtOpenAi::Client::qt_getEnumName(QtOpenAi::Client::GuardedChatReply::Position)
+src/client/include/QtOpenAi/Client/JobPoller.h	QtOpenAi::Client::JobPoller::trackPoll<QtOpenAi::Client::EvalRunReply, QtOpenAi::Core::EvalRun, QtOpenAi::Client::JobPoller::trackTerminalPoll<QtOpenAi::Client::EvalRunReply, QtOpenAi::Core::EvalRun, QtOpenAi::Client::EvalRunPollerPrivate, QtOpenAi::Client::EvalRunPoller>(QtOpenAi::Client::EvalRunReply*, QtOpenAi::Client::EvalRunPollerPrivate*, QtOpenAi::Core::EvalRun QtOpenAi::Client::EvalRunPollerPrivate::*, void (QtOpenAi::Client::EvalRunPoller::*)(QtOpenAi::Core::EvalRun const&), void (QtOpenAi::Client::EvalRunPoller::*)(QtOpenAi::Core::EvalRun const&))::{lambda(QtOpenAi::Core::EvalRun const&)#1}>(QtOpenAi::Client::EvalRunReply*, QtOpenAi::Client::JobPoller::trackTerminalPoll<QtOpenAi::Client::EvalRunReply, QtOpenAi::Core::EvalRun, QtOpenAi::Client::EvalRunPollerPrivate, QtOpenAi::Client::EvalRunPoller>(QtOpenAi::Client::EvalRunReply*, QtOpenAi::Client::EvalRunPollerPrivate*, QtOpenAi::Core::EvalRun QtOpenAi::Client::EvalRunPollerPrivate::*, void (QtOpenAi::Client::EvalRunPoller::*)(QtOpenAi::Core::EvalRun const&), void (QtOpenAi::Client::EvalRunPoller::*)(QtOpenAi::Core::EvalRun const&))::{lambda(QtOpenAi::Core::EvalRun const&)#1})::{lambda(QtOpenAi::Client::ClientError const&)#1}::operator()(QtOpenAi::Client::ClientError const&) const
+src/client/include/QtOpenAi/Client/JobPoller.h	QtOpenAi::Client::JobPoller::trackPoll<QtOpenAi::Client::FineTuningJobReply, QtOpenAi::Core::FineTuningJob, QtOpenAi::Client::JobPoller::trackTerminalPoll<QtOpenAi::Client::FineTuningJobReply, QtOpenAi::Core::FineTuningJob, QtOpenAi::Client::FineTuningJobPollerPrivate, QtOpenAi::Client::FineTuningJobPoller>(QtOpenAi::Client::FineTuningJobReply*, QtOpenAi::Client::FineTuningJobPollerPrivate*, QtOpenAi::Core::FineTuningJob QtOpenAi::Client::FineTuningJobPollerPrivate::*, void (QtOpenAi::Client::FineTuningJobPoller::*)(QtOpenAi::Core::FineTuningJob const&), void (QtOpenAi::Client::FineTuningJobPoller::*)(QtOpenAi::Core::FineTuningJob const&))::{lambda(QtOpenAi::Core::FineTuningJob const&)#1}>(QtOpenAi::Client::FineTuningJobReply*, QtOpenAi::Client::JobPoller::trackTerminalPoll<QtOpenAi::Client::FineTuningJobReply, QtOpenAi::Core::FineTuningJob, QtOpenAi::Client::FineTuningJobPollerPrivate, QtOpenAi::Client::FineTuningJobPoller>(QtOpenAi::Client::FineTuningJobReply*, QtOpenAi::Client::FineTuningJobPollerPrivate*, QtOpenAi::Core::FineTuningJob QtOpenAi::Client::FineTuningJobPollerPrivate::*, void (QtOpenAi::Client::FineTuningJobPoller::*)(QtOpenAi::Core::FineTuningJob const&), void (QtOpenAi::Client::FineTuningJobPoller::*)(QtOpenAi::Core::FineTuningJob const&))::{lambda(QtOpenAi::Core::FineTuningJob const&)#1})::{lambda(QtOpenAi::Client::ClientError const&)#1}::operator()(QtOpenAi::Client::ClientError const&) const
+src/client/include/QtOpenAi/Client/JobPoller.h	QtOpenAi::Client::JobPoller::trackPoll<QtOpenAi::Client::RunReply, QtOpenAi::Core::Run, QtOpenAi::Client::RunPoller::requestPoll()::{lambda(QtOpenAi::Core::Run const&)#1}>(QtOpenAi::Client::RunReply*, QtOpenAi::Client::RunPoller::requestPoll()::{lambda(QtOpenAi::Core::Run const&)#1})::{lambda(QtOpenAi::Client::ClientError const&)#1}::operator()(QtOpenAi::Client::ClientError const&) const
+src/client/include/QtOpenAi/Client/JobPoller.h	QtOpenAi::Client::JobPoller::trackPoll<QtOpenAi::Client::VideoReply, QtOpenAi::Core::VideoJob, QtOpenAi::Client::JobPoller::trackTerminalPoll<QtOpenAi::Client::VideoReply, QtOpenAi::Core::VideoJob, QtOpenAi::Client::VideoPollerPrivate, QtOpenAi::Client::VideoPoller>(QtOpenAi::Client::VideoReply*, QtOpenAi::Client::VideoPollerPrivate*, QtOpenAi::Core::VideoJob QtOpenAi::Client::VideoPollerPrivate::*, void (QtOpenAi::Client::VideoPoller::*)(QtOpenAi::Core::VideoJob const&), void (QtOpenAi::Client::VideoPoller::*)(QtOpenAi::Core::VideoJob const&))::{lambda(QtOpenAi::Core::VideoJob const&)#1}>(QtOpenAi::Client::VideoReply*, QtOpenAi::Client::JobPoller::trackTerminalPoll<QtOpenAi::Client::VideoReply, QtOpenAi::Core::VideoJob, QtOpenAi::Client::VideoPollerPrivate, QtOpenAi::Client::VideoPoller>(QtOpenAi::Client::VideoReply*, QtOpenAi::Client::VideoPollerPrivate*, QtOpenAi::Core::VideoJob QtOpenAi::Client::VideoPollerPrivate::*, void (QtOpenAi::Client::VideoPoller::*)(QtOpenAi::Core::VideoJob const&), void (QtOpenAi::Client::VideoPoller::*)(QtOpenAi::Core::VideoJob const&))::{lambda(QtOpenAi::Core::VideoJob const&)#1})::{lambda(QtOpenAi::Client::ClientError const&)#1}::operator()(QtOpenAi::Client::ClientError const&) const
+src/client/src/CannedReply_p.h	QtOpenAi::Client::CannedReply::abort()
+src/client/src/CannedReply_p.h	QtOpenAi::Client::CannedReply::bytesAvailable() const
+src/client/src/ChatCompletionAccumulator.cpp	QtOpenAi::Client::ChatCompletionAccumulator::clear()
+src/client/src/ChatMap.cpp	QtOpenAi::Client::ChatMap::client() const
+src/client/src/ChunkedUploader.cpp	QtOpenAi::Client::ChunkedUploader::autoDelete() const
+src/client/src/ChunkedUploader.cpp	QtOpenAi::Client::ChunkedUploader::bytesSent() const
+src/client/src/ChunkedUploader.cpp	QtOpenAi::Client::ChunkedUploader::bytesTotal() const
+src/client/src/ChunkedUploader.cpp	QtOpenAi::Client::ChunkedUploader::cancel()
+src/client/src/ChunkedUploader.cpp	QtOpenAi::Client::ChunkedUploader::chunkSize() const
+src/client/src/ChunkedUploader.cpp	QtOpenAi::Client::ChunkedUploader::isRunning() const
+src/client/src/ChunkedUploader.cpp	QtOpenAi::Client::ChunkedUploader::upload() const
+src/client/src/ChunkedUploader.cpp	QtOpenAi::Client::ChunkedUploader::uploadId() const
+src/client/src/Client.cpp	QtOpenAi::Client::Client::createImageVariation(QtOpenAi::Core::ImageVariationRequest const&)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::createThreadAndRunStream(QtOpenAi::Core::CreateRunRequest const&)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::createTranslation(QtOpenAi::Core::TranslationRequest const&)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::defaultHeaders() const
+src/client/src/Client.cpp	QtOpenAi::Client::Client::deleteConversationItem(QString const&, QString const&)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::getConversation(QString const&)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::getVectorStoreFile(QString const&, QString const&)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::getVectorStoreFileBatch(QString const&, QString const&)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::idempotencyKeysEnabled() const
+src/client/src/Client.cpp	QtOpenAi::Client::Client::organization() const
+src/client/src/Client.cpp	QtOpenAi::Client::Client::removeDefaultHeader(QByteArray const&)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::requestTimeoutMs() const
+src/client/src/Client.cpp	QtOpenAi::Client::Client::retryPolicy() const
+src/client/src/Client.cpp	QtOpenAi::Client::Client::setRequestTimeoutMs(int)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::updateConversation(QString const&, QJsonObject const&)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::uploadInChunks(QtOpenAi::Core::CreateUploadRequest const&, QIODevice*, long long)
+src/client/src/Client.cpp	QtOpenAi::Client::Client::userAgent() const
+src/client/src/Client.cpp	QtOpenAi::Client::ConversationReply* QtOpenAi::Client::ClientPrivate::get<QtOpenAi::Client::ConversationReply>(QString const&, QUrlQuery const&, char const*) const
+src/client/src/Client.cpp	QtOpenAi::Client::ConversationReply* QtOpenAi::Client::ClientPrivate::issue<QtOpenAi::Client::ConversationReply, QtOpenAi::Client::ClientPrivate::get<QtOpenAi::Client::ConversationReply>(QString const&, QUrlQuery const&, char const*) const::{lambda(QNetworkRequest)#1}>(QByteArray const&, QNetworkRequest, QByteArray const&, QtOpenAi::Client::ClientPrivate::get<QtOpenAi::Client::ConversationReply>(QString const&, QUrlQuery const&, char const*) const::{lambda(QNetworkRequest)#1}) const
+src/client/src/Client.cpp	QtOpenAi::Client::VectorStoreFileBatchReply* QtOpenAi::Client::ClientPrivate::get<QtOpenAi::Client::VectorStoreFileBatchReply>(QString const&, QUrlQuery const&, char const*) const
+src/client/src/Client.cpp	QtOpenAi::Client::VectorStoreFileBatchReply* QtOpenAi::Client::ClientPrivate::issue<QtOpenAi::Client::VectorStoreFileBatchReply, QtOpenAi::Client::ClientPrivate::get<QtOpenAi::Client::VectorStoreFileBatchReply>(QString const&, QUrlQuery const&, char const*) const::{lambda(QNetworkRequest)#1}>(QByteArray const&, QNetworkRequest, QByteArray const&, QtOpenAi::Client::ClientPrivate::get<QtOpenAi::Client::VectorStoreFileBatchReply>(QString const&, QUrlQuery const&, char const*) const::{lambda(QNetworkRequest)#1}) const
+src/client/src/Client.cpp	QtOpenAi::Client::VectorStoreFileReply* QtOpenAi::Client::ClientPrivate::get<QtOpenAi::Client::VectorStoreFileReply>(QString const&, QUrlQuery const&, char const*) const
+src/client/src/Client.cpp	QtOpenAi::Client::VectorStoreFileReply* QtOpenAi::Client::ClientPrivate::issue<QtOpenAi::Client::VectorStoreFileReply, QtOpenAi::Client::ClientPrivate::get<QtOpenAi::Client::VectorStoreFileReply>(QString const&, QUrlQuery const&, char const*) const::{lambda(QNetworkRequest)#1}>(QByteArray const&, QNetworkRequest, QByteArray const&, QtOpenAi::Client::ClientPrivate::get<QtOpenAi::Client::VectorStoreFileReply>(QString const&, QUrlQuery const&, char const*) const::{lambda(QNetworkRequest)#1}) const
+src/client/src/Guardrail.cpp	QtOpenAi::Client::Guardrail::client() const
+src/client/src/Interceptor.cpp	QtOpenAi::Client::Interceptor::beforeRequest(QtOpenAi::Client::InterceptedRequest&)
+src/client/src/JobPoller.cpp	QtOpenAi::Client::JobPoller::autoDelete() const
+src/client/src/JobPoller.cpp	QtOpenAi::Client::JobPoller::pollIntervalMs() const
+src/client/src/JobPoller.cpp	QtOpenAi::Client::JobPoller::setPollIntervalMs(int)
+src/client/src/JobPoller.cpp	QtOpenAi::Client::JobPoller::stop()
+src/client/src/LoggingInterceptor.cpp	QtOpenAi::Client::LoggingInterceptor::logHeaders() const
+src/client/src/LoggingInterceptor.cpp	QtOpenAi::Client::LoggingInterceptor::maxBodyLength() const
+src/client/src/LoggingInterceptor.cpp	QtOpenAi::Client::LoggingInterceptor::redactedBodyFields() const
+src/client/src/LoggingInterceptor.cpp	QtOpenAi::Client::LoggingInterceptor::setLogHeaders(bool)
+src/client/src/MetricsCollector.cpp	QtOpenAi::Client::MetricsCollector::catalog() const
+src/client/src/PageWalker.cpp	QtOpenAi::Client::PageWalkerBase::autoDelete() const
+src/client/src/ProviderProfile.cpp	QtOpenAi::Client::ProviderProfile::ProviderProfile(QtOpenAi::Client::ProviderProfile&&)
+src/client/src/ProviderProfile.cpp	QtOpenAi::Client::ProviderProfile::headers() const
+src/client/src/ProviderProfile.cpp	QtOpenAi::Client::ProviderProfile::operator=(QtOpenAi::Client::ProviderProfile const&)
+src/client/src/ProviderProfile.cpp	QtOpenAi::Client::ProviderProfile::operator=(QtOpenAi::Client::ProviderProfile&&)
+src/client/src/ProviderProfile.cpp	QtOpenAi::Client::ProviderProfile::setHeaders(QHash<QByteArray, QByteArray> const&)
+src/client/src/RateLimiter.cpp	QtOpenAi::Client::RateLimiterPrivate::wakeWhenBudgetFrees(long long)::{lambda()#1}::operator()() const
+src/client/src/RestReplyBase.cpp	QtOpenAi::Client::RestReplyBase::autoDelete() const
+src/client/src/SemanticIndex.cpp	QtOpenAi::Client::SemanticIndex::client() const
+src/client/src/SemanticIndex.cpp	QtOpenAi::Client::SemanticIndex::setModel(QString const&)
+src/client/src/SemanticIndex.cpp	QtOpenAi::Client::SemanticQueryReply::error() const
+src/client/src/StreamReplyBase.cpp	QtOpenAi::Client::StreamReplyBase::autoDelete() const
+src/client/src/StreamReplyBase.cpp	QtOpenAi::Client::StreamReplyBase::rateLimit() const
+src/core/include/QtOpenAi/Core/AdminApiKey.h	QMetaTypeId<QtOpenAi::Core::AdminApiKey>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/AdminApiKey.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::AdminApiKey> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Assistant.h	QMetaTypeId<QtOpenAi::Core::Assistant>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Assistant.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Assistant> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/AuditLog.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::AuditLog> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Batch.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Batch> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/BucketPage.h	QtOpenAi::Core::BucketPage<QtOpenAi::Core::UsageResult>::operator==(QtOpenAi::Core::BucketPage<QtOpenAi::Core::UsageResult> const&) const
+src/core/include/QtOpenAi/Core/Certificate.h	QMetaTypeId<QtOpenAi::Core::Certificate>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Certificate.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Certificate> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ChatCompletionChunk.h	QMetaTypeId<QtOpenAi::Core::ChatCompletionChunk>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ChatCompletionList.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::ChatCompletionResponse> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ChatCompletionList.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Message> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ChatKitSession.h	QMetaTypeId<QtOpenAi::Core::ChatKitSession>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ChatKitThread.h	QMetaTypeId<QtOpenAi::Core::ChatKitThread>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ChatKitThread.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::ChatKitThread> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ChatKitThreadItem.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::ChatKitThreadItem> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Container.h	QMetaTypeId<QtOpenAi::Core::Container>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Container.h	QMetaTypeId<QtOpenAi::Core::ContainerFile>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Container.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Container> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Container.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::ContainerFile> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ConversationItemList.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::ResponseOutputItem> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/CursorPage.h	QtOpenAi::Core::CursorPage<QtOpenAi::Core::OrganizationRole>::operator==(QtOpenAi::Core::CursorPage<QtOpenAi::Core::OrganizationRole> const&) const
+src/core/include/QtOpenAi/Core/DataRetention.h	QMetaTypeId<QtOpenAi::Core::DataRetention>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Eval.h	QMetaTypeId<QtOpenAi::Core::Eval>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Eval.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Eval> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/EvalRun.h	QMetaTypeId<QtOpenAi::Core::EvalRunOutputItem>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/EvalRun.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::EvalRun> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/EvalRun.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::EvalRunOutputItem> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/FileObject.h	QMetaTypeId<QtOpenAi::Core::FileObject>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/FileObject.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::FileObject> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/FineTuningCheckpoint.h	QMetaTypeId<QtOpenAi::Core::FineTuningCheckpointPermission>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/FineTuningCheckpoint.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::FineTuningCheckpointPermission> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/FineTuningCheckpoint.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::FineTuningJobCheckpoint> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/FineTuningJob.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::FineTuningJob> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/FineTuningJob.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::FineTuningJobEvent> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Group.h	QMetaTypeId<QtOpenAi::Core::CursorPage<QtOpenAi::Core::Group> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Group.h	QMetaTypeId<QtOpenAi::Core::CursorPage<QtOpenAi::Core::GroupMember> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Group.h	QMetaTypeId<QtOpenAi::Core::CursorPage<QtOpenAi::Core::ProjectGroup> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Group.h	QMetaTypeId<QtOpenAi::Core::Group>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Group.h	QMetaTypeId<QtOpenAi::Core::GroupMember>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Group.h	QMetaTypeId<QtOpenAi::Core::GroupMembership>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Group.h	QMetaTypeId<QtOpenAi::Core::ProjectGroup>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Invite.h	QMetaTypeId<QtOpenAi::Core::Invite>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Invite.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Invite> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ListPage.h	QtOpenAi::Core::ListPage<QtOpenAi::Core::AuditLog>::operator==(QtOpenAi::Core::ListPage<QtOpenAi::Core::AuditLog> const&) const
+src/core/include/QtOpenAi/Core/Model.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Model> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/OrganizationCosts.h	QMetaTypeId<QtOpenAi::Core::BucketPage<QtOpenAi::Core::CostResult> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/OrganizationRole.h	QMetaTypeId<QtOpenAi::Core::CursorPage<QtOpenAi::Core::OrganizationRole> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/OrganizationRole.h	QMetaTypeId<QtOpenAi::Core::OrganizationRole>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/OrganizationUsage.h	QMetaTypeId<QtOpenAi::Core::BucketPage<QtOpenAi::Core::UsageResult> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/OrganizationUser.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::OrganizationUser> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/OrganizationUser.h	QMetaTypeId<QtOpenAi::Core::OrganizationUser>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Project.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Project> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Project.h	QMetaTypeId<QtOpenAi::Core::Project>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ProjectApiKey.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::ProjectApiKey> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ProjectApiKey.h	QMetaTypeId<QtOpenAi::Core::ProjectApiKey>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ProjectPermissions.h	QMetaTypeId<QtOpenAi::Core::ProjectHostedToolPermissions>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ProjectPermissions.h	QMetaTypeId<QtOpenAi::Core::ProjectModelPermissions>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ProjectRateLimit.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::ProjectRateLimit> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ProjectRateLimit.h	QMetaTypeId<QtOpenAi::Core::ProjectRateLimit>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ProjectServiceAccount.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::ProjectServiceAccount> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ProjectServiceAccount.h	QMetaTypeId<QtOpenAi::Core::ProjectServiceAccount>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/RealtimeClientSecret.h	QMetaTypeId<QtOpenAi::Core::RealtimeClientSecret>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/RoleAssignment.h	QMetaTypeId<QtOpenAi::Core::RoleAssignment>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Run.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Run> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/RunStep.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::RunStep> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/RunStep.h	QMetaTypeId<QtOpenAi::Core::RunStep>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Skill.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::Skill> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Skill.h	QMetaTypeId<QtOpenAi::Core::Skill>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/SkillVersion.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::SkillVersion> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/SkillVersion.h	QMetaTypeId<QtOpenAi::Core::SkillVersion>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/SpendAlert.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::SpendAlert> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/SpendAlert.h	QMetaTypeId<QtOpenAi::Core::SpendAlert>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/SpendLimit.h	QMetaTypeId<QtOpenAi::Core::SpendLimit>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Thread.h	QMetaTypeId<QtOpenAi::Core::Thread>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ThreadMessage.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::ThreadMessage> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/ThreadMessage.h	QMetaTypeId<QtOpenAi::Core::ThreadMessage>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Upload.h	QMetaTypeId<QtOpenAi::Core::Upload>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Upload.h	QMetaTypeId<QtOpenAi::Core::UploadPart>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/VectorIndex.h	QMetaTypeId<QtOpenAi::Core::VectorMatch>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/VectorStore.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::VectorStore> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/VectorStore.h	QMetaTypeId<QtOpenAi::Core::VectorStore>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/VectorStoreFile.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::VectorStoreFile> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/VectorStoreFile.h	QMetaTypeId<QtOpenAi::Core::VectorStoreFile>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/VectorStoreFile.h	QMetaTypeId<QtOpenAi::Core::VectorStoreFileBatch>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/VectorStoreSearch.h	QMetaTypeId<QtOpenAi::Core::VectorStoreFileContentPage>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/VectorStoreSearch.h	QMetaTypeId<QtOpenAi::Core::VectorStoreSearchPage>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/VideoCharacter.h	QMetaTypeId<QtOpenAi::Core::VideoCharacter>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/VideoJob.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::VideoJob> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Voice.h	QMetaTypeId<QtOpenAi::Core::ListPage<QtOpenAi::Core::VoiceConsent> >::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Voice.h	QMetaTypeId<QtOpenAi::Core::Voice>::qt_metatype_id()
+src/core/include/QtOpenAi/Core/Voice.h	QMetaTypeId<QtOpenAi::Core::VoiceConsent>::qt_metatype_id()
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::object() const
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::operator=(QtOpenAi::Core::AdminApiKey const&)
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::setCreatedAt(long long)
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::setDeleted(bool)
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::setExpiresAt(long long)
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::setId(QString const&)
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::setLastUsedAt(long long)
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::setName(QString const&)
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::setObject(QString const&)
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::setOwner(QtOpenAi::Core::ApiKeyOwner const&)
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::setRedactedValue(QString const&)
+src/core/src/AdminApiKey.cpp	QtOpenAi::Core::AdminApiKey::setValue(QString const&)
+src/core/src/Assistant.cpp	QtOpenAi::Core::Assistant::operator=(QtOpenAi::Core::Assistant const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::operator=(QtOpenAi::Core::AuditLog const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::operator=(QtOpenAi::Core::AuditLog&&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::setActor(QtOpenAi::Core::AuditLogActor const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::setEffectiveAt(long long)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::setId(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::setPayload(QJsonObject const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::setProjectId(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::setProjectName(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::setSource(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::setType(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLog::source() const
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogActor::AuditLogActor(QtOpenAi::Core::AuditLogActor&&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogActor::operator=(QtOpenAi::Core::AuditLogActor const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogActor::setApiKeyId(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogActor::setApiKeyType(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogActor::setIpAddress(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogActor::setServiceAccountId(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogActor::setType(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogActor::setUser(QtOpenAi::Core::AuditLogUser const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogActor::setUserAgent(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogUser::AuditLogUser(QtOpenAi::Core::AuditLogUser&&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogUser::operator=(QtOpenAi::Core::AuditLogUser const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogUser::setEmail(QString const&)
+src/core/src/AuditLog.cpp	QtOpenAi::Core::AuditLogUser::setId(QString const&)
+src/core/src/Batch.cpp	QtOpenAi::Core::Batch::cancellingAt() const
+src/core/src/Batch.cpp	QtOpenAi::Core::Batch::expiredAt() const
+src/core/src/Certificate.cpp	QtOpenAi::Core::Certificate::createdAt() const
+src/core/src/Certificate.cpp	QtOpenAi::Core::Certificate::operator=(QtOpenAi::Core::Certificate const&)
+src/core/src/Certificate.cpp	QtOpenAi::Core::Certificate::validAt() const
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChatCompletionChunk::ChatCompletionChunk(QtOpenAi::Core::ChatCompletionChunk const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChatCompletionChunk::ChatCompletionChunk(QtOpenAi::Core::ChatCompletionChunk&&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChatCompletionChunk::object() const
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChatCompletionChunk::operator=(QtOpenAi::Core::ChatCompletionChunk const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChatCompletionChunk::operator=(QtOpenAi::Core::ChatCompletionChunk&&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChatCompletionChunk::setCreated(long long)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChatCompletionChunk::setObject(QString const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChatCompletionChunk::setSystemFingerprint(QString const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChoiceDelta::ChoiceDelta(QtOpenAi::Core::ChoiceDelta&&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChoiceDelta::setRefusal(QString const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChoiceDelta::setToolCalls(QList<QtOpenAi::Core::ToolCallChunk> const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChunkChoice::operator=(QtOpenAi::Core::ChunkChoice const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ChunkChoice::operator=(QtOpenAi::Core::ChunkChoice&&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ToolCallChunk::operator=(QtOpenAi::Core::ToolCallChunk const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ToolCallChunk::operator=(QtOpenAi::Core::ToolCallChunk&&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ToolCallChunk::operator==(QtOpenAi::Core::ToolCallChunk const&) const
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ToolCallChunk::setArgumentsFragment(QString const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ToolCallChunk::setFunctionName(QString const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ToolCallChunk::setId(QString const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ToolCallChunk::setIndex(int)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ToolCallChunk::setType(QString const&)
+src/core/src/ChatCompletionChunk.cpp	QtOpenAi::Core::ToolCallChunk::toJson() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::addMessage(QtOpenAi::Core::Message const&)
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::extraBody() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::logitBias() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::logprobs() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::maxTokens() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::metadata() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::modalities() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::operator=(QtOpenAi::Core::ChatCompletionRequest const&)
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::operator=(QtOpenAi::Core::ChatCompletionRequest&&)
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::parallelToolCalls() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::prediction() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::promptCacheKey() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::reasoningEffort() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::safetyIdentifier() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::serviceTier() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::setExtraBody(QJsonObject const&)
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::setMaxCompletionTokens(int)
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::setMessages(QList<QtOpenAi::Core::Message> const&)
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::setN(int)
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::setPrediction(QJsonObject const&)
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::setTopP(double)
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::stop() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::store() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::streamOptions() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::toolChoice() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::topLogprobs() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::user() const
+src/core/src/ChatCompletionRequest.cpp	QtOpenAi::Core::ChatCompletionRequest::webSearchOptions() const
+src/core/src/ChatCompletionResponse.cpp	QtOpenAi::Core::ChatCompletionResponse::setMetadata(QJsonObject const&)
+src/core/src/ChatCompletionResponse.cpp	QtOpenAi::Core::ChatCompletionResponse::setUsage(QtOpenAi::Core::Usage const&)
+src/core/src/ChatCompletionResponse.cpp	QtOpenAi::Core::ChatCompletionResponse::systemFingerprint() const
+src/core/src/ChatKitSession.cpp	QtOpenAi::Core::ChatKitSession::ChatKitSession(QtOpenAi::Core::ChatKitSession&&)
+src/core/src/ChatKitSession.cpp	QtOpenAi::Core::ChatKitSession::operator=(QtOpenAi::Core::ChatKitSession const&)
+src/core/src/ChatKitThread.cpp	QtOpenAi::Core::ChatKitThread::operator=(QtOpenAi::Core::ChatKitThread const&)
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::createdAt() const
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::object() const
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::operator=(QtOpenAi::Core::ChatKitThreadItem const&)
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::operator=(QtOpenAi::Core::ChatKitThreadItem&&)
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::operator==(QtOpenAi::Core::ChatKitThreadItem const&) const
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::setContent(QJsonArray const&)
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::setCreatedAt(long long)
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::setId(QString const&)
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::setObject(QString const&)
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::setRaw(QJsonObject const&)
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::setThreadId(QString const&)
+src/core/src/ChatKitThreadItem.cpp	QtOpenAi::Core::ChatKitThreadItem::setType(QString const&)
+src/core/src/Choice.cpp	QtOpenAi::Core::Choice::index() const
+src/core/src/Choice.cpp	QtOpenAi::Core::Choice::operator=(QtOpenAi::Core::Choice const&)
+src/core/src/Choice.cpp	QtOpenAi::Core::Choice::operator=(QtOpenAi::Core::Choice&&)
+src/core/src/Choice.cpp	QtOpenAi::Core::Choice::operator==(QtOpenAi::Core::Choice const&) const
+src/core/src/CompletionChoice.cpp	QtOpenAi::Core::CompletionChoice::index() const
+src/core/src/CompletionChoice.cpp	QtOpenAi::Core::CompletionChoice::logprobs() const
+src/core/src/CompletionChoice.cpp	QtOpenAi::Core::CompletionChoice::operator=(QtOpenAi::Core::CompletionChoice const&)
+src/core/src/CompletionChoice.cpp	QtOpenAi::Core::CompletionChoice::operator=(QtOpenAi::Core::CompletionChoice&&)
+src/core/src/CompletionChoice.cpp	QtOpenAi::Core::CompletionChoice::setLogprobs(QJsonValue const&)
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::CompletionRequest(QtOpenAi::Core::CompletionRequest&&)
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::bestOf() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::echo() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::extraBody() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::frequencyPenalty() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::maxTokens() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::model() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::n() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::operator=(QtOpenAi::Core::CompletionRequest const&)
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::operator=(QtOpenAi::Core::CompletionRequest&&)
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::presencePenalty() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::prompt() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::seed() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::setExtraBody(QJsonObject const&)
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::setModel(QString const&)
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::setPrompt(QJsonValue const&)
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::setPrompt(QString const&)
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::stop() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::stream() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::suffix() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::temperature() const
+src/core/src/CompletionRequest.cpp	QtOpenAi::Core::CompletionRequest::topP() const
+src/core/src/CompletionResponse.cpp	QtOpenAi::Core::CompletionResponse::CompletionResponse(QtOpenAi::Core::CompletionResponse&&)
+src/core/src/CompletionResponse.cpp	QtOpenAi::Core::CompletionResponse::created() const
+src/core/src/CompletionResponse.cpp	QtOpenAi::Core::CompletionResponse::id() const
+src/core/src/CompletionResponse.cpp	QtOpenAi::Core::CompletionResponse::model() const
+src/core/src/CompletionResponse.cpp	QtOpenAi::Core::CompletionResponse::object() const
+src/core/src/CompletionResponse.cpp	QtOpenAi::Core::CompletionResponse::operator=(QtOpenAi::Core::CompletionResponse const&)
+src/core/src/CompletionResponse.cpp	QtOpenAi::Core::CompletionResponse::setObject(QString const&)
+src/core/src/Container.cpp	QtOpenAi::Core::Container::operator=(QtOpenAi::Core::Container const&)
+src/core/src/Container.cpp	QtOpenAi::Core::ContainerFile::createdAt() const
+src/core/src/Container.cpp	QtOpenAi::Core::ContainerFile::operator=(QtOpenAi::Core::ContainerFile const&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::fileData() const
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::fileName() const
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::operator=(QtOpenAi::Core::ContentPart const&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::operator=(QtOpenAi::Core::ContentPart&&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::setAudioData(QString const&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::setAudioFormat(QString const&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::setFileData(QString const&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::setFileId(QString const&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::setFileName(QString const&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::setImageDetail(QString const&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::setImageUrl(QString const&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::setText(QString const&)
+src/core/src/ContentPart.cpp	QtOpenAi::Core::ContentPart::setType(QString const&)
+src/core/src/Conversation.cpp	QtOpenAi::Core::Conversation::Conversation(QtOpenAi::Core::Conversation&&)
+src/core/src/Conversation.cpp	QtOpenAi::Core::Conversation::createdAt() const
+src/core/src/Conversation.cpp	QtOpenAi::Core::Conversation::metadata() const
+src/core/src/Conversation.cpp	QtOpenAi::Core::Conversation::operator=(QtOpenAi::Core::Conversation const&)
+src/core/src/Conversation.cpp	QtOpenAi::Core::Conversation::setObject(QString const&)
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::CreateAssistantRequest(QtOpenAi::Core::CreateAssistantRequest const&)
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::CreateAssistantRequest(QtOpenAi::Core::CreateAssistantRequest&&)
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::description() const
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::instructions() const
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::metadata() const
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::model() const
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::name() const
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::operator=(QtOpenAi::Core::CreateAssistantRequest const&)
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::operator=(QtOpenAi::Core::CreateAssistantRequest&&)
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::operator==(QtOpenAi::Core::CreateAssistantRequest const&) const
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::responseFormat() const
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::setModel(QString const&)
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::setResponseFormat(QJsonValue const&)
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::setTools(QJsonArray const&)
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::temperature() const
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::toolResources() const
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::tools() const
+src/core/src/CreateAssistantRequest.cpp	QtOpenAi::Core::CreateAssistantRequest::topP() const
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::CreateBatchRequest()
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::CreateBatchRequest(QtOpenAi::Core::CreateBatchRequest const&)
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::CreateBatchRequest(QtOpenAi::Core::CreateBatchRequest&&)
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::completionWindow() const
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::endpoint() const
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::inputFileId() const
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::metadata() const
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::operator=(QtOpenAi::Core::CreateBatchRequest const&)
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::operator=(QtOpenAi::Core::CreateBatchRequest&&)
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::operator==(QtOpenAi::Core::CreateBatchRequest const&) const
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::outputExpiresAfterAnchor() const
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::outputExpiresAfterSeconds() const
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::setEndpoint(QString const&)
+src/core/src/CreateBatchRequest.cpp	QtOpenAi::Core::CreateBatchRequest::setInputFileId(QString const&)
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::CreateChatKitSessionRequest()
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::CreateChatKitSessionRequest(QtOpenAi::Core::CreateChatKitSessionRequest const&)
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::CreateChatKitSessionRequest(QtOpenAi::Core::CreateChatKitSessionRequest&&)
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::configuration() const
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::expiresAfterSeconds() const
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::maxRequestsPerMinute() const
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::operator=(QtOpenAi::Core::CreateChatKitSessionRequest const&)
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::operator=(QtOpenAi::Core::CreateChatKitSessionRequest&&)
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::operator==(QtOpenAi::Core::CreateChatKitSessionRequest const&) const
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::setUser(QString const&)
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::setWorkflowId(QString const&)
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::user() const
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::workflowId() const
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::workflowStateVariables() const
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::workflowTracingEnabled() const
+src/core/src/CreateChatKitSessionRequest.cpp	QtOpenAi::Core::CreateChatKitSessionRequest::workflowVersion() const
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::CreateContainerRequest()
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::CreateContainerRequest(QtOpenAi::Core::CreateContainerRequest const&)
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::CreateContainerRequest(QtOpenAi::Core::CreateContainerRequest&&)
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::expiresAfterAnchor() const
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::expiresAfterMinutes() const
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::fileIds() const
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::name() const
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::operator=(QtOpenAi::Core::CreateContainerRequest const&)
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::operator=(QtOpenAi::Core::CreateContainerRequest&&)
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::operator==(QtOpenAi::Core::CreateContainerRequest const&) const
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::setFileIds(QList<QString> const&)
+src/core/src/CreateContainerRequest.cpp	QtOpenAi::Core::CreateContainerRequest::setName(QString const&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::CreateEvalRequest()
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::CreateEvalRequest(QtOpenAi::Core::CreateEvalRequest const&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::CreateEvalRequest(QtOpenAi::Core::CreateEvalRequest&&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::dataSourceConfig() const
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::metadata() const
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::name() const
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::operator=(QtOpenAi::Core::CreateEvalRequest const&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::operator=(QtOpenAi::Core::CreateEvalRequest&&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::operator==(QtOpenAi::Core::CreateEvalRequest const&) const
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::setDataSourceConfig(QJsonObject const&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::setTestingCriteria(QJsonArray const&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRequest::testingCriteria() const
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::CreateEvalRunRequest()
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::CreateEvalRunRequest(QtOpenAi::Core::CreateEvalRunRequest const&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::CreateEvalRunRequest(QtOpenAi::Core::CreateEvalRunRequest&&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::dataSource() const
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::metadata() const
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::name() const
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::operator=(QtOpenAi::Core::CreateEvalRunRequest const&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::operator=(QtOpenAi::Core::CreateEvalRunRequest&&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::operator==(QtOpenAi::Core::CreateEvalRunRequest const&) const
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::setDataSource(QJsonObject const&)
+src/core/src/CreateEvalRequest.cpp	QtOpenAi::Core::CreateEvalRunRequest::setMetadata(QJsonObject const&)
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::CreateFineTuningJobRequest()
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::CreateFineTuningJobRequest(QtOpenAi::Core::CreateFineTuningJobRequest const&)
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::CreateFineTuningJobRequest(QtOpenAi::Core::CreateFineTuningJobRequest&&)
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::hyperparameters() const
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::metadata() const
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::methodType() const
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::model() const
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::operator=(QtOpenAi::Core::CreateFineTuningJobRequest const&)
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::operator=(QtOpenAi::Core::CreateFineTuningJobRequest&&)
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::operator==(QtOpenAi::Core::CreateFineTuningJobRequest const&) const
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::seed() const
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::setModel(QString const&)
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::setTrainingFile(QString const&)
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::suffix() const
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::trainingFile() const
+src/core/src/CreateFineTuningJobRequest.cpp	QtOpenAi::Core::CreateFineTuningJobRequest::validationFile() const
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::CreateInviteRequest(QtOpenAi::Core::CreateInviteRequest const&)
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::CreateInviteRequest(QtOpenAi::Core::CreateInviteRequest&&)
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::email() const
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::operator=(QtOpenAi::Core::CreateInviteRequest const&)
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::operator=(QtOpenAi::Core::CreateInviteRequest&&)
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::operator==(QtOpenAi::Core::CreateInviteRequest const&) const
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::projects() const
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::role() const
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::setEmail(QString const&)
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::setProjects(QList<QtOpenAi::Core::InviteProject> const&)
+src/core/src/CreateInviteRequest.cpp	QtOpenAi::Core::CreateInviteRequest::setRole(QString const&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::CreateRunRequest(QtOpenAi::Core::CreateRunRequest&&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::addMessage(QtOpenAi::Core::ThreadMessageInput const&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::addTool(QJsonObject const&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::additionalInstructions() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::additionalMessages() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::assistantId() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::instructions() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::maxCompletionTokens() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::maxPromptTokens() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::metadata() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::model() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::operator=(QtOpenAi::Core::CreateRunRequest const&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::operator=(QtOpenAi::Core::CreateRunRequest&&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::operator==(QtOpenAi::Core::CreateRunRequest const&) const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::parallelToolCalls() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::responseFormat() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::setAdditionalMessages(QList<QtOpenAi::Core::ThreadMessageInput> const&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::setMaxCompletionTokens(int)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::setMetadata(QJsonObject const&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::setResponseFormat(QJsonValue const&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::setTools(QJsonArray const&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::setTopP(double)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::setTruncationStrategy(QJsonObject const&)
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::stream() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::temperature() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::thread() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::toolChoice() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::tools() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::topP() const
+src/core/src/CreateRunRequest.cpp	QtOpenAi::Core::CreateRunRequest::truncationStrategy() const
+src/core/src/CreateSkillRequest.cpp	QtOpenAi::Core::CreateSkillRequest::CreateSkillRequest(QtOpenAi::Core::CreateSkillRequest const&)
+src/core/src/CreateSkillRequest.cpp	QtOpenAi::Core::CreateSkillRequest::CreateSkillRequest(QtOpenAi::Core::CreateSkillRequest&&)
+src/core/src/CreateSkillRequest.cpp	QtOpenAi::Core::CreateSkillRequest::operator=(QtOpenAi::Core::CreateSkillRequest const&)
+src/core/src/CreateSkillRequest.cpp	QtOpenAi::Core::CreateSkillRequest::operator=(QtOpenAi::Core::CreateSkillRequest&&)
+src/core/src/CreateSkillRequest.cpp	QtOpenAi::Core::CreateSkillRequest::operator==(QtOpenAi::Core::CreateSkillRequest const&) const
+src/core/src/CreateSkillRequest.cpp	QtOpenAi::Core::CreateSkillRequest::setFiles(QList<std::pair<QString, QByteArray> > const&)
+src/core/src/CreateThreadRequest.cpp	QtOpenAi::Core::CreateThreadRequest::CreateThreadRequest(QtOpenAi::Core::CreateThreadRequest&&)
+src/core/src/CreateThreadRequest.cpp	QtOpenAi::Core::CreateThreadRequest::addMessage(QtOpenAi::Core::ThreadMessageInput const&)
+src/core/src/CreateThreadRequest.cpp	QtOpenAi::Core::CreateThreadRequest::messages() const
+src/core/src/CreateThreadRequest.cpp	QtOpenAi::Core::CreateThreadRequest::metadata() const
+src/core/src/CreateThreadRequest.cpp	QtOpenAi::Core::CreateThreadRequest::operator=(QtOpenAi::Core::CreateThreadRequest&&)
+src/core/src/CreateThreadRequest.cpp	QtOpenAi::Core::CreateThreadRequest::operator==(QtOpenAi::Core::CreateThreadRequest const&) const
+src/core/src/CreateThreadRequest.cpp	QtOpenAi::Core::CreateThreadRequest::setMessages(QList<QtOpenAi::Core::ThreadMessageInput> const&)
+src/core/src/CreateThreadRequest.cpp	QtOpenAi::Core::CreateThreadRequest::toolResources() const
+src/core/src/CreateUploadRequest.cpp	QtOpenAi::Core::CreateUploadRequest::CreateUploadRequest(QtOpenAi::Core::CreateUploadRequest&&)
+src/core/src/CreateUploadRequest.cpp	QtOpenAi::Core::CreateUploadRequest::filename() const
+src/core/src/CreateUploadRequest.cpp	QtOpenAi::Core::CreateUploadRequest::mimeType() const
+src/core/src/CreateUploadRequest.cpp	QtOpenAi::Core::CreateUploadRequest::operator=(QtOpenAi::Core::CreateUploadRequest const&)
+src/core/src/CreateUploadRequest.cpp	QtOpenAi::Core::CreateUploadRequest::operator==(QtOpenAi::Core::CreateUploadRequest const&) const
+src/core/src/CreateUploadRequest.cpp	QtOpenAi::Core::CreateUploadRequest::purpose() const
+src/core/src/CreateUploadRequest.cpp	QtOpenAi::Core::CreateUploadRequest::setFilename(QString const&)
+src/core/src/CreateUploadRequest.cpp	QtOpenAi::Core::CreateUploadRequest::setMimeType(QString const&)
+src/core/src/CreateUploadRequest.cpp	QtOpenAi::Core::CreateUploadRequest::setPurpose(QString const&)
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::CreateVectorStoreRequest(QtOpenAi::Core::CreateVectorStoreRequest const&)
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::CreateVectorStoreRequest(QtOpenAi::Core::CreateVectorStoreRequest&&)
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::chunkingStrategy() const
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::expiresAfterAnchor() const
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::expiresAfterDays() const
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::fileIds() const
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::metadata() const
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::name() const
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::operator=(QtOpenAi::Core::CreateVectorStoreRequest const&)
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::operator=(QtOpenAi::Core::CreateVectorStoreRequest&&)
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::operator==(QtOpenAi::Core::CreateVectorStoreRequest const&) const
+src/core/src/CreateVectorStoreRequest.cpp	QtOpenAi::Core::CreateVectorStoreRequest::setFileIds(QList<QString> const&)
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::CreateVideoRequest()
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::CreateVideoRequest(QtOpenAi::Core::CreateVideoRequest const&)
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::CreateVideoRequest(QtOpenAi::Core::CreateVideoRequest&&)
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::extraBody() const
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::fromJson(QJsonObject const&)
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::model() const
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::operator=(QtOpenAi::Core::CreateVideoRequest const&)
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::operator=(QtOpenAi::Core::CreateVideoRequest&&)
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::operator==(QtOpenAi::Core::CreateVideoRequest const&) const
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::prompt() const
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::seconds() const
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::setModel(QString const&)
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::setPrompt(QString const&)
+src/core/src/CreateVideoRequest.cpp	QtOpenAi::Core::CreateVideoRequest::size() const
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::CreateVoiceConsentRequest()
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::CreateVoiceConsentRequest(QtOpenAi::Core::CreateVoiceConsentRequest const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::CreateVoiceConsentRequest(QtOpenAi::Core::CreateVoiceConsentRequest&&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::language() const
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::name() const
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::operator=(QtOpenAi::Core::CreateVoiceConsentRequest const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::operator=(QtOpenAi::Core::CreateVoiceConsentRequest&&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::operator==(QtOpenAi::Core::CreateVoiceConsentRequest const&) const
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::setFileName(QString const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::setLanguage(QString const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::setName(QString const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceConsentRequest::setRecording(QByteArray const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::CreateVoiceRequest()
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::CreateVoiceRequest(QtOpenAi::Core::CreateVoiceRequest const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::CreateVoiceRequest(QtOpenAi::Core::CreateVoiceRequest&&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::consentId() const
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::name() const
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::operator=(QtOpenAi::Core::CreateVoiceRequest const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::operator=(QtOpenAi::Core::CreateVoiceRequest&&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::operator==(QtOpenAi::Core::CreateVoiceRequest const&) const
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::setAudioSample(QByteArray const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::setConsentId(QString const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::setFileName(QString const&)
+src/core/src/CreateVoiceRequest.cpp	QtOpenAi::Core::CreateVoiceRequest::setName(QString const&)
+src/core/src/DataRetention.cpp	QtOpenAi::Core::DataRetention::DataRetention(QtOpenAi::Core::DataRetention&&)
+src/core/src/DataRetention.cpp	QtOpenAi::Core::DataRetention::operator=(QtOpenAi::Core::DataRetention const&)
+src/core/src/DataRetention.cpp	QtOpenAi::Core::DataRetention::setObject(QString const&)
+src/core/src/DataRetention.cpp	QtOpenAi::Core::DataRetention::setType(QString const&)
+src/core/src/EmbeddingRequest.cpp	QtOpenAi::Core::EmbeddingRequest::EmbeddingRequest(QtOpenAi::Core::EmbeddingRequest const&)
+src/core/src/EmbeddingRequest.cpp	QtOpenAi::Core::EmbeddingRequest::EmbeddingRequest(QtOpenAi::Core::EmbeddingRequest&&)
+src/core/src/EmbeddingRequest.cpp	QtOpenAi::Core::EmbeddingRequest::dimensions() const
+src/core/src/EmbeddingRequest.cpp	QtOpenAi::Core::EmbeddingRequest::encodingFormat() const
+src/core/src/EmbeddingRequest.cpp	QtOpenAi::Core::EmbeddingRequest::input() const
+src/core/src/EmbeddingRequest.cpp	QtOpenAi::Core::EmbeddingRequest::model() const
+src/core/src/EmbeddingRequest.cpp	QtOpenAi::Core::EmbeddingRequest::operator=(QtOpenAi::Core::EmbeddingRequest const&)
+src/core/src/EmbeddingRequest.cpp	QtOpenAi::Core::EmbeddingRequest::operator=(QtOpenAi::Core::EmbeddingRequest&&)
+src/core/src/EmbeddingRequest.cpp	QtOpenAi::Core::EmbeddingRequest::setInput(QString const&)
+src/core/src/EmbeddingRequest.cpp	QtOpenAi::Core::EmbeddingRequest::user() const
+src/core/src/EmbeddingResponse.cpp	QtOpenAi::Core::Embedding::operator=(QtOpenAi::Core::Embedding const&)
+src/core/src/EmbeddingResponse.cpp	QtOpenAi::Core::Embedding::operator=(QtOpenAi::Core::Embedding&&)
+src/core/src/EmbeddingResponse.cpp	QtOpenAi::Core::EmbeddingResponse::EmbeddingResponse(QtOpenAi::Core::EmbeddingResponse&&)
+src/core/src/EmbeddingResponse.cpp	QtOpenAi::Core::EmbeddingResponse::model() const
+src/core/src/EmbeddingResponse.cpp	QtOpenAi::Core::EmbeddingResponse::operator=(QtOpenAi::Core::EmbeddingResponse const&)
+src/core/src/Eval.cpp	QtOpenAi::Core::Eval::operator=(QtOpenAi::Core::Eval const&)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRun::metadata() const
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::object() const
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::operator=(QtOpenAi::Core::EvalRunOutputItem const&)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::setCreatedAt(long long)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::setDatasourceItem(QJsonObject const&)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::setDatasourceItemId(int)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::setEvalId(QString const&)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::setId(QString const&)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::setObject(QString const&)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::setResults(QJsonArray const&)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::setRunId(QString const&)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::setSample(QJsonObject const&)
+src/core/src/EvalRun.cpp	QtOpenAi::Core::EvalRunOutputItem::setStatus(QString const&)
+src/core/src/FileObject.cpp	QtOpenAi::Core::FileObject::operator=(QtOpenAi::Core::FileObject const&)
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::FileUploadRequest()
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::FileUploadRequest(QtOpenAi::Core::FileUploadRequest const&)
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::FileUploadRequest(QtOpenAi::Core::FileUploadRequest&&)
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::expiresAfterAnchor() const
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::operator=(QtOpenAi::Core::FileUploadRequest const&)
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::operator=(QtOpenAi::Core::FileUploadRequest&&)
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::operator==(QtOpenAi::Core::FileUploadRequest const&) const
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::purpose() const
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::setFileData(QByteArray const&)
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::setFileName(QString const&)
+src/core/src/FileUploadRequest.cpp	QtOpenAi::Core::FileUploadRequest::setPurpose(QString const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningCheckpointPermission::operator=(QtOpenAi::Core::FineTuningCheckpointPermission const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningCheckpointPermission::setCreatedAt(long long)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningCheckpointPermission::setId(QString const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningCheckpointPermission::setObject(QString const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningCheckpointPermission::setProjectId(QString const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::createdAt() const
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::object() const
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::operator=(QtOpenAi::Core::FineTuningJobCheckpoint const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::operator=(QtOpenAi::Core::FineTuningJobCheckpoint&&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::setCreatedAt(long long)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::setFineTunedModelCheckpoint(QString const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::setFineTuningJobId(QString const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::setId(QString const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::setMetrics(QtOpenAi::Core::FineTuningCheckpointMetrics const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::setObject(QString const&)
+src/core/src/FineTuningCheckpoint.cpp	QtOpenAi::Core::FineTuningJobCheckpoint::setStepNumber(int)
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJob::metadata() const
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJobEvent::object() const
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJobEvent::operator=(QtOpenAi::Core::FineTuningJobEvent const&)
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJobEvent::operator=(QtOpenAi::Core::FineTuningJobEvent&&)
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJobEvent::setCreatedAt(long long)
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJobEvent::setData(QJsonObject const&)
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJobEvent::setId(QString const&)
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJobEvent::setLevel(QString const&)
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJobEvent::setMessage(QString const&)
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJobEvent::setObject(QString const&)
+src/core/src/FineTuningJob.cpp	QtOpenAi::Core::FineTuningJobEvent::setType(QString const&)
+src/core/src/FunctionCall.cpp	QtOpenAi::Core::FunctionCall::FunctionCall(QtOpenAi::Core::FunctionCall&&)
+src/core/src/FunctionCall.cpp	QtOpenAi::Core::FunctionCall::isEmpty() const
+src/core/src/FunctionCall.cpp	QtOpenAi::Core::FunctionCall::operator=(QtOpenAi::Core::FunctionCall const&)
+src/core/src/FunctionCall.cpp	QtOpenAi::Core::FunctionCall::setArguments(QString const&)
+src/core/src/FunctionCall.cpp	QtOpenAi::Core::FunctionCall::setName(QString const&)
+src/core/src/Group.cpp	QtOpenAi::Core::Group::createdAt() const
+src/core/src/Group.cpp	QtOpenAi::Core::Group::groupType() const
+src/core/src/Group.cpp	QtOpenAi::Core::Group::object() const
+src/core/src/Group.cpp	QtOpenAi::Core::Group::operator=(QtOpenAi::Core::Group const&)
+src/core/src/Group.cpp	QtOpenAi::Core::Group::setDeleted(bool)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMember::GroupMember(QtOpenAi::Core::GroupMember const&)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMember::GroupMember(QtOpenAi::Core::GroupMember&&)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMember::email() const
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMember::id() const
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMember::name() const
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMember::operator=(QtOpenAi::Core::GroupMember const&)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMember::picture() const
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMember::setPicture(QString const&)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMember::setServiceAccount(bool)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMember::userType() const
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMembership::GroupMembership(QtOpenAi::Core::GroupMembership&&)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMembership::object() const
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMembership::operator=(QtOpenAi::Core::GroupMembership const&)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMembership::operator==(QtOpenAi::Core::GroupMembership const&) const
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMembership::setDeleted(bool)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMembership::setGroupId(QString const&)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMembership::setObject(QString const&)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMembership::setUserId(QString const&)
+src/core/src/Group.cpp	QtOpenAi::Core::GroupMembership::toJson() const
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::ProjectGroup(QtOpenAi::Core::ProjectGroup&&)
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::groupId() const
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::groupType() const
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::isDeleted() const
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::object() const
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::operator=(QtOpenAi::Core::ProjectGroup const&)
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::setCreatedAt(long long)
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::setDeleted(bool)
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::setGroupId(QString const&)
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::setGroupName(QString const&)
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::setGroupType(QString const&)
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::setObject(QString const&)
+src/core/src/Group.cpp	QtOpenAi::Core::ProjectGroup::setProjectId(QString const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::ImageEditRequest()
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::ImageEditRequest(QtOpenAi::Core::ImageEditRequest const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::ImageEditRequest(QtOpenAi::Core::ImageEditRequest&&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::addImage(QString const&, QByteArray const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::background() const
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::model() const
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::n() const
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::operator=(QtOpenAi::Core::ImageEditRequest const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::operator=(QtOpenAi::Core::ImageEditRequest&&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::operator==(QtOpenAi::Core::ImageEditRequest const&) const
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::outputFormat() const
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::prompt() const
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::responseFormat() const
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::setBackground(QString const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::setImages(QList<std::pair<QString, QByteArray> > const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::setModel(QString const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::setOutputFormat(QString const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::setPrompt(QString const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::setResponseFormat(QString const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::setUser(QString const&)
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::size() const
+src/core/src/ImageEditRequest.cpp	QtOpenAi::Core::ImageEditRequest::user() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::ImageGenerationRequest(QtOpenAi::Core::ImageGenerationRequest const&)
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::ImageGenerationRequest(QtOpenAi::Core::ImageGenerationRequest&&)
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::background() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::extraBody() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::model() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::moderation() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::n() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::operator=(QtOpenAi::Core::ImageGenerationRequest const&)
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::operator=(QtOpenAi::Core::ImageGenerationRequest&&)
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::outputFormat() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::prompt() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::quality() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::responseFormat() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::setExtraBody(QJsonObject const&)
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::setModel(QString const&)
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::setModeration(QString const&)
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::setOutputFormat(QString const&)
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::setPrompt(QString const&)
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::size() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::style() const
+src/core/src/ImageGenerationRequest.cpp	QtOpenAi::Core::ImageGenerationRequest::user() const
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::Image::operator=(QtOpenAi::Core::Image const&)
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::Image::operator=(QtOpenAi::Core::Image&&)
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::Image::operator==(QtOpenAi::Core::Image const&) const
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::Image::setB64Json(QString const&)
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::Image::setRevisedPrompt(QString const&)
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::Image::setUrl(QString const&)
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::ImageResponse::ImageResponse(QtOpenAi::Core::ImageResponse&&)
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::ImageResponse::operator=(QtOpenAi::Core::ImageResponse const&)
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::ImageResponse::operator==(QtOpenAi::Core::ImageResponse const&) const
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::ImageResponse::setCreated(long long)
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::ImageResponse::setData(QList<QtOpenAi::Core::Image> const&)
+src/core/src/ImageResponse.cpp	QtOpenAi::Core::ImageResponse::setUsage(QtOpenAi::Core::Usage const&)
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::ImageVariationRequest()
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::ImageVariationRequest(QtOpenAi::Core::ImageVariationRequest const&)
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::ImageVariationRequest(QtOpenAi::Core::ImageVariationRequest&&)
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::fileName() const
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::model() const
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::n() const
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::operator=(QtOpenAi::Core::ImageVariationRequest const&)
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::operator=(QtOpenAi::Core::ImageVariationRequest&&)
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::operator==(QtOpenAi::Core::ImageVariationRequest const&) const
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::responseFormat() const
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::setFileName(QString const&)
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::setImageData(QByteArray const&)
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::setModel(QString const&)
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::setSize(QString const&)
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::setUser(QString const&)
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::size() const
+src/core/src/ImageVariationRequest.cpp	QtOpenAi::Core::ImageVariationRequest::user() const
+src/core/src/Invite.cpp	QtOpenAi::Core::Invite::email() const
+src/core/src/Invite.cpp	QtOpenAi::Core::Invite::invitedAt() const
+src/core/src/Invite.cpp	QtOpenAi::Core::Invite::operator=(QtOpenAi::Core::Invite const&)
+src/core/src/Message.cpp	QtOpenAi::Core::Message::addContentPart(QtOpenAi::Core::ContentPart const&)
+src/core/src/Message.cpp	QtOpenAi::Core::Message::audioData() const
+src/core/src/Message.cpp	QtOpenAi::Core::Message::setContentParts(QList<QtOpenAi::Core::ContentPart> const&)
+src/core/src/Message.cpp	QtOpenAi::Core::Message::setToolCallId(QString const&)
+src/core/src/Model.cpp	QtOpenAi::Core::Model::created() const
+src/core/src/Model.cpp	QtOpenAi::Core::Model::operator=(QtOpenAi::Core::Model const&)
+src/core/src/Model.cpp	QtOpenAi::Core::Model::setObject(QString const&)
+src/core/src/ModelCatalog.cpp	QtOpenAi::Core::ModelCatalog::ModelCatalog(QtOpenAi::Core::ModelCatalog&&)
+src/core/src/ModelCatalog.cpp	QtOpenAi::Core::ModelCatalog::clear()
+src/core/src/ModelCatalog.cpp	QtOpenAi::Core::ModelCatalog::contains(QString const&) const
+src/core/src/ModelCatalog.cpp	QtOpenAi::Core::ModelCatalog::entry(QString const&) const
+src/core/src/ModelCatalog.cpp	QtOpenAi::Core::ModelCatalog::fallback() const
+src/core/src/ModelCatalog.cpp	QtOpenAi::Core::ModelCatalog::ids() const
+src/core/src/ModelCatalog.cpp	QtOpenAi::Core::ModelCatalog::isEmpty() const
+src/core/src/ModelCatalog.cpp	QtOpenAi::Core::ModelCatalog::mergeShared(QJsonObject const&)
+src/core/src/ModelCatalog.cpp	QtOpenAi::Core::ModelCatalog::operator=(QtOpenAi::Core::ModelCatalog&&)
+src/core/src/ModelCatalog.cpp	QtOpenAi::Core::ModelCatalog::remove(QString const&)
+src/core/src/ModelInfo.cpp	QtOpenAi::Core::ModelInfo::cachedInputPrice() const
+src/core/src/ModelInfo.cpp	QtOpenAi::Core::ModelInfo::capabilities() const
+src/core/src/ModerationRequest.cpp	QtOpenAi::Core::ModerationRequest::ModerationRequest(QtOpenAi::Core::ModerationRequest const&)
+src/core/src/ModerationRequest.cpp	QtOpenAi::Core::ModerationRequest::ModerationRequest(QtOpenAi::Core::ModerationRequest&&)
+src/core/src/ModerationRequest.cpp	QtOpenAi::Core::ModerationRequest::input() const
+src/core/src/ModerationRequest.cpp	QtOpenAi::Core::ModerationRequest::model() const
+src/core/src/ModerationRequest.cpp	QtOpenAi::Core::ModerationRequest::operator=(QtOpenAi::Core::ModerationRequest const&)
+src/core/src/ModerationRequest.cpp	QtOpenAi::Core::ModerationRequest::operator=(QtOpenAi::Core::ModerationRequest&&)
+src/core/src/ModerationRequest.cpp	QtOpenAi::Core::ModerationRequest::setInput(QJsonValue const&)
+src/core/src/ModerationRequest.cpp	QtOpenAi::Core::ModerationRequest::setInput(QString const&)
+src/core/src/ModerationResponse.cpp	QtOpenAi::Core::ModerationResponse::ModerationResponse(QtOpenAi::Core::ModerationResponse&&)
+src/core/src/ModerationResponse.cpp	QtOpenAi::Core::ModerationResponse::id() const
+src/core/src/ModerationResponse.cpp	QtOpenAi::Core::ModerationResponse::model() const
+src/core/src/ModerationResponse.cpp	QtOpenAi::Core::ModerationResponse::operator=(QtOpenAi::Core::ModerationResponse const&)
+src/core/src/ModerationResponse.cpp	QtOpenAi::Core::ModerationResult::categoryAppliedInputTypes() const
+src/core/src/ModerationResponse.cpp	QtOpenAi::Core::ModerationResult::operator=(QtOpenAi::Core::ModerationResult&&)
+src/core/src/ModerationResponse.cpp	QtOpenAi::Core::ModerationResult::setCategoryAppliedInputTypes(QJsonObject const&)
+src/core/src/OrganizationCosts.cpp	QtOpenAi::Core::CostResult::object() const
+src/core/src/OrganizationCosts.cpp	QtOpenAi::Core::CostResult::operator=(QtOpenAi::Core::CostResult const&)
+src/core/src/OrganizationCosts.cpp	QtOpenAi::Core::CostResult::operator=(QtOpenAi::Core::CostResult&&)
+src/core/src/OrganizationRole.cpp	QtOpenAi::Core::OrganizationRole::createdAt() const
+src/core/src/OrganizationRole.cpp	QtOpenAi::Core::OrganizationRole::isDeleted() const
+src/core/src/OrganizationRole.cpp	QtOpenAi::Core::OrganizationRole::metadata() const
+src/core/src/OrganizationRole.cpp	QtOpenAi::Core::OrganizationRole::object() const
+src/core/src/OrganizationRole.cpp	QtOpenAi::Core::OrganizationRole::operator=(QtOpenAi::Core::OrganizationRole const&)
+src/core/src/OrganizationRole.cpp	QtOpenAi::Core::OrganizationRole::setCreatedByUser(QtOpenAi::Core::OrganizationUser const&)
+src/core/src/OrganizationRole.cpp	QtOpenAi::Core::OrganizationRole::setDeleted(bool)
+src/core/src/OrganizationRole.cpp	QtOpenAi::Core::OrganizationRole::setMetadata(QJsonObject const&)
+src/core/src/OrganizationRole.cpp	QtOpenAi::Core::OrganizationRole::setPredefinedRole(bool)
+src/core/src/OrganizationRole.cpp	QtOpenAi::Core::OrganizationRole::updatedAt() const
+src/core/src/OrganizationUsage.cpp	QtOpenAi::Core::UsageResult::apiKeyId() const
+src/core/src/OrganizationUsage.cpp	QtOpenAi::Core::UsageResult::object() const
+src/core/src/OrganizationUsage.cpp	QtOpenAi::Core::UsageResult::operator=(QtOpenAi::Core::UsageResult const&)
+src/core/src/OrganizationUsage.cpp	QtOpenAi::Core::UsageResult::operator=(QtOpenAi::Core::UsageResult&&)
+src/core/src/OrganizationUsage.cpp	QtOpenAi::Core::UsageResult::setMetrics(QMap<QString, long long> const&)
+src/core/src/OrganizationUsage.cpp	QtOpenAi::Core::UsageResult::setSize(QString const&)
+src/core/src/OrganizationUsage.cpp	QtOpenAi::Core::UsageResult::setSource(QString const&)
+src/core/src/OrganizationUsage.cpp	QtOpenAi::Core::UsageResult::size() const
+src/core/src/OrganizationUsage.cpp	QtOpenAi::Core::UsageResult::source() const
+src/core/src/OrganizationUsage.cpp	QtOpenAi::Core::UsageResult::userId() const
+src/core/src/Project.cpp	QtOpenAi::Core::Project::createdAt() const
+src/core/src/Project.cpp	QtOpenAi::Core::Project::id() const
+src/core/src/Project.cpp	QtOpenAi::Core::Project::object() const
+src/core/src/Project.cpp	QtOpenAi::Core::Project::operator=(QtOpenAi::Core::Project const&)
+src/core/src/ProjectApiKey.cpp	QtOpenAi::Core::ApiKeyOwner::ApiKeyOwner(QtOpenAi::Core::ApiKeyOwner&&)
+src/core/src/ProjectApiKey.cpp	QtOpenAi::Core::ApiKeyOwner::setServiceAccount(QtOpenAi::Core::ProjectServiceAccount const&)
+src/core/src/ProjectApiKey.cpp	QtOpenAi::Core::ProjectApiKey::ProjectApiKey(QtOpenAi::Core::ProjectApiKey const&)
+src/core/src/ProjectApiKey.cpp	QtOpenAi::Core::ProjectApiKey::createdAt() const
+src/core/src/ProjectApiKey.cpp	QtOpenAi::Core::ProjectApiKey::id() const
+src/core/src/ProjectApiKey.cpp	QtOpenAi::Core::ProjectApiKey::name() const
+src/core/src/ProjectApiKey.cpp	QtOpenAi::Core::ProjectApiKey::object() const
+src/core/src/ProjectApiKey.cpp	QtOpenAi::Core::ProjectApiKey::operator=(QtOpenAi::Core::ProjectApiKey const&)
+src/core/src/ProjectPermissions.cpp	QtOpenAi::Core::ProjectHostedToolPermissions::ProjectHostedToolPermissions(QtOpenAi::Core::ProjectHostedToolPermissions&&)
+src/core/src/ProjectPermissions.cpp	QtOpenAi::Core::ProjectHostedToolPermissions::operator=(QtOpenAi::Core::ProjectHostedToolPermissions const&)
+src/core/src/ProjectPermissions.cpp	QtOpenAi::Core::ProjectHostedToolPermissions::setPermissions(QMap<QString, bool> const&)
+src/core/src/ProjectPermissions.cpp	QtOpenAi::Core::ProjectModelPermissions::ProjectModelPermissions(QtOpenAi::Core::ProjectModelPermissions&&)
+src/core/src/ProjectPermissions.cpp	QtOpenAi::Core::ProjectModelPermissions::object() const
+src/core/src/ProjectPermissions.cpp	QtOpenAi::Core::ProjectModelPermissions::operator=(QtOpenAi::Core::ProjectModelPermissions const&)
+src/core/src/ProjectPermissions.cpp	QtOpenAi::Core::ProjectModelPermissions::setDeleted(bool)
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::ProjectRateLimit(QtOpenAi::Core::ProjectRateLimit&&)
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::batchMaxInputTokensPerDay() const
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::id() const
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::maxAudioMegabytesPerMinute() const
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::maxRequestsPerDay() const
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::model() const
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::object() const
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::operator=(QtOpenAi::Core::ProjectRateLimit const&)
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::setBatchMaxInputTokensPerDay(std::optional<long long>)
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::setMaxAudioMegabytesPerMinute(std::optional<long long>)
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::setMaxImagesPerMinute(std::optional<long long>)
+src/core/src/ProjectRateLimit.cpp	QtOpenAi::Core::ProjectRateLimit::setMaxRequestsPerDay(std::optional<long long>)
+src/core/src/ProjectServiceAccount.cpp	QtOpenAi::Core::ProjectServiceAccount::ProjectServiceAccount(QtOpenAi::Core::ProjectServiceAccount&&)
+src/core/src/ProjectServiceAccount.cpp	QtOpenAi::Core::ProjectServiceAccount::createdAt() const
+src/core/src/ProjectServiceAccount.cpp	QtOpenAi::Core::ProjectServiceAccount::id() const
+src/core/src/ProjectServiceAccount.cpp	QtOpenAi::Core::ProjectServiceAccount::object() const
+src/core/src/ProjectServiceAccount.cpp	QtOpenAi::Core::ProjectServiceAccount::operator=(QtOpenAi::Core::ProjectServiceAccount const&)
+src/core/src/RealtimeClientSecret.cpp	QtOpenAi::Core::RealtimeClientSecret::RealtimeClientSecret(QtOpenAi::Core::RealtimeClientSecret&&)
+src/core/src/RealtimeClientSecret.cpp	QtOpenAi::Core::RealtimeClientSecret::operator=(QtOpenAi::Core::RealtimeClientSecret const&)
+src/core/src/RealtimeEvent.cpp	QtOpenAi::Core::RealtimeEvent::cancelResponse()
+src/core/src/RealtimeEvent.cpp	QtOpenAi::Core::RealtimeEvent::clearInputAudio()
+src/core/src/RealtimeEvent.cpp	QtOpenAi::Core::RealtimeEvent::operator=(QtOpenAi::Core::RealtimeEvent const&)
+src/core/src/RealtimeEvent.cpp	QtOpenAi::Core::RealtimeEvent::operator=(QtOpenAi::Core::RealtimeEvent&&)
+src/core/src/RealtimeEvent.cpp	QtOpenAi::Core::RealtimeEvent::operator==(QtOpenAi::Core::RealtimeEvent const&) const
+src/core/src/RealtimeEvent.cpp	QtOpenAi::Core::RealtimeEvent::setEventId(QString const&)
+src/core/src/RealtimeEvent.cpp	QtOpenAi::Core::RealtimeEvent::setType(QString const&)
+src/core/src/RealtimeSessionConfig.cpp	QtOpenAi::Core::RealtimeSessionConfig::RealtimeSessionConfig(QtOpenAi::Core::RealtimeSessionConfig&&)
+src/core/src/RealtimeSessionConfig.cpp	QtOpenAi::Core::RealtimeSessionConfig::include() const
+src/core/src/RealtimeSessionConfig.cpp	QtOpenAi::Core::RealtimeSessionConfig::prompt() const
+src/core/src/RealtimeSessionConfig.cpp	QtOpenAi::Core::RealtimeSessionConfig::tracing() const
+src/core/src/Response.cpp	QtOpenAi::Core::Response::Response(QtOpenAi::Core::Response&&)
+src/core/src/Response.cpp	QtOpenAi::Core::Response::createdAt() const
+src/core/src/Response.cpp	QtOpenAi::Core::Response::errorMessage() const
+src/core/src/Response.cpp	QtOpenAi::Core::Response::metadata() const
+src/core/src/Response.cpp	QtOpenAi::Core::Response::model() const
+src/core/src/Response.cpp	QtOpenAi::Core::Response::operator=(QtOpenAi::Core::Response const&)
+src/core/src/Response.cpp	QtOpenAi::Core::Response::previousResponseId() const
+src/core/src/Response.cpp	QtOpenAi::Core::Response::setErrorMessage(QString const&)
+src/core/src/Response.cpp	QtOpenAi::Core::Response::setMetadata(QJsonObject const&)
+src/core/src/Response.cpp	QtOpenAi::Core::Response::setObject(QString const&)
+src/core/src/Response.cpp	QtOpenAi::Core::Response::setOutput(QList<QtOpenAi::Core::ResponseOutputItem> const&)
+src/core/src/Response.cpp	QtOpenAi::Core::Response::setPreviousResponseId(QString const&)
+src/core/src/ResponseFormat.cpp	QtOpenAi::Core::ResponseFormat::operator=(QtOpenAi::Core::ResponseFormat const&)
+src/core/src/ResponseFormat.cpp	QtOpenAi::Core::ResponseFormat::operator=(QtOpenAi::Core::ResponseFormat&&)
+src/core/src/ResponseFormat.cpp	QtOpenAi::Core::ResponseFormat::setDescription(QString const&)
+src/core/src/ResponseFormat.cpp	QtOpenAi::Core::ResponseFormat::setName(QString const&)
+src/core/src/ResponseFormat.cpp	QtOpenAi::Core::ResponseFormat::setSchema(QJsonObject const&)
+src/core/src/ResponseFormat.cpp	QtOpenAi::Core::ResponseFormat::setStrict(bool)
+src/core/src/ResponseFormat.cpp	QtOpenAi::Core::ResponseFormat::setType(QString const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::id() const
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::operator=(QtOpenAi::Core::ResponseOutputItem const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::operator=(QtOpenAi::Core::ResponseOutputItem&&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::setArguments(QString const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::setCallId(QString const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::setId(QString const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::setName(QString const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::setRole(QString const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::setStatus(QString const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::setSummary(QList<QString> const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::setText(QString const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::setType(QString const&)
+src/core/src/ResponseOutputItem.cpp	QtOpenAi::Core::ResponseOutputItem::status() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::ResponseRequest(QtOpenAi::Core::ResponseRequest&&)
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::extraBody() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::input() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::instructions() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::maxOutputTokens() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::metadata() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::model() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::operator=(QtOpenAi::Core::ResponseRequest const&)
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::operator=(QtOpenAi::Core::ResponseRequest&&)
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::previousResponseId() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::reasoningEffort() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::setExtraBody(QJsonObject const&)
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::setInput(QJsonValue const&)
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::setInput(QString const&)
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::setModel(QString const&)
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::setTools(QList<QtOpenAi::Core::Tool> const&)
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::store() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::stream() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::temperature() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::toolChoice() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::tools() const
+src/core/src/ResponseRequest.cpp	QtOpenAi::Core::ResponseRequest::topP() const
+src/core/src/ResponseUsage.cpp	QtOpenAi::Core::ResponseUsage::ResponseUsage(QtOpenAi::Core::ResponseUsage&&)
+src/core/src/ResponseUsage.cpp	QtOpenAi::Core::ResponseUsage::totalTokens() const
+src/core/src/RoleAssignment.cpp	QtOpenAi::Core::RoleAssignment::RoleAssignment(QtOpenAi::Core::RoleAssignment&&)
+src/core/src/RoleAssignment.cpp	QtOpenAi::Core::RoleAssignment::operator=(QtOpenAi::Core::RoleAssignment const&)
+src/core/src/RoleAssignment.cpp	QtOpenAi::Core::RoleAssignment::operator==(QtOpenAi::Core::RoleAssignment const&) const
+src/core/src/RoleAssignment.cpp	QtOpenAi::Core::RoleAssignment::setDeleted(bool)
+src/core/src/RoleAssignment.cpp	QtOpenAi::Core::RoleAssignment::setGroup(QtOpenAi::Core::Group const&)
+src/core/src/RoleAssignment.cpp	QtOpenAi::Core::RoleAssignment::setObject(QString const&)
+src/core/src/RoleAssignment.cpp	QtOpenAi::Core::RoleAssignment::setRole(QtOpenAi::Core::OrganizationRole const&)
+src/core/src/RoleAssignment.cpp	QtOpenAi::Core::RoleAssignment::setUser(QtOpenAi::Core::OrganizationUser const&)
+src/core/src/RoleAssignment.cpp	QtOpenAi::Core::RoleAssignment::toJson() const
+src/core/src/RoleAssignment.cpp	QtOpenAi::Core::RoleAssignment::user() const
+src/core/src/RoleRequest.cpp	QtOpenAi::Core::RoleRequest::RoleRequest(QtOpenAi::Core::RoleRequest const&)
+src/core/src/RoleRequest.cpp	QtOpenAi::Core::RoleRequest::RoleRequest(QtOpenAi::Core::RoleRequest&&)
+src/core/src/RoleRequest.cpp	QtOpenAi::Core::RoleRequest::description() const
+src/core/src/RoleRequest.cpp	QtOpenAi::Core::RoleRequest::operator=(QtOpenAi::Core::RoleRequest const&)
+src/core/src/RoleRequest.cpp	QtOpenAi::Core::RoleRequest::operator=(QtOpenAi::Core::RoleRequest&&)
+src/core/src/RoleRequest.cpp	QtOpenAi::Core::RoleRequest::permissions() const
+src/core/src/RoleRequest.cpp	QtOpenAi::Core::RoleRequest::roleName() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::cancelledAt() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::createdAt() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::errorCode() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::errorMessage() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::expiresAt() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::failedAt() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::incompleteDetails() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::instructions() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::object() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::responseFormat() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::toolChoice() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::topP() const
+src/core/src/Run.cpp	QtOpenAi::Core::Run::truncationStrategy() const
+src/core/src/RunStep.cpp	QtOpenAi::Core::RunStep::assistantId() const
+src/core/src/RunStep.cpp	QtOpenAi::Core::RunStep::cancelledAt() const
+src/core/src/RunStep.cpp	QtOpenAi::Core::RunStep::createdAt() const
+src/core/src/RunStep.cpp	QtOpenAi::Core::RunStep::expiredAt() const
+src/core/src/RunStep.cpp	QtOpenAi::Core::RunStep::failedAt() const
+src/core/src/RunStep.cpp	QtOpenAi::Core::RunStep::metadata() const
+src/core/src/RunStep.cpp	QtOpenAi::Core::RunStep::object() const
+src/core/src/RunStep.cpp	QtOpenAi::Core::RunStep::operator=(QtOpenAi::Core::RunStep const&)
+src/core/src/RunStep.cpp	QtOpenAi::Core::RunStep::threadId() const
+src/core/src/Skill.cpp	QtOpenAi::Core::Skill::operator=(QtOpenAi::Core::Skill const&)
+src/core/src/SkillVersion.cpp	QtOpenAi::Core::SkillVersion::operator=(QtOpenAi::Core::SkillVersion const&)
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::SpeechRequest(QtOpenAi::Core::SpeechRequest const&)
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::SpeechRequest(QtOpenAi::Core::SpeechRequest&&)
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::input() const
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::instructions() const
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::model() const
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::operator=(QtOpenAi::Core::SpeechRequest const&)
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::operator=(QtOpenAi::Core::SpeechRequest&&)
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::responseFormat() const
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::setInput(QString const&)
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::setModel(QString const&)
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::setVoice(QString const&)
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::speed() const
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::streamFormat() const
+src/core/src/SpeechRequest.cpp	QtOpenAi::Core::SpeechRequest::voice() const
+src/core/src/SpendAlert.cpp	QtOpenAi::Core::SpendAlert::operator=(QtOpenAi::Core::SpendAlert const&)
+src/core/src/SpendAlert.cpp	QtOpenAi::Core::SpendAlert::setCurrency(QString const&)
+src/core/src/SpendAlert.cpp	QtOpenAi::Core::SpendAlert::setDeleted(bool)
+src/core/src/SpendAlert.cpp	QtOpenAi::Core::SpendAlert::setId(QString const&)
+src/core/src/SpendAlert.cpp	QtOpenAi::Core::SpendAlert::setInterval(QString const&)
+src/core/src/SpendAlert.cpp	QtOpenAi::Core::SpendAlert::setObject(QString const&)
+src/core/src/SpendAlert.cpp	QtOpenAi::Core::SpendAlertNotificationChannel::SpendAlertNotificationChannel(QtOpenAi::Core::SpendAlertNotificationChannel&&)
+src/core/src/SpendAlert.cpp	QtOpenAi::Core::SpendAlertNotificationChannel::setType(QString const&)
+src/core/src/SpendLimit.cpp	QtOpenAi::Core::SpendLimit::SpendLimit(QtOpenAi::Core::SpendLimit&&)
+src/core/src/SpendLimit.cpp	QtOpenAi::Core::SpendLimit::operator=(QtOpenAi::Core::SpendLimit const&)
+src/core/src/SpendLimit.cpp	QtOpenAi::Core::SpendLimit::setCurrency(QString const&)
+src/core/src/SpendLimit.cpp	QtOpenAi::Core::SpendLimit::setDeleted(bool)
+src/core/src/SpendLimit.cpp	QtOpenAi::Core::SpendLimit::setEnforcementStatus(QString const&)
+src/core/src/SpendLimit.cpp	QtOpenAi::Core::SpendLimit::setInterval(QString const&)
+src/core/src/SpendLimit.cpp	QtOpenAi::Core::SpendLimit::setObject(QString const&)
+src/core/src/Thread.cpp	QtOpenAi::Core::Thread::Thread(QtOpenAi::Core::Thread&&)
+src/core/src/Thread.cpp	QtOpenAi::Core::Thread::operator=(QtOpenAi::Core::Thread const&)
+src/core/src/ThreadMessage.cpp	QtOpenAi::Core::ThreadMessage::content() const
+src/core/src/ThreadMessage.cpp	QtOpenAi::Core::ThreadMessage::createdAt() const
+src/core/src/ThreadMessage.cpp	QtOpenAi::Core::ThreadMessage::incompleteAt() const
+src/core/src/ThreadMessage.cpp	QtOpenAi::Core::ThreadMessage::incompleteDetails() const
+src/core/src/ThreadMessage.cpp	QtOpenAi::Core::ThreadMessage::metadata() const
+src/core/src/ThreadMessage.cpp	QtOpenAi::Core::ThreadMessage::operator=(QtOpenAi::Core::ThreadMessage const&)
+src/core/src/ThreadMessage.cpp	QtOpenAi::Core::ThreadMessage::setCompletedAt(long long)
+src/core/src/TokenCounter.cpp	QtOpenAi::Core::TokenCounter::TokenCounter(QtOpenAi::Core::TokenCounter&&)
+src/core/src/TokenCounter.cpp	QtOpenAi::Core::TokenCounter::operator=(QtOpenAi::Core::TokenCounter&&)
+src/core/src/Tool.cpp	QtOpenAi::Core::FunctionDefinition::FunctionDefinition(QtOpenAi::Core::FunctionDefinition&&)
+src/core/src/Tool.cpp	QtOpenAi::Core::FunctionDefinition::isEmpty() const
+src/core/src/Tool.cpp	QtOpenAi::Core::FunctionDefinition::operator=(QtOpenAi::Core::FunctionDefinition const&)
+src/core/src/Tool.cpp	QtOpenAi::Core::FunctionDefinition::setDescription(QString const&)
+src/core/src/Tool.cpp	QtOpenAi::Core::FunctionDefinition::setName(QString const&)
+src/core/src/Tool.cpp	QtOpenAi::Core::FunctionDefinition::setParameters(QJsonObject const&)
+src/core/src/Tool.cpp	QtOpenAi::Core::Tool::isEmpty() const
+src/core/src/Tool.cpp	QtOpenAi::Core::Tool::setFunction(QtOpenAi::Core::FunctionDefinition const&)
+src/core/src/Tool.cpp	QtOpenAi::Core::Tool::setType(QString const&)
+src/core/src/Tool.cpp	QtOpenAi::Core::Tool::type() const
+src/core/src/ToolCall.cpp	QtOpenAi::Core::ToolCall::isEmpty() const
+src/core/src/ToolCall.cpp	QtOpenAi::Core::ToolCall::operator=(QtOpenAi::Core::ToolCall const&)
+src/core/src/ToolCall.cpp	QtOpenAi::Core::ToolCall::operator=(QtOpenAi::Core::ToolCall&&)
+src/core/src/ToolCall.cpp	QtOpenAi::Core::ToolCall::setFunction(QtOpenAi::Core::FunctionCall const&)
+src/core/src/ToolCall.cpp	QtOpenAi::Core::ToolCall::setId(QString const&)
+src/core/src/ToolCall.cpp	QtOpenAi::Core::ToolCall::type() const
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::TranscriptionRequest()
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::TranscriptionRequest(QtOpenAi::Core::TranscriptionRequest const&)
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::TranscriptionRequest(QtOpenAi::Core::TranscriptionRequest&&)
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::include() const
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::language() const
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::model() const
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::operator=(QtOpenAi::Core::TranscriptionRequest const&)
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::operator=(QtOpenAi::Core::TranscriptionRequest&&)
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::operator==(QtOpenAi::Core::TranscriptionRequest const&) const
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::prompt() const
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::responseFormat() const
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::setFileData(QByteArray const&)
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::setFileName(QString const&)
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::setInclude(QList<QString> const&)
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::setModel(QString const&)
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::setStream(bool)
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::stream() const
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::temperature() const
+src/core/src/TranscriptionRequest.cpp	QtOpenAi::Core::TranscriptionRequest::timestampGranularities() const
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionResponse::TranscriptionResponse(QtOpenAi::Core::TranscriptionResponse&&)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionResponse::operator=(QtOpenAi::Core::TranscriptionResponse const&)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionResponse::setTask(QString const&)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionResponse::setWords(QList<QtOpenAi::Core::TranscriptionWord> const&)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionSegment::avgLogprob() const
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionSegment::id() const
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionSegment::operator=(QtOpenAi::Core::TranscriptionSegment const&)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionSegment::operator=(QtOpenAi::Core::TranscriptionSegment&&)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionSegment::setAvgLogprob(double)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionSegment::setCompressionRatio(double)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionSegment::setNoSpeechProb(double)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionSegment::setSeek(int)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionSegment::setTemperature(double)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionSegment::start() const
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionWord::end() const
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionWord::operator=(QtOpenAi::Core::TranscriptionWord const&)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionWord::operator=(QtOpenAi::Core::TranscriptionWord&&)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionWord::operator==(QtOpenAi::Core::TranscriptionWord const&) const
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionWord::setEnd(double)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionWord::setStart(double)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionWord::setWord(QString const&)
+src/core/src/TranscriptionResponse.cpp	QtOpenAi::Core::TranscriptionWord::start() const
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::TranslationRequest()
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::TranslationRequest(QtOpenAi::Core::TranslationRequest const&)
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::TranslationRequest(QtOpenAi::Core::TranslationRequest&&)
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::fileData() const
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::fileName() const
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::model() const
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::operator=(QtOpenAi::Core::TranslationRequest const&)
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::operator=(QtOpenAi::Core::TranslationRequest&&)
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::operator==(QtOpenAi::Core::TranslationRequest const&) const
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::prompt() const
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::responseFormat() const
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::setFileData(QByteArray const&)
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::setFileName(QString const&)
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::setModel(QString const&)
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::setPrompt(QString const&)
+src/core/src/TranslationRequest.cpp	QtOpenAi::Core::TranslationRequest::temperature() const
+src/core/src/Upload.cpp	QtOpenAi::Core::Upload::Upload(QtOpenAi::Core::Upload&&)
+src/core/src/Upload.cpp	QtOpenAi::Core::Upload::createdAt() const
+src/core/src/Upload.cpp	QtOpenAi::Core::Upload::object() const
+src/core/src/Upload.cpp	QtOpenAi::Core::UploadPart::UploadPart(QtOpenAi::Core::UploadPart&&)
+src/core/src/Upload.cpp	QtOpenAi::Core::UploadPart::operator=(QtOpenAi::Core::UploadPart const&)
+src/core/src/Upload.cpp	QtOpenAi::Core::UploadPart::setCreatedAt(long long)
+src/core/src/Upload.cpp	QtOpenAi::Core::UploadPart::setId(QString const&)
+src/core/src/Upload.cpp	QtOpenAi::Core::UploadPart::setObject(QString const&)
+src/core/src/Upload.cpp	QtOpenAi::Core::UploadPart::setUploadId(QString const&)
+src/core/src/VectorIndex.cpp	QtOpenAi::Core::VectorIndex::VectorIndex(QtOpenAi::Core::VectorIndex&&)
+src/core/src/VectorIndex.cpp	QtOpenAi::Core::VectorIndex::operator=(QtOpenAi::Core::VectorIndex&&)
+src/core/src/VectorStore.cpp	QtOpenAi::Core::VectorStore::createdAt() const
+src/core/src/VectorStore.cpp	QtOpenAi::Core::VectorStore::expiresAt() const
+src/core/src/VectorStore.cpp	QtOpenAi::Core::VectorStore::operator=(QtOpenAi::Core::VectorStore const&)
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFile::createdAt() const
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFile::operator=(QtOpenAi::Core::VectorStoreFile const&)
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFileBatch::VectorStoreFileBatch(QtOpenAi::Core::VectorStoreFileBatch&&)
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFileBatch::createdAt() const
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFileBatch::object() const
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFileBatch::operator=(QtOpenAi::Core::VectorStoreFileBatch const&)
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFileBatch::setCreatedAt(long long)
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFileBatch::setFileCounts(QtOpenAi::Core::VectorStoreFileCounts const&)
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFileBatch::setId(QString const&)
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFileBatch::setObject(QString const&)
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFileBatch::setStatus(QtOpenAi::Core::VectorStoreFileStatus)
+src/core/src/VectorStoreFile.cpp	QtOpenAi::Core::VectorStoreFileBatch::setVectorStoreId(QString const&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::VectorStoreSearchRequest(QtOpenAi::Core::VectorStoreSearchRequest const&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::VectorStoreSearchRequest(QtOpenAi::Core::VectorStoreSearchRequest&&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::filters() const
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::maxNumResults() const
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::operator=(QtOpenAi::Core::VectorStoreSearchRequest const&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::operator=(QtOpenAi::Core::VectorStoreSearchRequest&&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::operator==(QtOpenAi::Core::VectorStoreSearchRequest const&) const
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::query() const
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::rankingOptions() const
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::rewriteQuery() const
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::setQuery(QString const&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchRequest::setRankingOptions(QJsonObject const&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchResult::attributes() const
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchResult::operator=(QtOpenAi::Core::VectorStoreSearchResult const&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchResult::operator=(QtOpenAi::Core::VectorStoreSearchResult&&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchResult::setAttributes(QJsonObject const&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchResult::setContent(QList<QtOpenAi::Core::VectorStoreContent> const&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchResult::setFileId(QString const&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchResult::setFilename(QString const&)
+src/core/src/VectorStoreSearch.cpp	QtOpenAi::Core::VectorStoreSearchResult::setScore(double)
+src/core/src/VideoCharacter.cpp	QtOpenAi::Core::VideoCharacter::VideoCharacter(QtOpenAi::Core::VideoCharacter&&)
+src/core/src/VideoCharacter.cpp	QtOpenAi::Core::VideoCharacter::operator=(QtOpenAi::Core::VideoCharacter const&)
+src/core/src/VideoCharacter.cpp	QtOpenAi::Core::VideoCharacter::operator==(QtOpenAi::Core::VideoCharacter const&) const
+src/core/src/VideoCharacter.cpp	QtOpenAi::Core::VideoCharacter::setCreatedAt(long long)
+src/core/src/VideoCharacter.cpp	QtOpenAi::Core::VideoCharacter::setId(QString const&)
+src/core/src/VideoCharacter.cpp	QtOpenAi::Core::VideoCharacter::setName(QString const&)
+src/core/src/VideoCharacter.cpp	QtOpenAi::Core::VideoCharacter::toJson() const
+src/core/src/VideoJob.cpp	QtOpenAi::Core::VideoJob::setExpiresAt(long long)
+src/core/src/VideoJob.cpp	QtOpenAi::Core::VideoJob::setPrompt(QString const&)
+src/core/src/VideoJob.cpp	QtOpenAi::Core::VideoJob::setRemixedFromVideoId(QString const&)
+src/core/src/VideoSourceRequest.cpp	QtOpenAi::Core::VideoSourceRequest::VideoSourceRequest(QtOpenAi::Core::VideoSourceRequest const&)
+src/core/src/VideoSourceRequest.cpp	QtOpenAi::Core::VideoSourceRequest::VideoSourceRequest(QtOpenAi::Core::VideoSourceRequest&&)
+src/core/src/VideoSourceRequest.cpp	QtOpenAi::Core::VideoSourceRequest::extraBody() const
+src/core/src/VideoSourceRequest.cpp	QtOpenAi::Core::VideoSourceRequest::operator=(QtOpenAi::Core::VideoSourceRequest const&)
+src/core/src/VideoSourceRequest.cpp	QtOpenAi::Core::VideoSourceRequest::operator=(QtOpenAi::Core::VideoSourceRequest&&)
+src/core/src/VideoSourceRequest.cpp	QtOpenAi::Core::VideoSourceRequest::operator==(QtOpenAi::Core::VideoSourceRequest const&) const
+src/core/src/VideoSourceRequest.cpp	QtOpenAi::Core::VideoSourceRequest::prompt() const
+src/core/src/VideoSourceRequest.cpp	QtOpenAi::Core::VideoSourceRequest::seconds() const
+src/core/src/VideoSourceRequest.cpp	QtOpenAi::Core::VideoSourceRequest::setExtraBody(QJsonObject const&)
+src/core/src/Voice.cpp	QtOpenAi::Core::Voice::Voice(QtOpenAi::Core::Voice&&)
+src/core/src/Voice.cpp	QtOpenAi::Core::Voice::operator=(QtOpenAi::Core::Voice const&)
+src/core/src/Voice.cpp	QtOpenAi::Core::VoiceConsent::operator=(QtOpenAi::Core::VoiceConsent const&)
+src/realtime/src/RealtimeConnection.cpp	QtOpenAi::Realtime::RealtimeConnection::apiKey() const
+src/realtime/src/RealtimeConnection.cpp	QtOpenAi::Realtime::RealtimeConnection::cancelResponse()
+src/realtime/src/RealtimeConnection.cpp	QtOpenAi::Realtime::RealtimeConnection::clearAudio()
+src/realtime/src/RealtimeConnection.cpp	QtOpenAi::Realtime::RealtimeConnection::createResponse(QJsonObject const&)
+src/realtime/src/RealtimeConnection.cpp	QtOpenAi::Realtime::RealtimeConnection::model() const
+src/realtime/src/RealtimeConnection.cpp	QtOpenAi::Realtime::RealtimeConnection::setDefaultHeader(QByteArray const&, QByteArray const&)
+src/realtime/src/RealtimeConnection.cpp	QtOpenAi::Realtime::RealtimeConnection::url() const
+src/sql/src/SqliteStore.cpp	QtOpenAi::Sql::SqliteStore::filePath() const
+src/storage/src/Autosave.cpp	QtOpenAi::Storage::Autosave::intervalMs() const
+src/storage/src/Autosave.cpp	QtOpenAi::Storage::Autosave::isEnabled() const
+src/storage/src/Autosave.cpp	QtOpenAi::Storage::Autosave::store() const
+src/storage/src/JsonFileStore.cpp	QtOpenAi::Storage::JsonFileStore::rootPath() const
+src/storage/src/PersistentResponseCache.cpp	QtOpenAi::Storage::PersistentResponseCache::ttlSeconds() const
+src/storage/src/Store.cpp	QtOpenAi::Storage::Store::Store()
+src/tools/include/QtOpenAi/Tools/FileSandbox.h	QtOpenAi::Tools::qt_getEnumName(QtOpenAi::Tools::FileSandbox::Rejection)
+src/tools/include/QtOpenAi/Tools/HttpTools.h	QtOpenAi::Tools::qt_getEnumName(QtOpenAi::Tools::HttpTools::Refusal)
+src/tools/src/DefaultTools.cpp	QtOpenAi::Tools::DefaultTools::utilityTools() const
+src/tools/src/FileSandbox.cpp	QtOpenAi::Tools::FileSandbox::FileSandbox(QtOpenAi::Tools::FileSandbox&&)
+src/tools/src/FileSandbox.cpp	QtOpenAi::Tools::FileSandbox::operator==(QtOpenAi::Tools::FileSandbox const&) const
+src/tools/src/FileSandbox.cpp	QtOpenAi::Tools::FileSandbox::roots() const
+src/tools/src/HttpTools.cpp	QtOpenAi::Tools::HttpTools::setNetworkAccessManager(QNetworkAccessManager*)

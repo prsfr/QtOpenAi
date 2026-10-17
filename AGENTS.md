@@ -29,8 +29,8 @@ script instead of spelling checks out in `ci.yml`, so a green local run and a
 green CI run mean the same thing. Every check is **deterministic**: the same
 tree gives the same verdict on every run and every machine. Where a check
 measures something (coverage, duplication, instruction counts), it compares
-against a baseline committed next to it, and the baseline only ever moves in
-the good direction.
+against a baseline committed in the repository (coverage's is in
+`tests/coverage/`), and the baseline only ever moves in the good direction.
 
 Run it before every push. Run the full set, not the check you think is
 relevant.
@@ -40,12 +40,60 @@ The warning gate (`-Werror`) runs in CI on pinned runners; `cmake
 "same verdict on every machine" rule: locally warnings never fail a check, and
 the compiler-dependent gate runs only on CI's pinned compilers.
 
-A check too costly for every run (`static`, a second full build) is marked
-`explicit-only` in its file: it runs only when named (`scripts/check.sh
-static`), and CI always names it. A run that names no checks prints it as
+A check too costly for every run (`static`, `sanitize`, `coverage`: each a
+second full build) is marked `explicit-only` in its file: it runs only when
+named (`scripts/check.sh static`, `scripts/check.sh coverage`), and CI always
+names it. A run that names no checks prints it as
 `SKIP ... (explicit only; ...)`; that line is not a failure and does not block
 a stage, `--strict` or not. Run it by name when a change could behave
-differently in a static build.
+differently in a static build, and `coverage` whenever a change adds or
+removes code in `src/`.
+
+### Coverage
+
+`scripts/check.sh coverage` builds `<build-dir>-coverage` with
+`QTOPENAI_COVERAGE=ON`, runs the tests from zeroed counters and has gcovr
+measure `src/`. It prints lines and branches per module (the directory under
+`src/`) with the change against the baseline, and fails when:
+
+1. a module's line or branch coverage is more than 0.5 points below its
+   baseline;
+2. a function in `src/` is never called and not listed in
+   `tests/coverage/uncalled-functions.txt`;
+3. a listed function is called now, or no longer exists (a stale entry);
+4. a module is measured but not in the baseline, or the other way round;
+5. a module's measured line or branch total is 0 while its baseline total is
+   not.
+
+Rule 2 sees only the functions the compiler emits: an unused inline function
+in a header, or a template nothing instantiates, is invisible to it, so the
+reviewer checks by eye that such code has a test. The check ignores
+`LCOV_EXCL_*`/`GCOVR_EXCL_*` exclusion markers and any `gcovr.cfg`, and runs
+the tests without the caller's Qt logging configuration, so none of them can
+change the measurement.
+
+A module more than 1.0 point above its baseline passes with a WARNING asking
+for the baseline to be raised.
+
+The baseline is two files: `tests/coverage/baseline.json` (covered and total
+lines and branches per module, and the toolchain) and
+`tests/coverage/uncalled-functions.txt` (file and function name, one per
+line). It holds for one compiler, gcovr and Qt -- CI's coverage job, the
+ubuntu-24.04 compiler with the distro gcovr and Qt. Another toolchain still
+measures and prints the table, then reports a SKIP; under `--strict`, as in
+CI, that is a failure. The coverage tree must sit inside the source tree, or
+gcov cannot read what moc generated and the check fails. After deleting or
+renaming a source file, remove `<build-dir>-coverage`: Ninja leaves the old
+objects behind and gcov fails on them.
+
+`QTOPENAI_COVERAGE_UPDATE_BASELINE=1 scripts/check.sh coverage` writes the
+measurement into both files and prints whether each module went up, down or
+stayed the same. It refuses on a toolchain other than the baseline's.
+Baselines only improve (rule 8): a "down" line is not allowed unless the
+commit says why.
+
+A change that adds a function adds a test that calls it, or says in the pull
+request why the function joins `uncalled-functions.txt`.
 
 ## The pipeline
 

@@ -18,6 +18,7 @@ class TestReply : public QObject
 private slots:
     void successfulCompletionEmitsFinished();
     void httpErrorEmitsFailedWithDetails();
+    void httpErrorWithANonJsonBodyKeepsTheTransportMessage();
     void requestBodyContainsModelAndMessages();
 };
 
@@ -70,6 +71,35 @@ void TestReply::httpErrorEmitsFailedWithDetails()
     QCOMPARE(error.message(), QStringLiteral("Invalid API key"));
     QCOMPARE(error.type(), QStringLiteral("invalid_request_error"));
     QCOMPARE(error.code(), QStringLiteral("invalid_api_key"));
+    delete reply;
+}
+
+void TestReply::httpErrorWithANonJsonBodyKeepsTheTransportMessage()
+{
+    // A proxy or load balancer answers with its own HTML page, not the API's
+    // error object: still an HTTP error, but with nothing in the body to read.
+    const QByteArray marker = "upstream-gateway-page";
+    StubServer server(QList<StubServer::Response> {
+            {"<html><body>" + marker + "</body></html>", 500, "text/html"}});
+    Client client(server.baseUrl(), QStringLiteral("k"));
+    client.setRetryPolicy(RetryPolicy::none());
+
+    ChatCompletionReply *reply = client.createChatCompletion(
+            ChatCompletionRequest(QStringLiteral("gpt-4o"), {Message::user(QStringLiteral("hi"))}));
+    reply->setAutoDelete(false);
+
+    QSignalSpy failedSpy(reply, &ChatCompletionReply::failed);
+    QVERIFY(QTest::qWaitFor([reply] { return reply->isFinished(); }, 5000));
+
+    QVERIFY(!reply->isSuccess());
+    QCOMPARE(failedSpy.count(), 1);
+    const ClientError error = reply->error();
+    QCOMPARE(error.kind(), ClientError::Kind::Http);
+    QCOMPARE(error.httpStatus(), 500);
+    QVERIFY(!error.message().isEmpty());
+    QVERIFY(!error.message().contains(QString::fromLatin1(marker)));
+    QVERIFY(error.type().isEmpty());
+    QVERIFY(error.code().isEmpty());
     delete reply;
 }
 
