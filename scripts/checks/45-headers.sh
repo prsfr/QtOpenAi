@@ -84,7 +84,9 @@ jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
 # previous run was given -- the option above all -- can outlive a change to
 # the main tree. The objects are kept.
 rm -f "$dir/build/CMakeCache.txt"
-cmake -S "$QTOPENAI_ROOT/tests/headers" -B "$dir/build" "${generator[@]}" \
+# Without check.sh's QTOPENAI_ROOT, which find_package(QtOpenAi) would read as
+# the package's <Name>_ROOT hint (CMP0144).
+env -u QTOPENAI_ROOT cmake -S "$QTOPENAI_ROOT/tests/headers" -B "$dir/build" "${generator[@]}" \
     -DCMAKE_CXX_COMPILER="$(cached CMAKE_CXX_COMPILER)" \
     -DQt6_DIR="$(cached Qt6_DIR)" \
     -DCMAKE_PREFIX_PATH="$dir/prefix" \
