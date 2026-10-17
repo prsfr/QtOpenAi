@@ -35,6 +35,11 @@ the good direction.
 Run it before every push. Run the full set, not the check you think is
 relevant.
 
+The warning gate (`-Werror`) runs in CI on pinned runners; `cmake
+-DQTOPENAI_WARNINGS_AS_ERRORS=ON <tree>` reproduces it locally. That keeps the
+"same verdict on every machine" rule: locally warnings never fail a check, and
+the compiler-dependent gate runs only on CI's pinned compilers.
+
 A check too costly for every run (`static`, a second full build) is marked
 `explicit-only` in its file: it runs only when named (`scripts/check.sh
 static`), and CI always names it. A run that names no checks prints it as
