@@ -39,6 +39,15 @@ option(QTOPENAI_INSTALL        "Generate QtOpenAi install/export rules" ${QTOPEN
 # CI turns it on, on pinned compilers; a local build prints warnings and fails
 # nothing (#206). No effect as a subproject: the parent's warning policy wins.
 option(QTOPENAI_WARNINGS_AS_ERRORS "Treat warnings in the QtOpenAi libraries as errors (top-level builds only)" OFF)
+# gcov instrumentation of the libraries and tests, for the coverage check
+# (scripts/checks/80-coverage.sh, #173). --coverage is GCC/Clang spelling;
+# clang-cl reports the ID Clang but takes only MSVC flags.
+option(QTOPENAI_COVERAGE "Instrument the QtOpenAi libraries and tests for gcov coverage (GCC or Clang)" OFF)
+if(QTOPENAI_COVERAGE AND (MSVC OR NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))
+    message(FATAL_ERROR
+        "QTOPENAI_COVERAGE=ON needs GCC or Clang, which take --coverage; "
+        "this compiler (${CMAKE_CXX_COMPILER_ID}, MSVC or clang-cl included) does not.")
+endif()
 
 include(GNUInstallDirs)
 set(QTOPENAI_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/QtOpenAi"
