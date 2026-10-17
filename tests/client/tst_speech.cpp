@@ -20,8 +20,9 @@ private slots:
 
 void TestSpeechClient::surfacesAudioBytesVerbatim()
 {
-    // Canned "audio" including a NUL byte to prove binary-safe handling.
-    const QByteArray audio = QByteArray("ID3\x00\x01\x02\x03 fake mp3 bytes", 24);
+    // Canned "audio" including a NUL byte to prove binary-safe handling, sized
+    // by the literal itself rather than a hand count.
+    const QByteArray audio = QByteArrayLiteral("ID3\x00\x01\x02\x03 fake mp3 bytes");
     StubServer server(audio, "audio/mpeg");
     Client client(server.baseUrl(), QStringLiteral("k"));
 

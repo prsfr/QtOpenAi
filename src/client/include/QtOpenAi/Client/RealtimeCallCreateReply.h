@@ -49,12 +49,12 @@ private:
         // rather than the whole value. Query strings and trailing slashes are
         // not part of the documented shape but cost nothing to survive.
         QByteArray location = responseHeader("Location");
-        const int query = location.indexOf('?');
+        const qsizetype query = location.indexOf('?');
         if (query >= 0)
             location.truncate(query);
         while (location.endsWith('/'))
             location.chop(1);
-        const int slash = location.lastIndexOf('/');
+        const qsizetype slash = location.lastIndexOf('/');
         m_callId = QString::fromUtf8(slash >= 0 ? location.mid(slash + 1) : location);
 
         Q_EMIT finished(m_callId, m_sdpAnswer);

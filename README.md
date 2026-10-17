@@ -3137,6 +3137,7 @@ ctest --test-dir build --output-on-failure
 | `QTOPENAI_INSTALL`        | `ON` top-level | Generate install and export rules.   |
 | `QTOPENAI_BUILD_REALTIME` | Qt WebSockets  | Build `QtOpenAi::Realtime`; on when `Qt6::WebSockets` is found. |
 | `QTOPENAI_BUILD_SQL`      | Qt Sql         | Build `QtOpenAi::Sql`; on when `Qt6::Sql` is found. |
+| `QTOPENAI_WARNINGS_AS_ERRORS` | `OFF`      | Top-level builds only: turn the library's warnings into errors — `-Werror` on GCC and Clang, `/WX` on MSVC. A top-level build always compiles the library with `-Wall -Wextra -Wpedantic -Wshadow` (GCC, Clang); as a subproject QtOpenAi adds no warning flag at all. |
 
 ### Using it from another CMake project
 
@@ -3180,18 +3181,23 @@ newer API nor a soon-removed one can slip in unnoticed.
 ### Before pushing
 
 Every check a change has to pass — formatting, build, tests, the headless
-check, a build as a subproject, the Qt minimum (`qt-min`: declared once, and
-built against when the tree's Qt is the minimum), and the deterministic quality
-gates as they are added — runs from one script, the same one CI calls. The
-suite against static libraries is a second full build, so it runs only when
-named; CI always runs it:
+check, every installed header compiled on its own (`headers`), the CI warning
+gate's setup (`warnings`), a build as a subproject, the Qt minimum (`qt-min`:
+declared once, and built against when the tree's Qt is the minimum), and the
+deterministic quality gates as they are added — runs from one script, the same
+one CI calls. The suites against static libraries and under ASan/UBSan are each
+a second full build, so they run only when named; CI always runs them:
 
 ```sh
-scripts/check.sh                  # everything but the static suite, in order
+scripts/check.sh                  # everything but static and sanitize, in order
 scripts/check.sh static           # the test suite against static libraries
+scripts/check.sh sanitize         # the test suite under ASan, LSan and UBSan (Linux)
 scripts/check.sh --list           # what exists
 scripts/check-format.sh --fix     # apply .clang-format
 ```
+
+The warning gate (`-Werror`) runs in CI on pinned runners; `cmake
+-DQTOPENAI_WARNINGS_AS_ERRORS=ON <tree>` reproduces it locally.
 
 How a change is specified, reviewed and hardened before it becomes a pull
 request is in [`AGENTS.md`](AGENTS.md).

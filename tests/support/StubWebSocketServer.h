@@ -79,6 +79,9 @@ private:
     void onConnection()
     {
         m_socket = m_server.nextPendingConnection();
+        // QWebSocketServer does not parent what it hands out; owned here, so
+        // every accepted socket goes with the server (#206).
+        m_socket->setParent(this);
         const QNetworkRequest request = m_socket->request();
         m_requestUrl = request.url();
         for (const QByteArray &name : request.rawHeaderList())

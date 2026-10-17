@@ -263,7 +263,8 @@ QList<VectorMatch> VectorIndex::search(const QList<double> &query, int k, double
     matches.reserve(wanted);
     for (qsizetype i = 0; i < wanted; ++i) {
         const QString &id = d->order.at(candidates.at(i).position);
-        const Entry &entry = d->entries.constFind(id).value();
+        const auto it = d->entries.constFind(id);
+        const Entry &entry = it.value();
         matches.append(VectorMatch {id, candidates.at(i).score, entry.text, entry.payload});
     }
     return matches;
@@ -273,7 +274,8 @@ QJsonObject VectorIndex::toJson() const
 {
     QJsonArray entries;
     for (const QString &id : d->order) {
-        const Entry &entry = d->entries.constFind(id).value();
+        const auto it = d->entries.constFind(id);
+        const Entry &entry = it.value();
         QJsonArray vector;
         for (double value : entry.vector)
             vector.append(value);
@@ -320,7 +322,8 @@ bool VectorIndex::operator==(const VectorIndex &other) const
         const auto theirs = other.d->entries.constFind(id);
         if (theirs == other.d->entries.constEnd())
             return false;
-        const Entry &mine = d->entries.constFind(id).value();
+        const auto ours = d->entries.constFind(id);
+        const Entry &mine = ours.value();
         if (mine.vector != theirs->vector || mine.text != theirs->text
             || mine.payload != theirs->payload)
             return false;

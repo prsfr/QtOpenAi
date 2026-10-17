@@ -54,17 +54,17 @@ StreamReplyBase::StreamReplyBase(StreamReplyBasePrivate &dd, QNetworkReply *repl
     connect(reply, &QNetworkReply::finished, this, [this]() {
         Q_D(StreamReplyBase);
         d->finished = true;
-        QNetworkReply *reply = d->networkReply;
-        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        d->rateLimit = detail::parseRateLimit(reply);
+        QNetworkReply *network = d->networkReply;
+        const int status = network->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        d->rateLimit = detail::parseRateLimit(network);
 
-        if (reply->error() != QNetworkReply::NoError || status >= 400) {
+        if (network->error() != QNetworkReply::NoError || status >= 400) {
             // An error response is delivered as a single JSON body rather than
             // as events, so whatever the parser is still holding is the start
             // of it rather than half an event.
             d->success = false;
-            d->error = detail::errorFromBody(d->parser.buffered() + reply->readAll(),
-                                             reply->errorString(), status, reply->error());
+            d->error = detail::errorFromBody(d->parser.buffered() + network->readAll(),
+                                             network->errorString(), status, network->error());
             Q_EMIT failed(d->error);
         } else {
             // isSuccess() is observably true while the subclass emits its

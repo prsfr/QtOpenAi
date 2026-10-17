@@ -130,7 +130,6 @@ bool Autosave::isDirty() const
 
 void Autosave::touch()
 {
-    Q_D(Autosave);
     // The generic mark: whatever changed, both halves are written. Its meaning is
     // unchanged -- it is the metrics signals that no longer come through here.
     markDirty(true, true);

@@ -41,7 +41,16 @@ public:
 Q_SIGNALS:
     // Every streamed event, keyed by the payload's `object` (e.g. "thread.run",
     // "thread.message.delta", "thread.run.step").
+#if defined(__clang__)
+// The signal hides QObject::event(QEvent *). Renaming it would change the API,
+// and `using QObject::event;` would make &RunStreamReply::event ambiguous in connect().
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Woverloaded-virtual"
+#endif
     void event(const QString &object, const QJsonObject &data);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
     // Incremental assistant text from a `thread.message.delta` event.
     void messageDelta(const QString &text);
     // A completed message from a `thread.message` event.

@@ -40,7 +40,7 @@ struct CursorPage
     QString next;
 
     bool isEmpty() const { return data.isEmpty(); }
-    int size() const { return data.size(); }
+    int size() const { return static_cast<int>(data.size()); }
 
     QJsonObject toJson() const
     {

@@ -36,6 +36,9 @@ else()
 endif()
 option(QTOPENAI_BUILD_SHARED   "Build QtOpenAi as shared libraries" ${_qtopenai_shared_default})
 option(QTOPENAI_INSTALL        "Generate QtOpenAi install/export rules" ${QTOPENAI_IS_TOPLEVEL})
+# CI turns it on, on pinned compilers; a local build prints warnings and fails
+# nothing (#206). No effect as a subproject: the parent's warning policy wins.
+option(QTOPENAI_WARNINGS_AS_ERRORS "Treat warnings in the QtOpenAi libraries as errors (top-level builds only)" OFF)
 
 include(GNUInstallDirs)
 set(QTOPENAI_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/QtOpenAi"

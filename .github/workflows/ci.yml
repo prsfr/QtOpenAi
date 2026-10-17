@@ -38,7 +38,7 @@ concurrency:
 jobs:
   format:
     name: clang-format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,15 +64,20 @@ jobs:
     # Linux only behind an opt-in switch; a release must not depend on someone
     # remembering to flip it, and the MSVC and Apple clang jobs are the ones that
     # catch template, constexpr and export-macro breakage.
+    #
+    # Pinned labels, not -latest (#206): Configure turns warnings into errors,
+    # and a label that moves to a new image brings a new compiler, which would
+    # turn main red with no change here. Moving a pin is a deliberate PR that
+    # fixes what the newer compiler reports (scripts/check.sh warnings).
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             qt_version: "6.11.1"
-          - os: macos-latest
+          - os: macos-15
             qt_version: "6.11.1"
-          - os: windows-latest
+          - os: windows-2025
             qt_version: "6.11.1"
 
     steps:
@@ -110,12 +115,24 @@ jobs:
           echo "CMAKE_PREFIX_PATH=$root" >> "$GITHUB_ENV"
           echo "$root/bin" >> "$GITHUB_PATH"
 
+      # The macos-15 label changes its default Xcode, and so Apple Clang, under
+      # the warning gate. 16.4 was the image's default when this was pinned;
+      # moving it is a deliberate PR. Before Configure, which resolves the SDK.
+      - name: Select Xcode
+        if: runner.os == 'macOS'
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app
+          xcodebuild -version
+
+      # Warnings are errors here, and only here, on the pinned compilers above
+      # (#206): a local build prints them and fails nothing.
       - name: Configure
         run: >
           cmake -S . -B build
           -DCMAKE_BUILD_TYPE=Release
           -DQTOPENAI_BUILD_TESTS=ON
           -DQTOPENAI_BUILD_EXAMPLES=ON
+          -DQTOPENAI_WARNINGS_AS_ERRORS=ON
 
       # `--parallel` without a number becomes `make -j` with no argument on the
       # Makefiles generator, which is *unbounded*: every ready target compiles
@@ -133,14 +150,15 @@ jobs:
 
       # The linker's view of the headless promise: no QtOpenAi library may
       # record a GUI library as NEEDED. The rationale lives in the check itself,
-      # scripts/checks/40-headless.sh.
-      - name: No GUI dependency
+      # scripts/checks/40-headless.sh. Then the gate's own setup, and every
+      # installed header compiled alone -- with -Werror, as this tree has it.
+      - name: No GUI dependency, warning gate, headers
         if: runner.os == 'Linux'
-        run: scripts/check.sh --strict --build-dir build headless
+        run: scripts/check.sh --strict --build-dir build headless warnings headers
 
   install-consumer:
     name: find_package smoke test (${{ matrix.link }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -200,17 +218,18 @@ jobs:
         run: LD_LIBRARY_PATH="$PWD/_prefix/lib:$QT_ROOT_DIR/lib" ./build-consumer/gui_consumer
 
   # The ways of building QtOpenAi that the shared test matrix does not cover
-  # (#210): the whole suite against static libraries, and QtOpenAi included
-  # from source into another project, which must leave that project's build
-  # type alone. Linux only -- both are platform-independent CMake, and the
-  # subproject check skips on Windows, which --strict would turn into a FAIL.
+  # (#210): the whole suite against static libraries, QtOpenAi included from
+  # source into another project, which must leave that project's build type
+  # alone, and the whole suite under ASan/UBSan (#206). Linux only -- the first
+  # two are platform-independent CMake, the subproject check skips on Windows,
+  # which --strict would turn into a FAIL, and sanitize is Linux-only.
   build-variants:
     name: check ${{ matrix.check }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        check: [static, subproject]
+        check: [static, subproject, sanitize]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -247,7 +266,7 @@ jobs:
           sudo apt-get install -y qt6-base-dev qt6-websockets-dev libqt6sql6-sqlite cmake ninja-build
 
       - name: scripts/check.sh against the minimum
-        run: scripts/check.sh --strict --build-dir build build test headless qt-min subproject
+        run: scripts/check.sh --strict --build-dir build build test headless headers qt-min subproject
 
       - name: Install, then build & run the package consumer
         run: >

@@ -752,7 +752,7 @@ Client::RequestPlan ClientPrivate::plan(const QByteArray &method, QNetworkReques
                                         const FactoryMaker &makeFactory) const
 {
     Client::RequestPlan planned;
-    planned.sent = InterceptedRequest {method, std::move(request), body};
+    planned.sent = InterceptedRequest {method, std::move(request), body, {}};
     const std::optional<InterceptedResponse> answer = runBeforeRequest(planned.sent);
     planned.answeredLocally = answer.has_value();
 
@@ -815,9 +815,9 @@ Reply *ClientPrivate::get(const QString &path, const QUrlQuery &query, const cha
 {
     QNetworkRequest request = apiRequest(this, path, beta);
     applyQuery(request, query);
-    QNetworkAccessManager *manager = q->networkAccessManager();
-    return issue<Reply>("GET", std::move(request), {}, [manager](QNetworkRequest sent) {
-        return getFactory(manager, std::move(sent));
+    QNetworkAccessManager *network = q->networkAccessManager();
+    return issue<Reply>("GET", std::move(request), {}, [network](QNetworkRequest sent) {
+        return getFactory(network, std::move(sent));
     });
 }
 
@@ -825,13 +825,13 @@ template <typename Reply>
 Reply *ClientPrivate::post(const QString &path, const QByteArray &body, const char *beta,
                            const QByteArray &contentType) const
 {
-    QNetworkAccessManager *manager = q->networkAccessManager();
+    QNetworkAccessManager *network = q->networkAccessManager();
     QNetworkRequest request = apiRequest(this, path, beta);
     if (!contentType.isEmpty())
         request.setHeader(QNetworkRequest::ContentTypeHeader, contentType);
     return issue<Reply>("POST", std::move(request), body,
-                        [this, manager, body](QNetworkRequest sent) {
-                            return postFactory(this, manager, std::move(sent), body);
+                        [this, network, body](QNetworkRequest sent) {
+                            return postFactory(this, network, std::move(sent), body);
                         });
 }
 
@@ -839,14 +839,14 @@ template <typename Reply>
 Reply *ClientPrivate::postMultipart(const QString &path, Core::FormFields fields,
                                     QList<detail::FormFilePart> files, const char *beta) const
 {
-    QNetworkAccessManager *manager = q->networkAccessManager();
+    QNetworkAccessManager *network = q->networkAccessManager();
     // The body is not offered to the chain here: it is rebuilt per attempt and
     // can be a whole file, so handing it over would mean holding an upload in
     // memory for the benefit of a logger.
     return issue<Reply>("POST", apiRequest(this, path, beta), {},
-                        [this, manager, fields = std::move(fields),
+                        [this, network, fields = std::move(fields),
                          files = std::move(files)](QNetworkRequest sent) mutable {
-                            return multipartPostFactory(this, manager, std::move(sent),
+                            return multipartPostFactory(this, network, std::move(sent),
                                                         std::move(fields), std::move(files));
                         });
 }
@@ -854,10 +854,10 @@ Reply *ClientPrivate::postMultipart(const QString &path, Core::FormFields fields
 template <typename Reply>
 Reply *ClientPrivate::remove(const QString &path, const char *beta) const
 {
-    QNetworkAccessManager *manager = q->networkAccessManager();
+    QNetworkAccessManager *network = q->networkAccessManager();
     return issue<Reply>(
             "DELETE", apiRequest(this, path, beta), {},
-            [manager](QNetworkRequest sent) { return deleteFactory(manager, std::move(sent)); });
+            [network](QNetworkRequest sent) { return deleteFactory(network, std::move(sent)); });
 }
 
 // The streaming endpoints deliberately sit outside the retry machinery: an SSE
@@ -878,7 +878,7 @@ Reply *ClientPrivate::postStream(const QString &path, Request request, const cha
     // interceptor, and serving one from a cache would mean fabricating a
     // sequence of events that never happened. An answer returned here is
     // ignored rather than quietly changing what a stream is.
-    InterceptedRequest outgoing {"POST", std::move(networkRequest), body};
+    InterceptedRequest outgoing {"POST", std::move(networkRequest), body, {}};
     runBeforeRequest(outgoing);
 
     return Client::makeReply<Reply>(q, q->networkAccessManager()->post(outgoing.request, body));
