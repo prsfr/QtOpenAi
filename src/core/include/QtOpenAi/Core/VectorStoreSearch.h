@@ -141,7 +141,7 @@ struct QTOPENAI_CORE_EXPORT VectorStoreSearchPage
     QString nextPage;
 
     bool isEmpty() const { return data.isEmpty(); }
-    int size() const { return data.size(); }
+    int size() const { return static_cast<int>(data.size()); }
 
     QJsonObject toJson() const;
     static VectorStoreSearchPage fromJson(const QJsonObject &json);
@@ -164,7 +164,7 @@ struct QTOPENAI_CORE_EXPORT VectorStoreFileContentPage
     QString nextPage;
 
     bool isEmpty() const { return data.isEmpty(); }
-    int size() const { return data.size(); }
+    int size() const { return static_cast<int>(data.size()); }
 
     // Convenience: every chunk's text joined with newlines.
     QString text() const;

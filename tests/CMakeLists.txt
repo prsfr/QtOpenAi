@@ -142,6 +142,15 @@ qtopenai_add_test(tst_core_realtime
 qtopenai_add_test(tst_core_metaschema
     SOURCES core/tst_metaschema.cpp
     LIBS QtOpenAi::Core)
+# The QTOPENAI_DOC_* macros expand in a consumer's TU, so this test, which uses
+# them with no parameters, is held to -Wpedantic (#206). Top-level builds only,
+# like the library's own warning flags.
+if(QTOPENAI_IS_TOPLEVEL AND NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(tst_core_metaschema PRIVATE -Wpedantic)
+    if(QTOPENAI_WARNINGS_AS_ERRORS)
+        target_compile_options(tst_core_metaschema PRIVATE -Werror)
+    endif()
+endif()
 
 qtopenai_add_test(tst_core_schemavalidator
     SOURCES core/tst_schemavalidator.cpp

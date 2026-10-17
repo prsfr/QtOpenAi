@@ -171,13 +171,15 @@ QStringList danglingAnnotations()
 #define QTOPENAI_DOC_CAT(a, b) QTOPENAI_DOC_CAT_(a, b)
 // Counts to 19, which is QTOPENAI_DOC_INVOKABLE with six parameters (1 + 3*6); the
 // eight-argument ceiling of QTOPENAI_DOC_METHOD sits at 17. Shared, so there is
-// one counter to reason about rather than two that could disagree.
+// one counter to reason about rather than two that could disagree. The trailing 0
+// is never counted: it keeps COUNT's `...` non-empty, which before C++20 a
+// variadic macro may not be (-Wpedantic, in every consumer's TU).
 #define QTOPENAI_DOC_COUNT(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16,  \
                            _17, _18, _19, N, ...)                                                  \
     N
 #define QTOPENAI_DOC_NARG(...)                                                                     \
     QTOPENAI_DOC_EXPAND(QTOPENAI_DOC_COUNT(__VA_ARGS__, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, \
-                                           8, 7, 6, 5, 4, 3, 2, 1))
+                                           8, 7, 6, 5, 4, 3, 2, 1, 0))
 
 #define QTOPENAI_DOC_M_1(m, d) Q_CLASSINFO("doc:" #m, d)
 #define QTOPENAI_DOC_M_3(m, d, n1, d1) QTOPENAI_DOC_M_1(m, d) Q_CLASSINFO("doc:" #m ":" #n1, d1)

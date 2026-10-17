@@ -33,7 +33,16 @@ public:
 
 Q_SIGNALS:
     // Every streamed event, with its `type` and raw JSON payload.
+#if defined(__clang__)
+// The signal hides QObject::event(QEvent *). Renaming it would change the API,
+// and `using QObject::event;` would make &ResponseStreamReply::event ambiguous in connect().
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Woverloaded-virtual"
+#endif
     void event(const QString &type, const QJsonObject &data);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
     // Incremental assistant text (`response.output_text.delta`).
     void outputTextDelta(const QString &text);
     // Incremental function-call arguments (`response.function_call_arguments.delta`).
