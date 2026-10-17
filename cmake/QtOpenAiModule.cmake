@@ -54,6 +54,25 @@ function(qtopenai_add_module name)
     target_compile_definitions(${target} PRIVATE
         QT_DISABLE_DEPRECATED_BEFORE=${QTOPENAI_QT_DEPRECATION_CUTOFF}
         QT_DISABLE_DEPRECATED_UP_TO=${QTOPENAI_QT_DEPRECATION_CUTOFF})
+    # Warning flags for our own build only (#206). As a subproject they would
+    # meet a parent's -Werror with whatever its compiler reports.
+    if(QTOPENAI_IS_TOPLEVEL)
+        if(MSVC)
+            # cl and clang-cl, where -Wall means /Wall: every warning there is.
+            if(QTOPENAI_WARNINGS_AS_ERRORS)
+                target_compile_options(${target} PRIVATE /WX)
+            endif()
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+            target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
+            if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+                # Qt's own idiom, qCDebug(category) with nothing after it.
+                target_compile_options(${target} PRIVATE -Wno-gnu-zero-variadic-macro-arguments)
+            endif()
+            if(QTOPENAI_WARNINGS_AS_ERRORS)
+                target_compile_options(${target} PRIVATE -Werror)
+            endif()
+        endif()
+    endif()
     if(NOT BUILD_SHARED_LIBS)
         target_compile_definitions(${target} PUBLIC QTOPENAI_${upper}_STATIC)
     endif()
