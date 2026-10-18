@@ -21,6 +21,16 @@
 # new directory scope.
 # ---------------------------------------------------------------------------
 
+# gcov instrumentation for one target when QTOPENAI_COVERAGE is ON (#173).
+# PRIVATE, so the exported targets never hand --coverage to a consumer. Target
+# options follow CMAKE_CXX_FLAGS_<CONFIG>, so -O0 wins over a build type's -O.
+function(qtopenai_enable_coverage target)
+    if(QTOPENAI_COVERAGE)
+        target_compile_options(${target} PRIVATE --coverage -O0 -g)
+        target_link_options(${target} PRIVATE --coverage)
+    endif()
+endfunction()
+
 function(qtopenai_add_module name)
     cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "HEADERS;SOURCES;LIBS")
 
@@ -73,6 +83,7 @@ function(qtopenai_add_module name)
             endif()
         endif()
     endif()
+    qtopenai_enable_coverage(${target})
     if(NOT BUILD_SHARED_LIBS)
         target_compile_definitions(${target} PUBLIC QTOPENAI_${upper}_STATIC)
     endif()

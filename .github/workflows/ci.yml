@@ -280,3 +280,36 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: LD_LIBRARY_PATH="$PWD/_prefix/lib" ./build-consumer/gui_consumer
+
+  # Line, branch and function coverage of src/ against tests/coverage/ (#173).
+  # The baseline holds for one compiler, gcovr and Qt -- Qt's macros expand
+  # into src/ lines -- so this is the qt-min toolchain plus the distro gcovr,
+  # not build-variants' Qt 6.11. Any drift in the three skips the check, which
+  # --strict turns into a failure here.
+  coverage:
+    name: coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt and gcovr from the distro
+        run: >
+          sudo apt-get update &&
+          sudo apt-get install -y qt6-base-dev qt6-websockets-dev libqt6sql6-sqlite cmake ninja-build gcovr
+
+      - name: scripts/check.sh coverage
+        run: scripts/check.sh --strict --build-dir build coverage
+
+      - name: Upload the coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: build-coverage/coverage/
+
+      - name: Coverage table in the job summary
+        if: always()
+        run: >
+          if [ -f build-coverage/coverage/coverage.md ]; then
+          cat build-coverage/coverage/coverage.md >> "$GITHUB_STEP_SUMMARY"; fi
