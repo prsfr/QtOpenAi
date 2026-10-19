@@ -1,0 +1,18 @@
+{
+  "minLines": 6,
+  "minTokens": 60,
+  "formatsExts": {
+    "cpp": ["cpp", "h"]
+  },
+  "reporters": ["json"],
+  "absolute": false,
+  "silent": true,
+  "ignore": [
+    "**/build/**",
+    "**/build-*/**",
+    "**/cmake-build-*/**",
+    "**/out/**",
+    "**/node_modules/**",
+    "**/tests/package/**"
+  ]
+}
