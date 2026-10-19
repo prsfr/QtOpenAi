@@ -121,7 +121,9 @@ writes the measurement into the baseline. It refuses, writing nothing, when any
 number went up (rule 8).
 
 A pull request that adds a clone removes it, or explains in review why it is one
-of these deliberate cases, looked at in #182 and left as they are:
+of the deliberate cases below. A deliberate clone is listed here, never marked
+in the source: a `jscpd:ignore` marker in a measured file fails the check. The
+cases looked at in #182 and left as they are:
 
 - The out-of-line special members of the implicitly shared value types: the
   compiler checks every line against its declaration; public-header macros

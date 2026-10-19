@@ -4,11 +4,11 @@
     "duplicatedLines": 361
   },
   "src": {
-    "clones": 46,
-    "duplicatedLines": 362
+    "clones": 47,
+    "duplicatedLines": 372
   },
   "tests": {
-    "clones": 25,
-    "duplicatedLines": 289
+    "clones": 29,
+    "duplicatedLines": 316
   }
 }

@@ -1,18 +1,18 @@
 {
   "minLines": 6,
   "minTokens": 60,
+  "maxLines": 1000000,
+  "maxSize": "100mb",
+  "mode": "mild",
+  "format": ["cpp"],
   "formatsExts": {
     "cpp": ["cpp", "h"]
   },
+  "ignore": [],
+  "ignorePattern": [],
+  "skipLocal": false,
+  "ignoreCase": false,
   "reporters": ["json"],
   "absolute": false,
-  "silent": true,
-  "ignore": [
-    "**/build/**",
-    "**/build-*/**",
-    "**/cmake-build-*/**",
-    "**/out/**",
-    "**/node_modules/**",
-    "**/tests/package/**"
-  ]
+  "silent": true
 }
