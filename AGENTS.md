@@ -125,7 +125,9 @@ of the deliberate cases below. A deliberate clone is listed here, never marked
 in the source: a `jscpd:ignore` marker in a measured file fails the check. So
 does a listed file of six or more lines that jscpd leaves unmeasured (no code or
 comment tokens, e.g. a header of only `#include` lines without the SPDX
-comment). The cases looked at in #182 and left as they are:
+comment). jscpd skips preprocessor lines, so a copied multi-line `#define` is
+invisible to it and is caught in review only. The cases looked at in #182 and
+left as they are:
 
 - The out-of-line special members of the implicitly shared value types: the
   compiler checks every line against its declaration; public-header macros
