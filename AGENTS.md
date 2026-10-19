@@ -119,16 +119,20 @@ bug.
 
 ### Loop rules
 
-- A FAIL at stage 4, 5 or 6 goes back to stage 3. If the fix changes only
-  test sources and their `tests/**/CMakeLists.txt` entries (rule 1), the
-  failing stage and **every stage after it** run again. If it changes any
+- A FAIL at stage 4, 5 or 6 goes back to stage 3, and so does a fix for a
+  minor finding. If the fix changes only test sources and their
+  `tests/**/CMakeLists.txt` entries (rule 1), the stage that raised the
+  finding and **every stage after it** run again. If it changes any
   other file — library code, CMake, a script, CI, docs, a baseline — stage 4
   and **every stage after it** run again. Earlier PASS verdicts stand: those of
   the stages before the first one that runs again.
 - A fix that needs a file outside the footprint goes back to stage 1, and the
   pipeline runs on from there. There is no other way to widen a footprint.
-- A finding is closed by a code change, or by a one-line reason it does not
+- A finding is closed by a file change, or by a one-line reason it does not
   apply that the stage that raised it accepts. It is never closed by silence.
+  A reason changes no file: only the stage that raised the finding runs again,
+  to accept it; no other stage does. Any file change in the same round still
+  follows the first rule.
 - Three FAILs in a row at the same stage for the same finding: stop and ask
   the person who owns the issue. The spec is probably wrong.
 - The spec may change during the work — by going back to stage 1, never by
