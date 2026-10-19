@@ -42,7 +42,8 @@ state=$(node -e '
     const fs = require("fs");
     const read = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
     const pinned = read(process.argv[1]).dependencies.jscpd;
-    const installed = fs.existsSync(process.argv[2]) ? read(process.argv[2]).version : "";
+    let installed = "";
+    try { installed = read(process.argv[2]).version; } catch (e) {}
     console.log(installed === pinned ? "installed" : "missing");
 ' "$checks/package.json" "$checks/node_modules/jscpd/package.json")
 if [[ $state != installed ]]; then
@@ -60,10 +61,11 @@ for dir in examples src tests; do
         [[ -f $file ]] && files+=("$file")
     done < <(git ls-files -z --cached --others --exclude-standard -- "$dir/*.cpp" "$dir/*.h" |
         LC_ALL=C sort -z)
-    # jscpd given no path scans the working directory.
+    # An empty list means git failed (the tree always has sources), and jscpd
+    # given no path would scan the working directory instead.
     if [[ ${#files[@]} -eq 0 ]]; then
-        : >"$tmp/$dir.empty"
-        continue
+        echo "no .cpp/.h files found under $dir/ -- git ls-files failed?" >&2
+        exit 1
     fi
     status=0
     node "$checks/node_modules/jscpd/bin/jscpd" --config .jscpd.json --output "$tmp/$dir" \
@@ -114,11 +116,6 @@ for (const dir of dirs) {
 const measured = {};
 const pairs = {};
 for (const dir of dirs) {
-    if (fs.existsSync(path.join(tmp, `${dir}.empty`))) {
-        measured[dir] = { clones: 0, duplicatedLines: 0 };
-        pairs[dir] = [];
-        continue;
-    }
     let report;
     try {
         report = JSON.parse(fs.readFileSync(path.join(tmp, dir, "jscpd-report.json"), "utf8"));
