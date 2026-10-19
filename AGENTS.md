@@ -131,8 +131,8 @@ bug.
 - A finding is closed by a file change, or by a one-line reason it does not
   apply that the stage that raised it accepts. It is never closed by silence.
   A reason changes no file: only the stage that raised the finding runs again,
-  to accept it; no other stage does. Any file change in the same round still
-  follows the first rule.
+  to accept it; no other stage does. Any file changed in the same fix still
+  reruns stages as the first bullet says.
 - Three FAILs in a row at the same stage for the same finding: stop and ask
   the person who owns the issue. The spec is probably wrong.
 - The spec may change during the work — by going back to stage 1, never by
