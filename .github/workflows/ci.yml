@@ -57,6 +57,12 @@ jobs:
       - name: Check examples
         run: scripts/check.sh --strict examples
 
+      # jscpd against the committed baseline, no build needed (#182). The
+      # image's node and npm install the pinned version; a registry outage is
+      # a failure, not a skip.
+      - name: Check duplication
+        run: scripts/check.sh --strict duplication
+
   build-and-test:
     name: ${{ matrix.os }} / Qt ${{ matrix.qt_version }}
     runs-on: ${{ matrix.os }}
