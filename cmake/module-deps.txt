@@ -1,0 +1,49 @@
+# The module graph of QtOpenAi, declared (#194): one line per edge,
+#
+#     <Module> <Dependency> <public|private>
+#
+# A dependency is another module or a Qt target spelled as CMake spells it
+# (Qt6::Network). public means the target links it PUBLIC and an installed
+# header may include it; private means PRIVATE, for the module's sources
+# only. `scripts/check.sh modules` holds both the link lists and the
+# #include lines to this file, both ways: an edge the build has and this file
+# lacks fails, and so does a line here the build does not link.
+#
+# Adding or widening an edge is a deliberate edit of this file, reviewed like
+# an API change (AGENTS.md, "Modules"). The PR that removes or narrows a
+# tagged edge edits its line in the same change as the CMake.
+
+Core     Qt6::Core        public
+
+Client   Core             public
+Client   Qt6::Core        public
+Client   Qt6::Network     public
+
+Chat     Client           public
+Chat     Core             public
+Chat     Qt6::Core        public
+
+Admin    Client           public
+Admin    Core             public
+Admin    Qt6::Core        public
+
+Tools    Client           public  # to be removed by #197
+Tools    Core             public
+Tools    Qt6::Core        public
+Tools    Qt6::Network     public  # to be made private by #199
+
+Storage  Chat             public  # to be removed by #197
+Storage  Client           public  # to be removed by #197
+Storage  Core             public
+Storage  Qt6::Core        public
+
+Realtime Core             public
+Realtime Qt6::Core        public
+Realtime Qt6::Network     public  # to be made private by #199
+Realtime Qt6::WebSockets  public  # to be made private by #199
+
+Sql      Storage          public
+Sql      Chat             public  # to be removed by #197
+Sql      Client           public  # to be removed by #197
+Sql      Qt6::Core        public
+Sql      Qt6::Sql         public  # to be made private by #199
