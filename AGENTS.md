@@ -173,8 +173,8 @@ or a Qt target (`Qt6::Network`). `scripts/check.sh modules` fails when
    `PUBLIC` link, private a `PRIVATE` one. The lists are read from a
    configure-only tree, `<build-dir>-modules`, rebuilt on every run.
 
-With a Qt that lacks WebSockets or Sql it runs every other rule and skips, a
-FAIL under `--strict`.
+Without cmake, on Windows, or with a Qt that lacks WebSockets or Sql, it runs
+the rules it can and skips, a FAIL under `--strict`.
 
 Adding or widening an edge is a deliberate edit of that file, reviewed like an
 API change (rule 4): it is in the diff, with its reason. The PR that removes

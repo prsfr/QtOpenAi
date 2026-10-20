@@ -63,9 +63,9 @@ if [[ ! -f $table || ! -r $table ]]; then
 fi
 modules=$(wc -l <"$tmp/modules" | tr -d ' ')
 
-# --- The table: syntax, names, completeness, cycles --------------------------
-: >"$tmp/edges"
-awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" -v table="$table" '
+# Insertion sort of space-separated words, for every awk program below: POSIX
+# awk has no sort of its own.
+sortwords='
     function sortwords(s,    w, n, i, j, x, out) {
         n = split(s, w, " ")
         for (i = 2; i <= n; i++) {
@@ -77,6 +77,11 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" -v table="$table" '
         for (i = 1; i <= n; i++) out = out (i > 1 ? " " : "") w[i]
         return out
     }
+'
+
+# --- The table: syntax, names, completeness, cycles --------------------------
+: >"$tmp/edges"
+awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" -v table="$table" "$sortwords"'
     BEGIN {
         while ((getline l < modfile) > 0) {
             split(l, a, " ")
@@ -154,18 +159,7 @@ if [[ ! -s $tmp/files ]]; then
 fi
 files=$(wc -l <"$tmp/files" | tr -d ' ')
 
-awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" '
-    function sortwords(s,    w, n, i, j, x, out) {
-        n = split(s, w, " ")
-        for (i = 2; i <= n; i++) {
-            x = w[i]
-            for (j = i - 1; j >= 1 && w[j] > x; j--) w[j + 1] = w[j]
-            w[j + 1] = x
-        }
-        out = ""
-        for (i = 1; i <= n; i++) out = out (i > 1 ? " " : "") w[i]
-        return out
-    }
+awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" "$sortwords"'
     function exists(file,    x, r) {
         if (file == path) return 1
         if (!(file in found)) {
@@ -192,6 +186,8 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" '
         delim = substr(s, 1, 1)
         t = substr(s, 2, length(s) - 2)
         if (index(t, "../") || substr(t, 1, 1) == "/") { print where "relative include"; return }
+        # Whatever the spelling, before the branches below return.
+        if (pub && t ~ /_p\.h$/) print where "installed header includes the private header " t
         if (substr(t, 1, 9) == "QtOpenAi/") {
             rest = substr(t, 10)
             x = index(rest, "/") ? substr(rest, 1, index(rest, "/") - 1) : rest
@@ -204,14 +200,13 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" '
             return
         }
         if (delim == "\"" && !index(t, "/") && ((t in expanded) || iscommon(t))) {
-            if (pub) print where "installed header includes the private header " t
+            if (pub && t !~ /_p\.h$/) print where "installed header includes the private header " t
             if (!(t in expanded)) {
                 expanded[t] = 1
                 scan("src/common/" t, ln)
             }
             return
         }
-        if (pub && t ~ /_p\.h$/) { print where "installed header includes the private header " t; return }
         # Quoted, a name in the directory of the including file is a local
         # header: the compiler looks there before any Qt directory.
         if (!index(t, "/") && (t ~ /^Q/ || t ~ /^q.*\.h$/) &&
@@ -375,18 +370,7 @@ done
 report "$tmp/export.err"
 
 : >"$tmp/missing"
-awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" -v table="$table" -v missing="$tmp/missing" '
-    function sortwords(s,    w, n, i, j, x, out) {
-        n = split(s, w, " ")
-        for (i = 2; i <= n; i++) {
-            x = w[i]
-            for (j = i - 1; j >= 1 && w[j] > x; j--) w[j + 1] = w[j]
-            w[j + 1] = x
-        }
-        out = ""
-        for (i = 1; i <= n; i++) out = out (i > 1 ? " " : "") w[i]
-        return out
-    }
+awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" -v table="$table" -v missing="$tmp/missing" "$sortwords"'
     BEGIN {
         while ((getline l < modfile) > 0) {
             split(l, a, " ")
