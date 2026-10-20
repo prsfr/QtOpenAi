@@ -352,7 +352,7 @@ fi
 # The install export, in whichever layout this CMake writes it (3.21:
 # Export/lib/cmake/QtOpenAi/, from 3.24: Export/<hash>/).
 : >"$tmp/export.err"
-find "$tree/CMakeFiles/Export" -type f -name QtOpenAiTargets.cmake 2>/dev/null | sort >"$tmp/exports"
+{ find "$tree/CMakeFiles/Export" -type f -name QtOpenAiTargets.cmake 2>/dev/null || true; } | sort >"$tmp/exports"
 count=$(wc -l <"$tmp/exports" | tr -d ' ')
 if [[ $count -ne 1 ]]; then
     echo "expected one QtOpenAiTargets.cmake under $tree/CMakeFiles/Export, found $count -- refused"
