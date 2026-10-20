@@ -1,0 +1,14 @@
+{
+  "examples": {
+    "clones": 28,
+    "duplicatedLines": 361
+  },
+  "src": {
+    "clones": 47,
+    "duplicatedLines": 372
+  },
+  "tests": {
+    "clones": 29,
+    "duplicatedLines": 316
+  }
+}

@@ -30,7 +30,9 @@ green CI run mean the same thing. Every check is **deterministic**: the same
 tree gives the same verdict on every run and every machine. Where a check
 measures something (coverage, duplication, instruction counts), it compares
 against a baseline committed in the repository (coverage's is in
-`tests/coverage/`), and the baseline only ever moves in the good direction.
+`tests/coverage/`, duplication's is
+`scripts/checks/duplication-baseline.json`), and the baseline only ever moves
+in the good direction.
 
 Run it before every push. Run the full set, not the check you think is
 relevant.
@@ -94,6 +96,63 @@ commit says why.
 
 A change that adds a function adds a test that calls it, or says in the pull
 request why the function joins `uncalled-functions.txt`.
+
+### Duplication
+
+`scripts/check.sh duplication` runs jscpd (pinned in
+`scripts/checks/package.json`, settings in `.jscpd.json`) over `src/`,
+`tests/` and `examples/`, each on its own, and compares each directory's clone
+count and duplicated lines with `scripts/checks/duplication-baseline.json`. It
+fails when either number exceeds the baseline, and lists that directory's clone
+pairs as `file:start-end ≡ file:start-end`. It needs node and npm, and the
+registry for the first `npm ci`; without them it skips, a FAIL under
+`--strict`.
+
+The files measured are git's: untracked, non-ignored `.cpp`/`.h` files under
+the three directories count locally, so a scratch file can fail a local run.
+jscpd merges overlapping clones in the order it reads files, so renaming or
+adding a file that takes part in a clone can move a directory's totals by a few
+lines with no new clone. Such a rise is explained in review, or the clone is
+refactored; the baseline is never raised.
+
+When a directory goes below its baseline, the check passes and prints
+`QTOPENAI_DUPLICATION_UPDATE_BASELINE=1 scripts/check.sh duplication`, which
+writes the measurement into the baseline. It refuses, writing nothing, when any
+number went up (rule 8).
+
+A pull request that adds a clone removes it, or explains in review why it is one
+of the deliberate cases below. A deliberate clone is listed here, never marked
+in the source: a `jscpd:ignore` marker in a measured file fails the check. So
+does a listed file of six or more lines that jscpd leaves unmeasured (no code or
+comment tokens, e.g. a header of only `#include` lines without the SPDX
+comment). jscpd skips preprocessor lines, so a copied multi-line `#define` is
+invisible to it and is caught in review only. The cases looked at in #182 and
+left as they are:
+
+- The out-of-line special members of the implicitly shared value types: the
+  compiler checks every line against its declaration; public-header macros
+  were declined in #162.
+- The per-field getter/setter/`toJson`/`fromJson`/`operator==` mirroring: a
+  generator would make the most-read code the hardest to read, and the
+  key-symmetry risk is covered by #180.
+- The request/resource field blocks (`Create*Request` vs. resource,
+  `ImageEditRequest`/`ImageVariationRequest`, …): flat value types, #142.
+- The `TypedReply` subclass residue (`friend class Client;`,
+  `using TypedReply::TypedReply;`): #162.
+- The encode/decode loops of `ListPage`/`CursorPage`/`BucketPage`: installed
+  templates that cannot use the private helpers.
+- `SqliteStore.h` ≡ `JsonFileStore.h` and `ResponseCache.h` ≡
+  `PersistentResponseCache.h`: each the override list of a shared interface.
+- The `Client.cpp` endpoint wrappers over `get`/`post`/`remove`/
+  `postMultipart`: #162.
+- `LoggingInterceptor.cpp`: the body-excerpt tail of
+  `beforeRequest()`/`afterResponse()`; fold it into a private helper when that
+  file is next touched.
+- README snippets that repeat a header or example: they are meant to read
+  stand-alone.
+- The internal repeats of `tests/storage/tst_store.cpp` and
+  `tests/*/tst_pagination.cpp`: already data-driven; the rest are per-scenario
+  arrange blocks.
 
 ## The pipeline
 

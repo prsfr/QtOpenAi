@@ -35,3 +35,6 @@ __pycache__/
 
 # Agent pipeline working files (AGENTS.md)
 /.work/
+
+# jscpd for scripts/checks/16-duplication.sh, installed by npm ci (#182)
+/scripts/checks/node_modules/
