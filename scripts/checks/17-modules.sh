@@ -9,6 +9,9 @@
 #     a Qt module the table does not give that module (a public edge, for an
 #     installed header). A private header from src/common/ counts as written
 #     in the file that includes it, so it cannot carry an edge in unseen;
+#   - a file under src/ is not a .h, .cpp or CMakeLists.txt, src/common/ holds
+#     anything but headers, or an installed header is outside
+#     include/QtOpenAi/<its module>/;
 #   - an installed header includes a private one, or the install export file
 #     names a path in the source tree;
 #   - a QtOpenAi target's links and the table differ, either way, visibility
@@ -148,30 +151,20 @@ edges=$(wc -l <"$tmp/edges" | tr -d ' ')
 
 # --- The #include lines ------------------------------------------------------
 # git's files, as format and duplication see them: tracked or untracked, not
-# ignored.
-: >"$tmp/files"
+# ignored. Whether a header exists is asked of this list, not of the disk, so
+# a case-insensitive filesystem cannot match <formfields_p.h> where Linux
+# would not.
+: >"$tmp/all"
 while IFS= read -r -d '' file; do
-    [[ -f $file ]] && printf '%s\n' "$file" >>"$tmp/files"
-done < <(git ls-files -z --cached --others --exclude-standard -- 'src/*.h' 'src/*.cpp' | sort -z)
-if [[ ! -s $tmp/files ]]; then
+    [[ -f $file ]] && printf '%s\n' "$file" >>"$tmp/all"
+done < <(git ls-files -z --cached --others --exclude-standard -- src | sort -z)
+files=$(grep -cE '\.(h|cpp)$' "$tmp/all" || true)
+if [[ $files -eq 0 ]]; then
     echo "no .h/.cpp files found under src/ -- git ls-files failed?" >&2
     exit 1
 fi
-files=$(wc -l <"$tmp/files" | tr -d ' ')
 
-awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" "$sortwords"'
-    function exists(file,    x, r) {
-        if (file == path) return 1
-        if (!(file in found)) {
-            r = (getline x < file)
-            close(file)
-            found[file] = (r >= 0)
-        }
-        return found[file]
-    }
-    function iscommon(name) {
-        return exists("src/common/" name)
-    }
+awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" -v allfile="$tmp/all" "$sortwords"'
     function need(d, shown, where,    v, list) {
         v = ((M, d) in vis) ? vis[M, d] : ""
         if (v == "public" || (v == "private" && !pub)) return
@@ -199,7 +192,8 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" "$sortwords"'
             need("Qt6::" substr(t, 3, index(t, "/") - 3), "<" t ">", where)
             return
         }
-        if (delim == "\"" && !index(t, "/") && ((t in expanded) || iscommon(t))) {
+        # Either spelling, at any depth: -I src/common finds them all.
+        if (("src/common/" t) in listed) {
             if (pub && t !~ /_p\.h$/) print where "installed header includes the private header " t
             if (!(t in expanded)) {
                 expanded[t] = 1
@@ -210,7 +204,7 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" "$sortwords"'
         # Quoted, a name in the directory of the including file is a local
         # header: the compiler looks there before any Qt directory.
         if (!index(t, "/") && (t ~ /^Q/ || t ~ /^q.*\.h$/) &&
-            (delim == "<" || !exists(dir "/" t))) print where "use <QtModule/Header>"
+            (delim == "<" || !((dir "/" t) in listed))) print where "use <QtModule/Header>"
     }
     # Lines of a common header are reported at the line that included it.
     function scan(file, at,    l, n, r) {
@@ -236,16 +230,27 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" "$sortwords"'
         }
         for (m in alldeps) alldeps[m] = sortwords(alldeps[m])
         for (m in pubdeps) pubdeps[m] = sortwords(pubdeps[m])
+        while ((getline l < allfile) > 0) listed[l] = 1
     }
     {
         path = $0
         n = split(path, p, "/")
-        if (p[2] == "common") next
+        # The layout: what is not listed here is never read.
+        if (p[2] == "common") {
+            if (path !~ /\.h$/) print path ": src/common/ holds headers only; nothing compiles or scans anything else there"
+            next
+        }
+        if (p[n] == "CMakeLists.txt") next
+        if (path !~ /\.(h|cpp)$/) { print path ": only .h, .cpp and CMakeLists.txt files belong under src/"; next }
         if (n < 4 || !(p[2] in moddir) || (p[3] != "include" && p[3] != "src")) {
             print path ": not under the include/ or src/ of a module"
             next
         }
         M = moddir[p[2]]
+        if (p[3] == "include" && (n < 6 || p[4] != "QtOpenAi" || p[5] != M)) {
+            print path ": an installed header of " M " belongs under include/QtOpenAi/" M "/"
+            next
+        }
         # A module with no line is already a table error.
         if (!(M in alldeps)) next
         pub = (p[3] == "include")
@@ -254,7 +259,7 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" "$sortwords"'
         split("", expanded)
         scan(path, 0)
     }
-' "$tmp/files" >"$tmp/include.err"
+' "$tmp/all" >"$tmp/include.err"
 report "$tmp/include.err"
 
 summary() {
@@ -387,6 +392,9 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" -v table="$table" -v miss
     }
     $1 == "T" { t = $2; target[++nt] = t; next }
     { e = substr($0, 3) }
+    # A link made from another directory carries markers around the entry,
+    # one of them a heap address.
+    e ~ /^::@/ { next }
     $1 == "L" && !((t, e) in inL) { inL[t, e] = 1; L[t, ++nl[t]] = e }
     $1 == "I" && !((t, e) in inI) { inI[t, e] = 1; I[t, ++ni[t]] = e }
     END {
