@@ -3,7 +3,8 @@
 #
 # Kept in its own module because it is the only part of the library that needs
 # Qt6::WebSockets: every other endpoint is a request/reply over QNetworkAccess-
-# Manager. Depends on Core for the event and session value types, and not on
+# Manager. Depends on Core for the event and session value types, on
+# Qt6::Network for the QNetworkRequest that opens the socket, and not on
 # Client — the REST half of /realtime (minting a client secret, SIP call
 # control) lives there and is usable on its own.
 # ---------------------------------------------------------------------------
@@ -21,5 +22,6 @@ qtopenai_add_module(Realtime
     LIBS
         QtOpenAi::Core
         Qt6::Core
+        Qt6::Network
         Qt6::WebSockets
 )
