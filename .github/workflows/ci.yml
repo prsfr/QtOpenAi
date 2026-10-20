@@ -154,13 +154,15 @@ jobs:
         working-directory: build
         run: ctest --build-config Release --output-on-failure
 
-      # The linker's view of the headless promise: no QtOpenAi library may
-      # record a GUI library as NEEDED. The rationale lives in the check itself,
-      # scripts/checks/40-headless.sh. Then the gate's own setup, and every
-      # installed header compiled alone -- with -Werror, as this tree has it.
-      - name: No GUI dependency, warning gate, headers
+      # The declared module graph against the includes and the link lists
+      # (scripts/checks/17-modules.sh). The linker's view of the headless
+      # promise: no QtOpenAi library may record a GUI library as NEEDED. The
+      # rationale lives in the check itself, scripts/checks/40-headless.sh.
+      # Then the gate's own setup, and every installed header compiled alone
+      # -- with -Werror, as this tree has it.
+      - name: Module graph, no GUI dependency, warning gate, headers
         if: runner.os == 'Linux'
-        run: scripts/check.sh --strict --build-dir build headless warnings headers
+        run: scripts/check.sh --strict --build-dir build modules headless warnings headers
 
   install-consumer:
     name: find_package smoke test (${{ matrix.link }})
