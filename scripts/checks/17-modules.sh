@@ -166,13 +166,17 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" '
         for (i = 1; i <= n; i++) out = out (i > 1 ? " " : "") w[i]
         return out
     }
-    function iscommon(name,    x, r) {
-        if (!(name in common)) {
-            r = (getline x < ("src/common/" name))
-            close("src/common/" name)
-            common[name] = (r >= 0)
+    function exists(file,    x, r) {
+        if (file == path) return 1
+        if (!(file in found)) {
+            r = (getline x < file)
+            close(file)
+            found[file] = (r >= 0)
         }
-        return common[name]
+        return found[file]
+    }
+    function iscommon(name) {
+        return exists("src/common/" name)
     }
     function need(d, shown, where,    v, list) {
         v = ((M, d) in vis) ? vis[M, d] : ""
@@ -195,7 +199,7 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" '
             else if (x != M) need(x, rest, where)
             return
         }
-        if (delim == "<" && t ~ /^Qt[A-Za-z0-9_]+\//) {
+        if (t ~ /^Qt[A-Za-z0-9_]+\//) {
             need("Qt6::" substr(t, 3, index(t, "/") - 3), "<" t ">", where)
             return
         }
@@ -208,7 +212,10 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" '
             return
         }
         if (pub && t ~ /_p\.h$/) { print where "installed header includes the private header " t; return }
-        if (delim == "<" && !index(t, "/") && (t ~ /^Q/ || t ~ /^q.*\.h$/)) print where "use <QtModule/Header>"
+        # Quoted, a name in the directory of the including file is a local
+        # header: the compiler looks there before any Qt directory.
+        if (!index(t, "/") && (t ~ /^Q/ || t ~ /^q.*\.h$/) &&
+            (delim == "<" || !exists(dir "/" t))) print where "use <QtModule/Header>"
     }
     # Lines of a common header are reported at the line that included it.
     function scan(file, at,    l, n, r) {
@@ -247,6 +254,8 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" '
         # A module with no line is already a table error.
         if (!(M in alldeps)) next
         pub = (p[3] == "include")
+        dir = path
+        sub(/\/[^\/]*$/, "", dir)
         split("", expanded)
         scan(path, 0)
     }
