@@ -171,14 +171,18 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" -v allfile="$tmp/all" "$s
         list = pub ? pubdeps[M] : alldeps[M]
         print where M " includes " shown "; " M " may depend on: " (list == "" ? "(nothing)" : list)
     }
-    function classify(l, where, ln,    s, delim, t, rest, x) {
+    function classify(l, where, ln, fdir,    s, delim, t, rest, x, seg, ns, i, c) {
         if (l !~ /^[ \t]*#[ \t]*include/) return
         if (!match(l, /^[ \t]*#[ \t]*include[ \t]*[<"][^>"]*[>"]/)) { print where "unparsed include"; return }
         s = substr(l, RSTART, RLENGTH)
         sub(/^[ \t]*#[ \t]*include[ \t]*/, "", s)
         delim = substr(s, 1, 1)
         t = substr(s, 2, length(s) - 2)
-        if (index(t, "../") || substr(t, 1, 1) == "/") { print where "relative include"; return }
+        # Only canonical paths: "./x.h" or "a//x.h" reach the same file as
+        # x.h and a/x.h, but would miss the lookups below.
+        ns = split(t, seg, "/")
+        for (i = 1; i <= ns; i++)
+            if (seg[i] == "" || seg[i] == "." || seg[i] == "..") { print where "relative include"; return }
         # Whatever the spelling, before the branches below return.
         if (pub && t ~ /_p\.h$/) print where "installed header includes the private header " t
         if (substr(t, 1, 9) == "QtOpenAi/") {
@@ -192,12 +196,17 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" -v allfile="$tmp/all" "$s
             need("Qt6::" substr(t, 3, index(t, "/") - 3), "<" t ">", where)
             return
         }
-        # Either spelling, at any depth: -I src/common finds them all.
-        if (("src/common/" t) in listed) {
+        # Either spelling, at any depth: -I src/common finds them all. A
+        # quoted include in a common header looks beside that header first,
+        # as the compiler does.
+        c = ""
+        if (delim == "\"" && substr(fdir "/", 1, 11) == "src/common/" && ((fdir "/" t) in listed)) c = fdir "/" t
+        else if (("src/common/" t) in listed) c = "src/common/" t
+        if (c != "") {
             if (pub && t !~ /_p\.h$/) print where "installed header includes the private header " t
-            if (!(t in expanded)) {
-                expanded[t] = 1
-                scan("src/common/" t, ln)
+            if (!(c in expanded)) {
+                expanded[c] = 1
+                scan(c, ln)
             }
             return
         }
@@ -207,11 +216,13 @@ awk -v modfile="$tmp/modules" -v edgefile="$tmp/edges" -v allfile="$tmp/all" "$s
             (delim == "<" || !((dir "/" t) in listed))) print where "use <QtModule/Header>"
     }
     # Lines of a common header are reported at the line that included it.
-    function scan(file, at,    l, n, r) {
+    function scan(file, at,    l, n, r, fdir) {
+        fdir = file
+        sub(/\/[^\/]*$/, "", fdir)
         n = 0
         while ((r = (getline l < file)) > 0) {
             n++
-            classify(l, path ":" (at ? at : n) ": ", at ? at : n)
+            classify(l, path ":" (at ? at : n) ": ", at ? at : n, fdir)
         }
         if (r < 0) print path ": cannot read " file
         close(file)
