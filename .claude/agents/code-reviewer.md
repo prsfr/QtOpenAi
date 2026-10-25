@@ -25,8 +25,8 @@ Check, in this order, and cite `file:line` for every finding:
    blocking.
 4. **No sprawl** (AGENTS.md rules 3, 4, 6, 7): new helpers that duplicate one
    the impact map listed; an abstraction with one user; a new module edge or
-   dependency; code made dead and left behind; comments that narrate instead
-   of explain.
+   dependency (a line added to, or widened in, `cmake/module-deps.txt`); code
+   made dead and left behind; comments that narrate instead of explain.
 5. **Duplicates.** The change was applied to every copy the impact map
    listed, or to none.
 6. **Conventions.** Naming, d-pointers, export macros, no `get` prefix,

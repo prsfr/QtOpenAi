@@ -20,8 +20,9 @@ Your job is to stop sprawl before it is written:
    `file:line`. "Write a new helper" is only acceptable when you searched and
    found nothing, and you say what you searched for.
 2. **Touches.** Which modules the footprint is in, and their dependency edges
-   (`target_link_libraries`, cross-module `#include`s). Flag any new edge the
-   change would need — the spec must then justify it or change.
+   as `cmake/module-deps.txt` declares them (`scripts/check.sh modules` holds
+   the links and `#include`s to it). Flag any new edge the change would need —
+   the spec must then justify it or change.
 3. **Duplicates.** Other copies of the logic being changed. A fix applied to
    one copy and not the others is a defect; list them all.
 4. **Baseline.** Run `scripts/check.sh` (reuse a build dir with

@@ -154,6 +154,33 @@ left as they are:
   `tests/*/tst_pagination.cpp`: already data-driven; the rest are per-scenario
   arrange blocks.
 
+### Modules
+
+`cmake/module-deps.txt` is the declared module graph: one line per edge,
+`<Module> <Dependency> <public|private>`, where a dependency is another module
+or a Qt target (`Qt6::Network`). `scripts/check.sh modules` fails when
+
+1. the table is malformed, names an unknown module, leaves a module out, or
+   has a cycle;
+2. an `#include` in `src/<module>/include/` or `src/<module>/src/` reaches a
+   module or Qt module the table does not give that module -- a `public` edge
+   for an installed header. A `src/common/` header counts as written in the
+   file that includes it. Relative, macro and slash-less Qt includes
+   (`<QNetworkReply>`) are refused;
+3. an installed header includes a private header, or the install export file
+   names a path in the source tree;
+4. a target's link lists and the table differ, either way: public is a
+   `PUBLIC` link, private a `PRIVATE` one. The lists are read from a
+   configure-only tree, `<build-dir>-modules`, rebuilt on every run.
+
+Without cmake, on Windows, or with a Qt that lacks WebSockets or Sql, it runs
+the rules it can and skips, a FAIL under `--strict`.
+
+Adding or widening an edge is a deliberate edit of that file, reviewed like an
+API change (rule 4): it is in the diff, with its reason. The PR that removes
+or narrows an edge a line's comment names (`# to be removed by #<n>`) edits
+that line together with the CMake.
+
 ## The pipeline
 
 One issue → one `git worktree` → one branch → one pull request.
@@ -221,7 +248,7 @@ Test plan:    which test proves which criterion; the failing test comes first
 
 ```
 Reuse:        existing helpers/types to use instead of writing new ones
-Touches:      modules and their dependency edges; must not add an edge
+Touches:      modules and their edges in cmake/module-deps.txt; must not add one
 Duplicates:   copies of the logic being changed elsewhere (change all or none)
 Baseline:     scripts/check.sh result before the change
 Risks:        what could break that the tests would not notice
