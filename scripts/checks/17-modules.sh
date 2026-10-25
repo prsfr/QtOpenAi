@@ -155,9 +155,17 @@ edges=$(wc -l <"$tmp/edges" | tr -d ' ')
 # a case-insensitive filesystem cannot match <formfields_p.h> where Linux
 # would not.
 : >"$tmp/all"
+: >"$tmp/odd.err"
 while IFS= read -r -d '' file; do
-    [[ -f $file ]] && printf '%s\n' "$file" >>"$tmp/all"
+    if [[ -f $file ]]; then
+        printf '%s\n' "$file" >>"$tmp/all"
+    elif [[ -e $file || -L $file ]]; then
+        # A symlink to a directory, a dangling symlink or a submodule would
+        # hide what it points at.
+        printf '%s: not a regular file\n' "$file" >>"$tmp/odd.err"
+    fi
 done < <(git ls-files -z --cached --others --exclude-standard -- src | sort -z)
+report "$tmp/odd.err"
 files=$(grep -cE '\.(h|cpp)$' "$tmp/all" || true)
 if [[ $files -eq 0 ]]; then
     echo "no .h/.cpp files found under src/ -- git ls-files failed?" >&2
